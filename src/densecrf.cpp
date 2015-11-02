@@ -113,12 +113,13 @@ void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q ) 
 	}
 }
 MatrixXf DenseCRF::inference ( int n_iterations ) const {
+	cout << "Starting Standard inference" << endl;
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
 	unary.fill(0);
 	if( unary_ )
 		unary = unary_->get();
 	expAndNormalize( Q, -unary );
-	
+
 	for( int it=0; it<n_iterations; it++ ) {
 		tmp1 = -unary;
 		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -126,42 +127,106 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 			tmp1 -= tmp2;
 		}
 		expAndNormalize( Q, tmp1 );
+		double KL = klDivergence(Q);
+		VectorXs temp_map = currentMap(Q);
+		double map_energy = assignment_energy(temp_map);
+		cout << "KL-div: " << KL << "\t MAP Energy: " << map_energy << endl;
 	}
 	return Q;
 }
+
+MatrixXf DenseCRF::grad_inference( int n_iterations, int nb_lambdas ) const {
+
+	cout << "Starting gradual inference" << endl;
+	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
+	unary.fill(0);
+	if( unary_ )
+		unary = unary_->get();
+	expAndNormalize( Q, -unary );
+
+
+	for(int  lambda_pow=0; lambda_pow < 1; lambda_pow++){
+		float lambda = 1/ pow(2,lambda_pow);
+		for( int it=0; it<n_iterations; it++ ) {
+			tmp1 = -unary;
+			for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+				pairwise_[k]->apply( tmp2, Q );
+				tmp1 -= tmp2;
+			}
+			tmp1 = lambda * tmp1;
+			expAndNormalize( Q, tmp1 );
+
+			double KL = klDivergence(Q);
+			VectorXs temp_map = currentMap(Q);
+			double map_energy = assignment_energy(temp_map);
+			cout << "KL-div: " << KL << "\t MAP Energy: " << map_energy << endl;
+		}
+	}
+	return Q;
+}
+
+
 VectorXs DenseCRF::map ( int n_iterations ) const {
 	// Run inference
 	MatrixXf Q = inference( n_iterations );
 	// Find the map
 	return currentMap( Q );
 }
+
+VectorXs DenseCRF::grad_map ( int n_iterations, int nb_lambdas ) const {
+	// Run inference
+	MatrixXf Q = grad_inference( n_iterations, nb_lambdas);
+	// Find the map
+	return currentMap( Q );
+}
+
+
+
 ///////////////////
 /////  Debug  /////
 ///////////////////
-VectorXf DenseCRF::unaryEnergy(const VectorXs & l) {
-	assert( l.cols() == N_ );
+double DenseCRF::assignment_energy( const VectorXs & l) const {
+	VectorXf unary = unaryEnergy(l);
+	VectorXf pairwise = pairwiseEnergy(l);
+
+	VectorXf total_energy = unary + pairwise;
+
+	assert( total_energy.rows() == N_);
+	double ass_energy = 0;
+	for( int i=0; i< N_; ++i) {
+		ass_energy += total_energy[i];
+	}
+
+	return ass_energy;
+}
+
+
+
+
+VectorXf DenseCRF::unaryEnergy(const VectorXs & l) const{
+	assert( l.rows() == N_ );
 	VectorXf r( N_ );
 	r.fill(0.f);
 	if( unary_ ) {
 		MatrixXf unary = unary_->get();
-		
+
 		for( int i=0; i<N_; i++ )
 			if ( 0 <= l[i] && l[i] < M_ )
 				r[i] = unary( l[i], i );
 	}
 	return r;
 }
-VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) {
-	assert( l.cols() == N_ );
+VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
+	assert( l.rows() == N_ );
 	VectorXf r( N_ );
 	r.fill(0.f);
-	
+
 	if( term == -1 ) {
 		for( unsigned int i=0; i<pairwise_.size(); i++ )
 			r += pairwiseEnergy( l, i );
 		return r;
 	}
-	
+
 	MatrixXf Q( M_, N_ );
 	// Build the current belief [binary assignment]
 	for( int i=0; i<N_; i++ )

@@ -95,20 +95,24 @@ int main( int argc, char* argv[]){
 	// r_stddev = g_stddev = b_stddev = 20
 	// weight = 10
 	crf.addPairwiseBilateral( 80, 80, 13, 13, 13, im, new PottsCompatibility( 10 ) );
-	
+
 	// Do map inference
-// 	MatrixXf Q = crf.startInference(), t1, t2;
-// 	printf("kl = %f\n", crf.klDivergence(Q) );
-// 	for( int it=0; it<5; it++ ) {
-// 		crf.stepInference( Q, t1, t2 );
-// 		printf("kl = %f\n", crf.klDivergence(Q) );
-// 	}
-// 	VectorXs map = crf.currentMap(Q);
-	VectorXs map = crf.map(5);
+//	MatrixXf Q = crf.startInference(), t1, t2;
+//	printf("kl = %f\n", crf.klDivergence(Q) );
+//	for( int it=0; it<5; it++ ) {
+//		crf.stepInference( Q, t1, t2 );
+//		printf("kl = %f\n", crf.klDivergence(Q) );
+//	}
+//	VectorXs map = crf.currentMap(Q);
+	VectorXs map = crf.map(20);
+	VectorXs grad_map = crf.grad_map(4, 5);
+
 	// Store the result
 	unsigned char *res = colorize( map, W, H );
 	writePPM( argv[3], W, H, res );
-	
+
+
+
 	delete[] im;
 	delete[] anno;
 	delete[] res;
