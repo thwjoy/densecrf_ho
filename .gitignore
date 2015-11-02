@@ -1,0 +1,10 @@
+*.cmake
+CMakeCache.txt
+**CMakeFiles/
+**Makefile
+*.a
+examples/dense_inference
+examples/dense_learning
+examples/test_optimization
+examples/test_pairwise
+examples/test_permutohedral
