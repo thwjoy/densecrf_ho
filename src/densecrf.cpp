@@ -113,7 +113,7 @@ void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q ) 
 	}
 }
 MatrixXf DenseCRF::inference ( int n_iterations ) const {
-	cout << "Starting Standard inference" << endl;
+	std::cout << "Starting Standard inference" << std::endl;
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
 	unary.fill(0);
 	if( unary_ )
@@ -130,14 +130,14 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 		double KL = klDivergence(Q);
 		VectorXs temp_map = currentMap(Q);
 		double map_energy = assignment_energy(temp_map);
-		cout << "KL-div: " << KL << "\t MAP Energy: " << map_energy << endl;
+		std::cout << "KL-div: " << KL << "\t MAP Energy: " << map_energy << std::endl;
 	}
 	return Q;
 }
 
 MatrixXf DenseCRF::grad_inference( int n_iterations, int nb_lambdas ) const {
 
-	cout << "Starting gradual inference" << endl;
+	std::cout << "Starting gradual inference" << std::endl;
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
 	unary.fill(0);
 	if( unary_ )
@@ -161,7 +161,7 @@ MatrixXf DenseCRF::grad_inference( int n_iterations, int nb_lambdas ) const {
 			double KL = klDivergence(Q);
 			VectorXs temp_map = currentMap(Q);
 			double map_energy = assignment_energy(temp_map);
-			cout << "KL-div: " << KL << "\t MAP Energy: " << map_energy << endl;
+			std::cout << "KL-div: " << KL << "\t MAP Energy: " << map_energy << std::endl;
 		}
 	}
 	return Q;
