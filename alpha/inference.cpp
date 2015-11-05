@@ -31,12 +31,21 @@ int main(int argc, char* argv[]) {
 MatrixXf loadUnary( const std::string path_to_unary, img_size& size) {
 
     ProbImage texton;
-    texton.load(path_to_unary.c_str());
+    texton.decompress(path_to_unary.c_str());
     texton.boostToProb();
 
     MatrixXf unaries( texton.width() * texton.height(), texton.depth());
+    int i,j,k;
+    for(i=0; i<texton.height(); ++i){
+        for(j=0; j<texton.width(); ++j){
+            for(k=0; k<texton.depth(); ++k){
+                // careful with the index position, the operator takes x (along width), then y (along height)
+                unaries(i*texton.width() + j, k) = texton(j,i,k);
+            }
+        }
+    }
 
-    size = {texton.height(), texton.width()};
+    size = {texton.width(), texton.height()};
 
     return unaries;
 }
@@ -54,14 +63,14 @@ void save_map(const MatrixXf estimates, const img_size size, const std::string p
     // Make the image
     unsigned char * img = new unsigned char[estimates.rows()* 3];
     for(int i=0; i<estimates.rows(); ++i) {
-        unsigned char color= (labeling[i] *255) / estimates.cols();
+        unsigned char color= (labeling[i] *256*256*256 / estimates.cols());
+        img[3*i + 0] = color&0xff;
+        img[3*i + 1] = (color>>8)&0xff;
+        img[3*i + 2] = (color>>16)&0xff;
 
-        for(int c=0; c<3; ++c){
-            img[3*i + c] = color;
-        }
     }
 
     //Write the image to the file
-    writePPM(path_to_output.c_str(), size.second, size.first, img);
+    writePPM(path_to_output.c_str(), size.first, size.second, img);
 
 }
