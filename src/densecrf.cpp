@@ -145,15 +145,17 @@ MatrixXf DenseCRF::grad_inference( int n_iterations, int nb_lambdas ) const {
 	expAndNormalize( Q, -unary );
 
 
-	for(int  lambda_pow=0; lambda_pow < 1; lambda_pow++){
-		float lambda = 1/ pow(2,lambda_pow);
+	for(int  lambda_pow=0; lambda_pow < nb_lambdas; lambda_pow++){
+		// We want to make lambda go to zero.
+		float lambda = 1/pow(1.1,lambda_pow);
+
 		for( int it=0; it<n_iterations; it++ ) {
 			tmp1 = -unary;
 			for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 				pairwise_[k]->apply( tmp2, Q );
 				tmp1 -= tmp2;
 			}
-			tmp1 = lambda * tmp1;
+			tmp1 = (1/lambda) * tmp1;
 			expAndNormalize( Q, tmp1 );
 
 			double KL = klDivergence(Q);

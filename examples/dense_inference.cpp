@@ -52,8 +52,8 @@ MatrixXf computeUnary( const VectorXs & lbl, int M ){
 }
 
 int main( int argc, char* argv[]){
-	if (argc<4){
-		printf("Usage: %s image annotations output\n", argv[0] );
+	if (argc<5){
+		printf("Usage: %s image annotations output grad_output\n", argv[0] );
 		return 1;
 	}
 	// Number of labels
@@ -104,12 +104,15 @@ int main( int argc, char* argv[]){
 //		printf("kl = %f\n", crf.klDivergence(Q) );
 //	}
 //	VectorXs map = crf.currentMap(Q);
-	VectorXs map = crf.map(20);
-	VectorXs grad_map = crf.grad_map(4, 5);
+
+	VectorXs map = crf.map(40);
+	VectorXs grad_map = crf.grad_map(1, 40);
 
 	// Store the result
 	unsigned char *res = colorize( map, W, H );
+	unsigned char *grad_res = colorize( grad_map, W, H);
 	writePPM( argv[3], W, H, res );
+	writePPM( argv[4], W, H, grad_res );
 
 
 
