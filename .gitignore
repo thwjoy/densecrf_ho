@@ -10,3 +10,4 @@ examples/test_pairwise
 examples/test_permutohedral
 *.res
 *.resgrad
+alpha/inference
