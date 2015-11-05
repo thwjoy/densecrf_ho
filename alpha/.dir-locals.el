@@ -1,0 +1,5 @@
+((nil .  ((projectile-project-compilation-cmd . "cd build/ && cmake -GNinja ../ && ninja")
+          (projectile-project-run-cmd . "build/alpha/inference")
+          )
+      )
+ )
