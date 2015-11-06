@@ -23,14 +23,14 @@ int main(int argc, char* argv[]) {
 
 
     // Load a crf
-    DenseCRF2D crf(size.width, size.height, unaries.cols());
+    DenseCRF2D crf(size.width, size.height, unaries.rows());
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3, 3, new PottsCompatibility(3));
 
     crf.addPairwiseBilateral( 80, 80, 13, 13, 13, img, new PottsCompatibility(10));
 
 
-    MatrixXf Q = crf.inference(1);
+    MatrixXf Q = crf.inference(10);
 
     std::cout << "Performed inference" << std::endl;
 

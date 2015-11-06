@@ -116,17 +116,16 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 	std::cout << "Starting Standard inference" << std::endl;
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
 	unary.fill(0);
-	if( unary_ )
+	if( unary_ ){
 		unary = unary_->get();
+	}
 	expAndNormalize( Q, -unary );
-	std::cout << "Done with the initialization" << std::endl;
 
 	for( int it=0; it<n_iterations; it++ ) {
 		tmp1 = -unary;
 		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 			pairwise_[k]->apply( tmp2, Q );
 			tmp1 -= tmp2;
-			std::cout << "Applied one filter" << std::endl;
 		}
 		expAndNormalize( Q, tmp1 );
 		std::cout << "one MF iteration" << std::endl;

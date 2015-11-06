@@ -28,8 +28,12 @@ MatrixXf load_unary( const std::string path_to_unary, img_size& size) {
     for(i=0; i<texton.height(); ++i){
         for(j=0; j<texton.width(); ++j){
             for(k=0; k<texton.depth(); ++k){
-                // careful with the index position, the operator takes x (along width), then y (along height)
-                unaries(k, i*texton.width() + j) = texton(j,i,k);
+                // careful with the index position, the operator takes
+                // x (along width), then y (along height)
+
+                // Also note that these are probabilities, what we
+                // want are unaries, so we need to
+                unaries(k, i*texton.width() + j) = -log( texton(j,i,k));
             }
         }
     }
