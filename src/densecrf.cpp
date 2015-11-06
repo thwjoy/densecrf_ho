@@ -128,7 +128,6 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 			tmp1 -= tmp2;
 		}
 		expAndNormalize( Q, tmp1 );
-		std::cout << "one MF iteration" << std::endl;
 	}
 	return Q;
 }

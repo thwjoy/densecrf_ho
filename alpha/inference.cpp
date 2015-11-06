@@ -1,5 +1,5 @@
 #include "inference.hpp"
-#include "densecrf.h"
+#include "alpha_crf.hpp"
 #include <iostream>
 #include <string>
 
@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
 
 
     // Load a crf
-    DenseCRF2D crf(size.width, size.height, unaries.rows());
+    AlphaCRF crf(size.width, size.height, unaries.rows(), 1);
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3, 3, new PottsCompatibility(3));
 
@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
 
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    save_map(Q, size, path_to_output);
+    // save_map(Q, size, path_to_output);
 
 
 

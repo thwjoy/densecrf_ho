@@ -1,4 +1,4 @@
 include_directories(../external/ProbImage ../external/ppm)
 
-add_executable(inference inference.cpp file_storage.cpp)
+add_executable(inference inference.cpp file_storage.cpp alpha_crf)
 target_link_libraries(inference probimage ppm densecrf)
