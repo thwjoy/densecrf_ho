@@ -119,18 +119,17 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 	if( unary_ )
 		unary = unary_->get();
 	expAndNormalize( Q, -unary );
+	std::cout << "Done with the initialization" << std::endl;
 
 	for( int it=0; it<n_iterations; it++ ) {
 		tmp1 = -unary;
 		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 			pairwise_[k]->apply( tmp2, Q );
 			tmp1 -= tmp2;
+			std::cout << "Applied one filter" << std::endl;
 		}
 		expAndNormalize( Q, tmp1 );
-		double KL = klDivergence(Q);
-		VectorXs temp_map = currentMap(Q);
-		double map_energy = assignment_energy(temp_map);
-		std::cout << "KL-div: " << KL << "\t MAP Energy: " << map_energy << std::endl;
+		std::cout << "one MF iteration" << std::endl;
 	}
 	return Q;
 }
