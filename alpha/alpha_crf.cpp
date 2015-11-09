@@ -53,7 +53,7 @@ MatrixXf AlphaCRF::inference(int nb_iterations){
         MatrixXf approx_part = (1-alpha) * Q.array().log() * -1;
         proxy_unary = true_unary_part + approx_part;
         //// Pairwise term are created when we set up the CRF because they
-        //// are going to remain the same // TODO: Verify that they are created properly.
+        //// are going to remain the same
         std::cout << "Done constructing the proxy distribution" << "\n\n";
 
         std::cout << "Starting to estimate the marginals of the distribution" << '\n';
