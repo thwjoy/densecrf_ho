@@ -24,11 +24,13 @@ int main(int argc, char* argv[]) {
 
     // Load a crf
     AlphaCRF crf(size.width, size.height, unaries.rows(), 1);
+
+    std::cout << unaries.rows() << " " << unaries.cols()  << '\n';
+
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3, 3, new PottsCompatibility(3));
 
     crf.addPairwiseBilateral( 80, 80, 13, 13, 13, img, new PottsCompatibility(10));
-
 
     MatrixXf Q = crf.inference(10);
 
@@ -36,7 +38,7 @@ int main(int argc, char* argv[]) {
 
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    // save_map(Q, size, path_to_output);
+    save_map(Q, size, path_to_output);
 
 
 

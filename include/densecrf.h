@@ -32,6 +32,10 @@
 #include "pairwise.h"
 #include <vector>
 
+void expAndNormalize( MatrixXf & out, const MatrixXf & in);
+void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q);
+
+
 /**** DenseCRF ****/
 class DenseCRF{
 protected:
@@ -67,6 +71,7 @@ public:
 	void setUnaryEnergy( const MatrixXf & unary );
 	// Add a logistic unary term
 	void setUnaryEnergy( const MatrixXf & L, const MatrixXf & f );
+	UnaryEnergy* getUnaryEnergy();
 
 	// Run inference and return the probabilities
 	MatrixXf inference( int n_iterations ) const;

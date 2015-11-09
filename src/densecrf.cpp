@@ -92,6 +92,10 @@ void DenseCRF::setUnaryEnergy( const MatrixXf & unary ) {
 void  DenseCRF::setUnaryEnergy( const MatrixXf & L, const MatrixXf & f ) {
 	setUnaryEnergy( new LogisticUnaryEnergy( L, f ) );
 }
+
+UnaryEnergy* DenseCRF::getUnaryEnergy() {
+	return unary_;
+}
 ///////////////////////
 /////  Inference  /////
 ///////////////////////
