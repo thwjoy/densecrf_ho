@@ -21,15 +21,14 @@ int main(int argc, char* argv[]) {
     MatrixXf unaries = load_unary(path_to_unary, size);
     unsigned char * img = load_image(path_to_image, size);
 
-
     // Load a crf
-    AlphaCRF crf(size.width, size.height, unaries.rows(), 20, 10);
+    AlphaCRF crf(size.width, size.height, unaries.rows(), 20, 5);
 
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3, 3, new PottsCompatibility(3));
 
     crf.addPairwiseBilateral( 80, 80, 13, 13, 13, img, new PottsCompatibility(10));
-    MatrixXf Q = crf.inference(15);
+    MatrixXf Q = crf.inference(3);
 
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code

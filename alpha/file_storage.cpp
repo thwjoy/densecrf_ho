@@ -56,10 +56,9 @@ void save_map(const MatrixXf estimates, const img_size size, const std::string p
     // Make the image
     unsigned char * img = new unsigned char[estimates.cols()* 3];
     for(int i=0; i<estimates.cols(); ++i) {
-        unsigned char color= (labeling[i] *256*256*256 / estimates.rows());
-        img[3*i + 0] = color&0xff;
-        img[3*i + 1] = (color>>8)&0xff;
-        img[3*i + 2] = (color>>16)&0xff;
+        img[3*i + 0] = legend[3*labeling[i]];
+        img[3*i + 1] = legend[3*labeling[i] + 1];
+        img[3*i + 2] = legend[3*labeling[i] + 2];
 
     }
 
