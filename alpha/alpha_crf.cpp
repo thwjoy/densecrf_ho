@@ -1,6 +1,7 @@
 #include "alpha_crf.hpp"
-//#include "densecrf.h"
 #include <iostream>
+
+
 
 
 //////////////////////////////////
@@ -24,7 +25,7 @@ void AlphaCRF::addPairwiseEnergy(const MatrixXf & features, LabelCompatibility *
 ////////////////////
 
 MatrixXf AlphaCRF::inference(int nb_iterations){
-    std::cout << "Starting inference to minimize alpha-divergence." << "\n\n";
+    D("Starting inference to minimize alpha-divergence.");
 
     // Q contains our approximation, unary contains the true
     // distribution unary, approx_Q is the meanfield approximation of
@@ -39,13 +40,13 @@ MatrixXf AlphaCRF::inference(int nb_iterations){
     } else {
         unary = unary_->get();
     }
-    std::cout << "Initializing the approximating distribution with the unaries." << '\n';
+    D("Initializing the approximating distribution with the unaries.");
     expAndNormalize( Q, -unary);
-    std::cout << "Got initial estimates of the distribution" << "\n\n";
+    D("Got initial estimates of the distribution");
 
     for (int nb_iter=0; nb_iter < nb_iterations; nb_iter++) {
 
-        std::cout << "Constructing proxy distributions" << '\n';
+        D("Constructing proxy distributions");
         // Compute the factors for the approximate distribution
         //Unaries
         MatrixXf true_unary_part = alpha* unary;
@@ -54,21 +55,21 @@ MatrixXf AlphaCRF::inference(int nb_iterations){
 
         //// Pairwise term are created when we set up the CRF because they
         //// are going to remain the same
-        std::cout << "Done constructing the proxy distribution" << "\n";
+        D("Done constructing the proxy distribution");;
 
-        std::cout << "Starting to estimate the marginals of the distribution" << '\n';
+        D("Starting to estimate the marginals of the distribution");
         expAndNormalize(approx_Q, -proxy_unary);
         for (int marg_est_cnt=0; marg_est_cnt<nb_mf_marg; marg_est_cnt++) {
             mf_for_marginals(approx_Q, tmp1, tmp2);
         }
-        std::cout << "Finished MF marginals estimation" << "\n";
+        D("Finished MF marginals estimation");
 
-        std::cout << "Estimate the update rule parameters" << '\n';
+        D("Estimate the update rule parameters");
         tmp1 = Q.array().pow(alpha-1);
         tmp2 = tmp1.cwiseProduct(approx_Q);
         tmp2 = tmp2.array().pow(1/alpha);
         expAndNormalize(Q, tmp2);
-        std::cout << "Updated our approximation" << "\n\n";
+        D("Updated our approximation");
     }
 
     return Q;
