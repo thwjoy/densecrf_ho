@@ -7,7 +7,7 @@
 // Constructors and Destructors //
 //////////////////////////////////
 
-AlphaCRF::AlphaCRF(int W, int H, int M, float alpha, int nb_mf_marg) : DenseCRF2D(W, H, M), alpha(alpha){
+AlphaCRF::AlphaCRF(int W, int H, int M, float alpha, int nb_mf_marg) : DenseCRF2D(W, H, M), alpha(alpha), nb_mf_marg(nb_mf_marg){
 }
 AlphaCRF::~AlphaCRF(){}
 
@@ -39,7 +39,6 @@ MatrixXf AlphaCRF::inference(int nb_iterations){
     } else {
         unary = unary_->get();
     }
-
     std::cout << "Initializing the approximating distribution with the unaries." << '\n';
     expAndNormalize( Q, -unary);
     std::cout << "Got initial estimates of the distribution" << "\n\n";
@@ -50,18 +49,19 @@ MatrixXf AlphaCRF::inference(int nb_iterations){
         // Compute the factors for the approximate distribution
         //Unaries
         MatrixXf true_unary_part = alpha* unary;
-        MatrixXf approx_part = (1-alpha) * Q.array().log() * -1;
+        MatrixXf approx_part = -1 * (1-alpha) * Q.array().log();
         proxy_unary = true_unary_part + approx_part;
+
         //// Pairwise term are created when we set up the CRF because they
         //// are going to remain the same
-        std::cout << "Done constructing the proxy distribution" << "\n\n";
+        std::cout << "Done constructing the proxy distribution" << "\n";
 
         std::cout << "Starting to estimate the marginals of the distribution" << '\n';
-        approx_Q = Q;
+        expAndNormalize(approx_Q, -proxy_unary);
         for (int marg_est_cnt=0; marg_est_cnt<nb_mf_marg; marg_est_cnt++) {
             mf_for_marginals(approx_Q, tmp1, tmp2);
         }
-        std::cout << "Finished MF marginals estimation" << "\n\n";
+        std::cout << "Finished MF marginals estimation" << "\n";
 
         std::cout << "Estimate the update rule parameters" << '\n';
         tmp1 = Q.array().pow(alpha-1);
@@ -69,23 +69,19 @@ MatrixXf AlphaCRF::inference(int nb_iterations){
         tmp2 = tmp2.array().pow(1/alpha);
         expAndNormalize(Q, tmp2);
         std::cout << "Updated our approximation" << "\n\n";
-
-
     }
-
-
 
     return Q;
 }
 
 // Reuse the same tempvariables at all step.
-void AlphaCRF::mf_for_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2) {
-    tmp1 = -proxy_unary; // TODO: check that this is not cloning-linking it.
+void AlphaCRF::mf_for_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2) {
+    tmp1 = -proxy_unary;
 
     for (int i=0; i<pairwise_.size(); i++) {
-        pairwise_[i]->apply(tmp2, Q);
+        pairwise_[i]->apply(tmp2, approx_Q);
         tmp1 -= tmp2;
     }
 
-    expAndNormalize(Q, tmp1);
+    expAndNormalize(approx_Q, tmp1);
 }

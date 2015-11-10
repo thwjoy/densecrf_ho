@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
 
 
     // Load a crf
-    AlphaCRF crf(size.width, size.height, unaries.rows(), 0.5);
+    AlphaCRF crf(size.width, size.height, unaries.rows(), 20, 10);
 
     std::cout << unaries.rows() << " " << unaries.cols()  << '\n';
 
@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     crf.addPairwiseGaussian(3, 3, new PottsCompatibility(3));
 
     crf.addPairwiseBilateral( 80, 80, 13, 13, 13, img, new PottsCompatibility(10));
-    MatrixXf Q = crf.inference(10);
+    MatrixXf Q = crf.inference(15);
 
     std::cout << "Performed inference" << std::endl;
 
