@@ -1,21 +1,28 @@
 #include "file_storage.hpp"
-#include "ppm.h"
 #include "probimage.h"
 #include <iostream>
+#include <opencv2/opencv.hpp>
 
 
 unsigned char * load_image( const std::string path_to_image, img_size size){
-    int W, H;
-    unsigned char * img = readPPM( path_to_image.c_str(), W, H);
-    if(!img){
-        std::cout << "Couldn't load the image" << std::endl;
-    }
-    if(size.height != H || size.width != W){
+    cv::Mat img = cv::imread(path_to_image);
+
+    if(size.height != img.rows || size.width != img.cols) {
         std::cout << "Dimension doesn't correspond to unaries" << std::endl;
     }
-    return img;
-}
 
+    unsigned char * char_img = new unsigned char[size.width*size.height*3];
+    for (int j=0; j < size.height; j++) {
+        for (int i=0; i < size.width; i++) {
+            cv::Vec3b intensity = img.at<cv::Vec3b>(j,i); // this comes in BGR
+            char_img[(i+j*size.width)*3+0] = intensity.val[2];
+            char_img[(i+j*size.width)*3+1] = intensity.val[1];
+            char_img[(i+j*size.width)*3+2] = intensity.val[0];
+        }
+    }
+
+    return char_img;
+}
 
 MatrixXf load_unary( const std::string path_to_unary, img_size& size) {
 
@@ -54,15 +61,17 @@ void save_map(const MatrixXf estimates, const img_size size, const std::string p
     }
 
     // Make the image
-    unsigned char * img = new unsigned char[estimates.cols()* 3];
+    cv::Mat img(size.height, size.width, CV_8UC3);
+    cv::Vec3b intensity;
     for(int i=0; i<estimates.cols(); ++i) {
-        img[3*i + 0] = legend[3*labeling[i]];
-        img[3*i + 1] = legend[3*labeling[i] + 1];
-        img[3*i + 2] = legend[3*labeling[i] + 2];
+        intensity[2] = legend[3*labeling[i]];
+        intensity[1] = legend[3*labeling[i] + 1];
+        intensity[0] = legend[3*labeling[i] + 2];
 
+        int col = i % size.width;
+        int row = (i - col)/size.width;
+        img.at<cv::Vec3b>(row, col) = intensity;
     }
 
-    //Write the image to the file
-    writePPM(path_to_output.c_str(), size.width, size.height, img);
-
+    cv::imwrite(path_to_output, img);
 }

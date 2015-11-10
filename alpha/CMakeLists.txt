@@ -1,7 +1,9 @@
 include_directories(../external/ProbImage ../external/ppm)
 
+find_package(OpenCV REQUIRED)
+
 add_library(inference inference.cpp file_storage.cpp alpha_crf.cpp)
-target_link_libraries(inference densecrf probimage ppm)
+target_link_libraries(inference densecrf probimage ${OpenCV_LIBS})
 
 
 add_executable(example_inference  example_inference.cpp)
