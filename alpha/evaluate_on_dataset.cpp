@@ -16,6 +16,11 @@ std::string stringreplace(std::string s,
   return s;
 }
 
+static inline std::string &rtrim(std::string &s) {
+        s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+        return s;
+}
+
 
 std::vector<std::string> get_all_test_files(std::string path_to_dataset){
     std::string path_to_testlist = path_to_dataset + "split/Test.txt";
@@ -25,7 +30,7 @@ std::vector<std::string> get_all_test_files(std::string path_to_dataset){
     std::ifstream file(path_to_testlist.c_str());
 
     while(getline(file, next_img_name)){
-        test_images.push_back(next_img_name);
+        test_images.push_back(rtrim(next_img_name));
     }
 
     return test_images;
@@ -36,7 +41,8 @@ void do_inference(std::string path_to_images, std::string path_to_unaries,
     std::string image_path = path_to_images + image_name;
 
     std::string unaries_path = path_to_unaries + image_name;
-    unaries_path = stringreplace(path_to_unaries, ".bmp", ".c_unary");
+    unaries_path = stringreplace(unaries_path, ".bmp", ".c_unary");
+
 
     std::string output_path = path_to_results + image_name;
     output_path = stringreplace(output_path, ".bmp", "_res.bmp");
@@ -57,7 +63,7 @@ int main(int argc, char *argv[])
     std::string path_to_results = argv[2];
 
     std::vector<std::string> test_images = get_all_test_files(path_to_dataset);
-    std::string path_to_images = path_to_dataset + "MSCR_ObjCategImageDatabase_v2/Images/";
+    std::string path_to_images = path_to_dataset + "MSRC_ObjCategImageDatabase_v2/Images/";
     std::string path_to_unaries = path_to_dataset + "texton_unaries/";
 
     for (std::vector<std::string>::iterator image_name = test_images.begin(); image_name != test_images.end(); ++image_name) {
