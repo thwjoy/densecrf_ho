@@ -1,3 +1,5 @@
+#include <stdexcept>
+#include <unordered_map>
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -9,7 +11,7 @@
 
 #include "inference.hpp"
 
-#define NUMLABELS 21
+#define NUMLABELS 22
 
 ///////////////////////////////////
 // String Manipulation Functions //
@@ -36,31 +38,62 @@ std::string stringreplace(std::string s,
 /////////////////
 // Color Index //
 /////////////////
+struct vec3bcomp{
+    bool operator() (const cv::Vec3b& lhs, const cv::Vec3b& rhs) const
+        {
+            for (int i = 0; i < 3; i++) {
+                if(lhs[i]!=rhs[i]){
+                    return lhs.val[i]<rhs.val[i];
+                }
+            }
+            return false;
+        }
+};
+
+std::map<cv::Vec3b, int, vec3bcomp> color_to_label;
+
+void init_map(){
+    color_to_label[cv::Vec3b(128,0,0)] = 0;
+    color_to_label[cv::Vec3b(0,128,0)] = 1;
+    color_to_label[cv::Vec3b(128,128,0)] = 2;
+    color_to_label[cv::Vec3b(0,0,128)] = 3;
+    color_to_label[cv::Vec3b(0,128,128)] = 4;
+    color_to_label[cv::Vec3b(128,128,128)] = 5;
+    color_to_label[cv::Vec3b(192,0,0)] = 6;
+    color_to_label[cv::Vec3b(64,128,0)] = 7;
+    color_to_label[cv::Vec3b(192,128,0)] = 8;
+    color_to_label[cv::Vec3b(64,0,128)] = 9;
+    color_to_label[cv::Vec3b(192,0,128)] = 10;
+    color_to_label[cv::Vec3b(64,128,128)] = 11;
+    color_to_label[cv::Vec3b(192,128,128)] = 12;
+    color_to_label[cv::Vec3b(0,64,0)] = 13;
+    color_to_label[cv::Vec3b(128,64,0)] = 14;
+    color_to_label[cv::Vec3b(0,192,0)] = 15;
+    color_to_label[cv::Vec3b(128,64,128)] = 16;
+    color_to_label[cv::Vec3b(0,192,128)] = 17;
+    color_to_label[cv::Vec3b(128,192,128)] = 18;
+    color_to_label[cv::Vec3b(64,64,0)] = 19;
+    color_to_label[cv::Vec3b(192,64,0)] = 20;
+    color_to_label[cv::Vec3b(0,0,0)] = 21;
+
+    // Ignored labels
+    color_to_label[cv::Vec3b(64,0,0)] = 21;
+    color_to_label[cv::Vec3b(128,0,128)] = 21;
+}
 
 int lookup_label_index(cv::Vec3b gtVal)
 {
-    if(gtVal == cv::Vec3b(128,0,0)) return 0;
-    else if(gtVal == cv::Vec3b(0,128,0)) return 1;
-    else if(gtVal == cv::Vec3b(128,128,0)) return 2;
-    else if(gtVal == cv::Vec3b(0,0,128)) return 3;
-    else if(gtVal == cv::Vec3b(0,128,128)) return 4;
-    else if(gtVal == cv::Vec3b(128,128,128)) return 5;
-    else if(gtVal == cv::Vec3b(192,0,0)) return 6;
-    else if(gtVal == cv::Vec3b(64,128,0)) return 7;
-    else if(gtVal == cv::Vec3b(192,128,0)) return 8;
-    else if(gtVal == cv::Vec3b(64,0,128)) return 9;
-    else if(gtVal == cv::Vec3b(192,0,128)) return 10;
-    else if(gtVal == cv::Vec3b(64,128,128)) return 11;
-    else if(gtVal == cv::Vec3b(192,128,128)) return 12;
-    else if(gtVal == cv::Vec3b(0,64,0)) return 13;
-    else if(gtVal == cv::Vec3b(128,64,0)) return 14;
-    else if(gtVal == cv::Vec3b(0,192,0)) return 15;
-    else if(gtVal == cv::Vec3b(128,64,128)) return 16;
-    else if(gtVal == cv::Vec3b(0,192,128)) return 17;
-    else if(gtVal == cv::Vec3b(128,192,128)) return 18;
-    else if(gtVal == cv::Vec3b(64,64,0)) return 19;
-    else if(gtVal == cv::Vec3b(192,64,0)) return 20;
-    else if(gtVal == cv::Vec3b(0,0,0)) return -1;
+    int label=-1;
+    try {
+        label = color_to_label.at(gtVal);
+    } catch( std::out_of_range) {
+        std::cout << gtVal << '\n';
+    }
+    if (label != -1) {
+        return label;
+    } else {
+        return 21;
+    }
 }
 
 
@@ -111,7 +144,7 @@ double mean_vector (const std::vector<T> & vector, std::set<int> & indicesNotCon
 double compute_mean_iou (const std::vector<int> & confusionMatrix, int numLabels)
 {
     std::set<int> indicesNotConsider;
-    indicesNotConsider.insert(-1); // no void labels
+    indicesNotConsider.insert(21); // no void labels
 
     std::vector<int> rowSums;
     std::vector<int> colSums;
@@ -184,24 +217,22 @@ void do_inference(std::string path_to_images, std::string path_to_unaries,
 /////////////////////////////
 // Evalutating the results //
 /////////////////////////////
-std::vector<int> evaluate_segmentation(std::string path_to_ground_truths, std::string path_to_results, std::string image_name)
+void evaluate_segmentation(std::string path_to_ground_truths, std::string path_to_results, std::string image_name, std::vector<int>& confMat)
 {
     std::string gt_path = path_to_ground_truths + image_name;
     gt_path = stringreplace(gt_path, ".bmp", "_GT.bmp");
     std::string output_path = path_to_results + image_name;
     output_path = stringreplace(output_path, ".bmp", "_res.bmp");
 
-    std::vector<int> confMat(NUMLABELS * NUMLABELS);
-
     cv::Mat gtImg = cv::imread(gt_path);
-    cv::Mat crfImg = cv::imread(output_path);
+    cv::Mat crfImg = cv::imread(gt_path);
 
     assert(gtImg.rows == crfImg.rows);
     assert(gtImg.cols == crfImg.cols);
 
     for(int y = 0; y < gtImg.rows; ++y)
     {
-        for(int x = 0; x < crfImg.rows; ++x)
+        for(int x = 0; x < gtImg.cols; ++x)
         {
             cv::Point p(x,y);
             cv::Vec3b gtVal = gtImg.at<cv::Vec3b>(p);
@@ -213,8 +244,6 @@ std::vector<int> evaluate_segmentation(std::string path_to_ground_truths, std::s
             ++confMat[gtIndex * NUMLABELS + crfIndex];
         }
     }
-
-    return confMat;
 
 }
 
@@ -246,6 +275,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    init_map();
+
     std::string path_to_dataset = argv[1];
     std::string path_to_results = argv[2];
 
@@ -267,10 +298,12 @@ int main(int argc, char *argv[])
 
 
     // Confusion evaluation
-    std::vector<int> totalConfMat(NUMLABELS * NUMLABELS);
+    std::vector<int> totalConfMat(NUMLABELS * NUMLABELS, 0);
+    std::vector<int> conf_mat(NUMLABELS * NUMLABELS, 0);
     std::vector<double> meanIous;
     for(std::vector<std::string>::iterator image_name = test_images.begin(); image_name != test_images.end(); ++image_name) {
-        std::vector<int> conf_mat = evaluate_segmentation(path_to_ground_truths, path_to_results, *image_name);
+        std::fill(conf_mat.begin(), conf_mat.end(), 0);
+        evaluate_segmentation(path_to_ground_truths, path_to_results, *image_name, conf_mat);
 
         for(int j = 0; j < NUMLABELS * NUMLABELS; ++j)
         {
