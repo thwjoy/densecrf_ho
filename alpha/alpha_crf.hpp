@@ -16,15 +16,12 @@ protected:
     // Alpha for which we minimize the alpha-divergence.
     float alpha;
 
-    // Hyperparameters on how to run the algorithm.
-    int nb_mf_marg;
-
 public:
-    AlphaCRF(int W, int H, int M, float alpha, int nb_mf_marg=3);
+    AlphaCRF(int W, int H, int M, float alpha);
     virtual ~AlphaCRF();
     void addPairwiseEnergy( const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type=DIAG_KERNEL, NormalizationType normalization_type=NORMALIZE_SYMMETRIC );
 
-    MatrixXf inference(int nb_iterations);
+    MatrixXf inference();
 
 protected:
     void mf_for_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2);

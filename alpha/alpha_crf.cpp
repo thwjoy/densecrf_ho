@@ -8,7 +8,7 @@
 // Constructors and Destructors //
 //////////////////////////////////
 
-AlphaCRF::AlphaCRF(int W, int H, int M, float alpha, int nb_mf_marg) : DenseCRF2D(W, H, M), alpha(alpha), nb_mf_marg(nb_mf_marg){
+AlphaCRF::AlphaCRF(int W, int H, int M, float alpha) : DenseCRF2D(W, H, M), alpha(alpha) {
 }
 AlphaCRF::~AlphaCRF(){}
 
@@ -24,13 +24,13 @@ void AlphaCRF::addPairwiseEnergy(const MatrixXf & features, LabelCompatibility *
 // Inference Code //
 ////////////////////
 
-MatrixXf AlphaCRF::inference(int nb_iterations){
+MatrixXf AlphaCRF::inference(){
     D("Starting inference to minimize alpha-divergence.");
 
     // Q contains our approximation, unary contains the true
     // distribution unary, approx_Q is the meanfield approximation of
     // the proxy-distribution
-    MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_);
+    MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), Q_old(M_, N_), approx_Q_old(M_,N_);
     // tmp1 and tmp2 are matrix to gather intermediary computations
     MatrixXf tmp1(M_, N_), tmp2(M_, N_);
 
@@ -40,11 +40,16 @@ MatrixXf AlphaCRF::inference(int nb_iterations){
     } else {
         unary = unary_->get();
     }
-    D("Initializing the approximating distribution with the unaries.");
-    expAndNormalize( Q, -unary);
+    D("Initializing the approximating distribution");
+    expAndNormalize( Q, -unary); // Initialization by the unaries
+    //Q.fill(1/(float)M_); // Initialization to a uniform distribution
     D("Got initial estimates of the distribution");
 
-    for (int nb_iter=0; nb_iter < nb_iterations; nb_iter++) {
+    Q_old = Q;
+    bool continue_minimizing_alpha_div = true;
+    float Q_change;
+    int nb_approximate_distribution = 0;
+    while(continue_minimizing_alpha_div){
 
         D("Constructing proxy distributions");
         // Compute the factors for the approximate distribution
@@ -58,10 +63,27 @@ MatrixXf AlphaCRF::inference(int nb_iterations){
         D("Done constructing the proxy distribution");;
 
         D("Starting to estimate the marginals of the distribution");
-        expAndNormalize(approx_Q, -proxy_unary);
-        for (int marg_est_cnt=0; marg_est_cnt<nb_mf_marg; marg_est_cnt++) {
+        // Starting value.
+        expAndNormalize(approx_Q, -proxy_unary); // Initialization by the unaries
+        //approx_Q.fill(1/(float)M_); // Uniform initialization
+
+        // Setup the checks for convergence.
+        bool continue_estimating_marginals = true;
+        approx_Q_old = approx_Q;
+        float marginal_change;
+        int nb_marginal_estimation = 0;
+        while(continue_estimating_marginals) {
+            // Perform one meanfield iteration to update our approximation
             mf_for_marginals(approx_Q, tmp1, tmp2);
+            // Evaluate how much our distribution changed
+            marginal_change = (approx_Q - approx_Q_old).squaredNorm();
+            // If we stopped changing a lot, stop the loop and
+            // consider we have some good marginals
+            approx_Q_old = approx_Q;
+            continue_estimating_marginals = (marginal_change > 0.001);
+            ++ nb_marginal_estimation;
         }
+        std::cout << nb_marginal_estimation << '\t';
         D("Finished MF marginals estimation");
 
         D("Estimate the update rule parameters");
@@ -70,8 +92,14 @@ MatrixXf AlphaCRF::inference(int nb_iterations){
         tmp2 = tmp2.array().pow(1/alpha);
         expAndNormalize(Q, tmp2);
         D("Updated our approximation");
-    }
 
+        Q_change = (Q_old - Q).squaredNorm();
+        Q_old = Q;
+        continue_minimizing_alpha_div = (Q_change > 0.001);
+        ++nb_approximate_distribution;
+    }
+    std::cout << "\n Nb of approximate distribution constructed:" << nb_approximate_distribution << '\n';
+    D("Done with alpha-divergence minimization");
     return Q;
 }
 

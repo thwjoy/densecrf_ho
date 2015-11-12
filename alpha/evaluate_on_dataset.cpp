@@ -223,8 +223,8 @@ void do_inference(std::string path_to_images, std::string path_to_unaries,
 
     struct stat path_stat;
     if(stat(output_path.c_str(), &path_stat)!=0){
-        minimize_dense_alpha_divergence(image_path, unaries_path, output_path,
-                                        20, 5, 5);
+        minimize_dense_alpha_divergence(image_path, unaries_path, output_path, 20, 1);
+        //minimize_mean_field(image_path, unaries_path, output_path, 20);
     }
 }
 
