@@ -239,7 +239,7 @@ void evaluate_segmentation(std::string path_to_ground_truths, std::string path_t
     std::string output_path = path_to_results + image_name;
     output_path = stringreplace(output_path, ".bmp", "_res.bmp");
 
-    cv::Mat gtImg = cv::imread(gt_path);
+    cv::Mat gtImg = cv::imread(output_path);
     cv::Mat crfImg = cv::imread(gt_path);
 
     assert(gtImg.rows == crfImg.rows);
