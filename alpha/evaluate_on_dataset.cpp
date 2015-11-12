@@ -7,6 +7,7 @@
 #include <set>
 #include <opencv2/opencv.hpp>
 #include <sys/stat.h>
+#include <limits>
 
 
 #include "inference.hpp"
