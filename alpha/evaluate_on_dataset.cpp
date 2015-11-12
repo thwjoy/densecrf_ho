@@ -141,6 +141,17 @@ double mean_vector (const std::vector<T> & vector, std::set<int> & indicesNotCon
     return mean/N;
 }
 
+
+void find_blank_gt (const std::vector<int> & rowSums, std::set<int> & indicesNotConsider)
+{
+    for (int i = 0; i < rowSums.size(); ++i){
+        if (rowSums[i] == 0) {
+            indicesNotConsider.insert(i);
+        }
+    }
+}
+
+
 double compute_mean_iou (const std::vector<int> & confusionMatrix, int numLabels)
 {
     std::set<int> indicesNotConsider;
@@ -158,9 +169,13 @@ double compute_mean_iou (const std::vector<int> & confusionMatrix, int numLabels
     for (size_t i = 0; i < numLabels; ++i){
         size_t uni = rowSums[i] + colSums[i] - confusionMatrix[numLabels * i + i]; // "union" is a c++ reserved word
         size_t intersection = confusionMatrix[numLabels * i + i];
-        iouPerClass.push_back( intersection/ ((double) (uni + std::numeric_limits<double>::epsilon() )) );
-    }
+        double iou = intersection/ ((double) (uni + std::numeric_limits<double>::epsilon() ));
 
+        iouPerClass.push_back(iou);
+    }
+     // Necessary because in the case of a label not present in a GT,
+     // this would mean an IoU of zero which is exagerated
+    find_blank_gt (rowSums, indicesNotConsider);
     double mean = mean_vector(iouPerClass, indicesNotConsider);
 
     return mean;
