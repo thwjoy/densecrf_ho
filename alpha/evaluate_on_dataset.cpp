@@ -266,9 +266,9 @@ void evaluate_segmentation(std::string path_to_ground_truths, std::string path_t
 //////////////////////////
 // Convenience function //
 //////////////////////////
-std::vector<std::string> get_all_test_files(std::string path_to_dataset)
+std::vector<std::string> get_all_test_files(std::string path_to_dataset, std::string split)
 {
-    std::string path_to_testlist = path_to_dataset + "split/Validation.txt";
+    std::string path_to_testlist = path_to_dataset + "split/" + split+ ".txt";
 
     std::vector<std::string> test_images;
     std::string next_img_name;
@@ -286,14 +286,16 @@ std::vector<std::string> get_all_test_files(std::string path_to_dataset)
 int main(int argc, char *argv[])
 {
     if (argc<3) {
-        std::cout << "evaluate path_to_dataset path_to_results" << '\n';
+        std::cout << "evaluate split path_to_dataset path_to_results" << '\n';
+        std::cout << "Example: evaluate Validation /home/rudy/datasets/MSRC/ ./validation/" << '\n';
         return 1;
     }
 
     init_map();
 
-    std::string path_to_dataset = argv[1];
-    std::string path_to_results = argv[2];
+    std::string split = argv[1];
+    std::string path_to_dataset = argv[2];
+    std::string path_to_results = argv[3];
 
     struct stat resdir_stat;
     if (stat(path_to_results.c_str(), &resdir_stat) == -1) {
@@ -301,7 +303,7 @@ int main(int argc, char *argv[])
     }
 
 
-    std::vector<std::string> test_images = get_all_test_files(path_to_dataset);
+    std::vector<std::string> test_images = get_all_test_files(path_to_dataset, split);
     std::string path_to_images = path_to_dataset + "MSRC_ObjCategImageDatabase_v2/Images/";
     std::string path_to_unaries = path_to_dataset + "texton_unaries/";
     std::string path_to_ground_truths = path_to_dataset + "MSRC_ObjCategImageDatabase_v2/GroundTruth/";
