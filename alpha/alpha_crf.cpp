@@ -1,4 +1,5 @@
 #include "alpha_crf.hpp"
+#include "brute_force.hpp"
 #include <iostream>
 
 
@@ -16,17 +17,26 @@ AlphaCRF::~AlphaCRF(){}
 // proxy-term with the proper weight
 void AlphaCRF::addPairwiseEnergy(const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type){
     assert(features.cols() == N_);
-    function->setParameters( alpha * function->parameters());
+    VectorXf potts_weight = function->parameters();
+    function->setParameters( alpha * potts_weight);
     DenseCRF::addPairwiseEnergy( new PairwisePotential( features, function, kernel_type, normalization_type));
     if (monitor_mode) {
-        pairwise_weights.push_back(function->parameters());
-        pairwise_features.push_back(&features);
+        assert(potts_weight.rows() == 1);
+        assert(potts_weight.cols() == 1);
+        MatrixXf feat = features;
+        pairwise_weights.push_back(potts_weight(0));
+        pairwise_features.push_back(feat);
     }
 }
 
 void AlphaCRF::keep_track_of_steps(){
     monitor_mode = true;
 };
+
+void AlphaCRF::damp_updates(float damping_factor){
+    use_damping = true;
+    damping_factor = damping_factor;
+}
 
 ////////////////////
 // Inference Code //
@@ -37,7 +47,7 @@ MatrixXf AlphaCRF::inference(){
     // Q contains our approximation, unary contains the true
     // distribution unary, approx_Q is the meanfield approximation of
     // the proxy-distribution
-    MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), Q_old(M_, N_), approx_Q_old(M_,N_);
+    MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), Q_old(M_, N_), approx_Q_old(M_,N_), new_Q(M_,N_);
     // tmp1 and tmp2 are matrix to gather intermediary computations
     MatrixXf tmp1(M_, N_), tmp2(M_, N_);
 
@@ -59,7 +69,7 @@ MatrixXf AlphaCRF::inference(){
     while(continue_minimizing_alpha_div){
 
         if (monitor_mode) {
-            float ad = compute_alpha_divergence(unary, pairwise_features, pairwise_weights, Q, alpha);
+            double ad = compute_alpha_divergence(unary, pairwise_features, pairwise_weights, Q, alpha);
             alpha_divergences.push_back(ad);
         }
 
@@ -95,22 +105,25 @@ MatrixXf AlphaCRF::inference(){
             continue_estimating_marginals = (marginal_change > 0.001);
             ++ nb_marginal_estimation;
         }
-        std::cout << nb_marginal_estimation << '\t';
         D("Finished MF marginals estimation");
 
         D("Estimate the update rule parameters");
         tmp1 = Q.array().pow(alpha-1);
         tmp2 = tmp1.cwiseProduct(approx_Q);
         tmp2 = tmp2.array().pow(1/alpha);
-        expAndNormalize(Q, tmp2);
-        D("Updated our approximation");
+        expAndNormalize(new_Q, tmp2);
+        if(use_damping){
+            Q = Q.array().pow(damping_factor) * new_Q.array().pow(1-damping_factor);
+        } else {
+            Q = new_Q;
+        }
 
+        D("Updated our approximation");
         Q_change = (Q_old - Q).squaredNorm();
         Q_old = Q;
         continue_minimizing_alpha_div = (Q_change > 0.001);
         ++nb_approximate_distribution;
     }
-    std::cout << "\n Nb of approximate distribution constructed:" << nb_approximate_distribution << '\n';
     D("Done with alpha-divergence minimization");
     return Q;
 }

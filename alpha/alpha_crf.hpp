@@ -16,12 +16,17 @@ protected:
     // Alpha for which we minimize the alpha-divergence.
     float alpha;
 
+    // Use damping or not, when updating the approximation
+    bool use_damping = false;
+    float damping_factor = 1e-3;
+
     // History of all the alpha divergences that we went through
-    std::vector<float> alpha_divergences;
+    std::vector<double> alpha_divergences;
     bool monitor_mode = false;
     // Useful to have to compute the alpha-divergences
-    std::vector<MatrixXf*> pairwise_features;
     std::vector<float> pairwise_weights;
+    std::vector<MatrixXf> pairwise_features;
+
 
 public:
     AlphaCRF(int W, int H, int M, float alpha);
@@ -30,7 +35,7 @@ public:
 
     MatrixXf inference();
     void keep_track_of_steps();
-
+    void damp_updates(float damping_factor);
 protected:
     void mf_for_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2);
 
