@@ -1,6 +1,7 @@
 #include "alpha_crf.hpp"
 #include "brute_force.hpp"
 #include <iostream>
+#include <deque>
 
 
 
@@ -47,10 +48,11 @@ MatrixXf AlphaCRF::inference(){
     // Q contains our approximation, unary contains the true
     // distribution unary, approx_Q is the meanfield approximation of
     // the proxy-distribution
-    MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), Q_old(M_, N_), approx_Q_old(M_,N_), new_Q(M_,N_);
-    // tmp1 and tmp2 are matrix to gather intermediary computations
+    MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), approx_Q_old(M_,N_), new_Q(M_,N_);
+// tmp1 and tmp2 are matrix to gather intermediary computations
     MatrixXf tmp1(M_, N_), tmp2(M_, N_);
 
+    std::deque<MatrixXf> previous_Q;
 
     if(!unary_){
         unary.fill(0);
@@ -62,7 +64,7 @@ MatrixXf AlphaCRF::inference(){
     //Q.fill(1/(float)M_); // Initialization to a uniform distribution
     D("Got initial estimates of the distribution");
 
-    Q_old = Q;
+    previous_Q.push_back(Q);
     bool continue_minimizing_alpha_div = true;
     float Q_change;
     int nb_approximate_distribution = 0;
@@ -117,11 +119,18 @@ MatrixXf AlphaCRF::inference(){
         } else {
             Q = new_Q;
         }
-
+        for (std::deque<MatrixXf>::reverse_iterator prev = previous_Q.rbegin(); prev != previous_Q.rend(); prev++) {
+            Q_change = (*prev - Q).squaredNorm();
+            continue_minimizing_alpha_div = (Q_change > 0.001);
+            if(not continue_minimizing_alpha_div){
+                break;
+            }
+        }
+        previous_Q.push_back(Q);
+        if(previous_Q.size()>5){
+            previous_Q.pop_front();
+        }
         D("Updated our approximation");
-        Q_change = (Q_old - Q).squaredNorm();
-        Q_old = Q;
-        continue_minimizing_alpha_div = (Q_change > 0.001);
         ++nb_approximate_distribution;
     }
     D("Done with alpha-divergence minimization");
