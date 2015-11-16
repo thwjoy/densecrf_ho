@@ -18,7 +18,15 @@ void AlphaCRF::addPairwiseEnergy(const MatrixXf & features, LabelCompatibility *
     assert(features.cols() == N_);
     function->setParameters( alpha * function->parameters());
     DenseCRF::addPairwiseEnergy( new PairwisePotential( features, function, kernel_type, normalization_type));
+    if (monitor_mode) {
+        pairwise_weights.push_back(function->parameters());
+        pairwise_features.push_back(&features);
+    }
 }
+
+void AlphaCRF::keep_track_of_steps(){
+    monitor_mode = true;
+};
 
 ////////////////////
 // Inference Code //
@@ -26,7 +34,6 @@ void AlphaCRF::addPairwiseEnergy(const MatrixXf & features, LabelCompatibility *
 
 MatrixXf AlphaCRF::inference(){
     D("Starting inference to minimize alpha-divergence.");
-
     // Q contains our approximation, unary contains the true
     // distribution unary, approx_Q is the meanfield approximation of
     // the proxy-distribution
@@ -50,6 +57,11 @@ MatrixXf AlphaCRF::inference(){
     float Q_change;
     int nb_approximate_distribution = 0;
     while(continue_minimizing_alpha_div){
+
+        if (monitor_mode) {
+            float ad = compute_alpha_divergence(unary, pairwise_features, pairwise_weights, Q, alpha);
+            alpha_divergences.push_back(ad);
+        }
 
         D("Constructing proxy distributions");
         // Compute the factors for the approximate distribution
@@ -104,13 +116,13 @@ MatrixXf AlphaCRF::inference(){
 }
 
 // Reuse the same tempvariables at all step.
-void AlphaCRF::mf_for_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2) {
-    tmp1 = -proxy_unary;
+    void AlphaCRF::mf_for_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2) {
+        tmp1 = -proxy_unary;
 
-    for (int i=0; i<pairwise_.size(); i++) {
-        pairwise_[i]->apply(tmp2, approx_Q);
-        tmp1 -= tmp2;
+        for (int i=0; i<pairwise_.size(); i++) {
+            pairwise_[i]->apply(tmp2, approx_Q);
+            tmp1 -= tmp2;
+        }
+
+        expAndNormalize(approx_Q, tmp1);
     }
-
-    expAndNormalize(approx_Q, tmp1);
-}
