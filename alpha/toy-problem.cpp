@@ -34,7 +34,7 @@ MatrixXf get_unaries(int nb_variables, int nb_labels){
 
 int main(int argc, char *argv[])
 {
-    std::srand(time(NULL)); // Set the seed
+    std::srand(1337); // Set the seed
     int nb_variables = 5;
     int nb_labels = 5;
     int nb_features = 5;
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     for (int filter = 0; filter < all_pairwise.size() ; filter++) {
         crf.addPairwiseEnergy(*(all_pairwise[filter]), new PottsCompatibility(10));
     }
-    crf.damp_updates(0.5);
+    //crf.damp_updates(0.5);
 
     crf.inference();
 

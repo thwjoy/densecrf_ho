@@ -60,8 +60,8 @@ MatrixXf AlphaCRF::inference(){
         unary = unary_->get();
     }
     D("Initializing the approximating distribution");
-    expAndNormalize( Q, -unary); // Initialization by the unaries
-    //Q.fill(1/(float)M_); // Initialization to a uniform distribution
+    //expAndNormalize( Q, -unary); // Initialization by the unaries
+    Q.fill(1/(float)M_); // Initialization to a uniform distribution
     D("Got initial estimates of the distribution");
 
     previous_Q.push_back(Q);
@@ -86,28 +86,7 @@ MatrixXf AlphaCRF::inference(){
         //// are going to remain the same
         D("Done constructing the proxy distribution");;
 
-        D("Starting to estimate the marginals of the distribution");
-        // Starting value.
-        expAndNormalize(approx_Q, -proxy_unary); // Initialization by the unaries
-        //approx_Q.fill(1/(float)M_); // Uniform initialization
-
-        // Setup the checks for convergence.
-        bool continue_estimating_marginals = true;
-        approx_Q_old = approx_Q;
-        float marginal_change;
-        int nb_marginal_estimation = 0;
-        while(continue_estimating_marginals) {
-            // Perform one meanfield iteration to update our approximation
-            mf_for_marginals(approx_Q, tmp1, tmp2);
-            // Evaluate how much our distribution changed
-            marginal_change = (approx_Q - approx_Q_old).squaredNorm();
-            // If we stopped changing a lot, stop the loop and
-            // consider we have some good marginals
-            approx_Q_old = approx_Q;
-            continue_estimating_marginals = (marginal_change > 0.001);
-            ++ nb_marginal_estimation;
-        }
-        D("Finished MF marginals estimation");
+        estimate_marginals(approx_Q, approx_Q_old, tmp1, tmp2);
 
         D("Estimate the update rule parameters");
         tmp1 = Q.array().pow(alpha-1);
@@ -138,13 +117,44 @@ MatrixXf AlphaCRF::inference(){
 }
 
 // Reuse the same tempvariables at all step.
-    void AlphaCRF::mf_for_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2) {
-        tmp1 = -proxy_unary;
+void AlphaCRF::mf_for_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2) {
+    tmp1 = -proxy_unary;
 
-        for (int i=0; i<pairwise_.size(); i++) {
-            pairwise_[i]->apply(tmp2, approx_Q);
-            tmp1 -= tmp2;
-        }
-
-        expAndNormalize(approx_Q, tmp1);
+    for (int i=0; i<pairwise_.size(); i++) {
+        pairwise_[i]->apply(tmp2, approx_Q);
+        tmp1 -= tmp2;
     }
+
+    expAndNormalize(approx_Q, tmp1);
+}
+
+void AlphaCRF::estimate_marginals(MatrixXf & approx_Q, MatrixXf & approx_Q_old, MatrixXf & tmp1, MatrixXf & tmp2){
+    /**
+     * approx_Q is a M_ by N_ matrix containing all our marginals that we want to estimate.
+     * approx_Q_old .... that contains the previous marginals estimation so that we can estimate convergences.
+     * tmp1 and tmp2 are also of the same size, they are temporary matrix, used to perform computations.
+     * We pass all of these so that there is no need to reallocate / deallocate.
+     */
+    D("Starting to estimate the marginals of the distribution");
+    // Starting value.
+    //expAndNormalize(approx_Q, -proxy_unary); // Initialization by the unaries
+    approx_Q.fill(1/(float)M_);// Uniform initialization
+    // Setup the checks for convergence.
+    bool continue_estimating_marginals = true;
+    approx_Q_old = approx_Q;
+    float marginal_change;
+    int nb_marginal_estimation = 0;
+
+    while(continue_estimating_marginals) {
+        // Perform one meanfield iteration to update our approximation
+        mf_for_marginals(approx_Q, tmp1, tmp2);
+        // Evaluate how much our distribution changed
+        marginal_change = (approx_Q - approx_Q_old).squaredNorm();
+        // If we stopped changing a lot, stop the loop and
+        // consider we have some good marginals
+        approx_Q_old = approx_Q;
+        continue_estimating_marginals = (marginal_change > 0.001);
+        ++ nb_marginal_estimation;
+    }
+    D("Finished MF marginals estimation");
+}

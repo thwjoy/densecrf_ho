@@ -38,5 +38,5 @@ public:
     void damp_updates(float damping_factor);
 protected:
     void mf_for_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2);
-
+    void estimate_marginals(MatrixXf & approx_Q, MatrixXf & approx_Q_old, MatrixXf & tmp1, MatrixXf & tmp2);
 };
