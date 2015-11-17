@@ -3,7 +3,12 @@
 #include <iostream>
 #include <deque>
 
-
+void normalize(MatrixXf & in){
+    for (int i=0; i<in.cols(); i++) {
+        float col_min = in.col(i).minCoeff();
+        in.col(i).array() -= col_min;
+    }
+}
 
 
 //////////////////////////////////
@@ -49,7 +54,7 @@ MatrixXf AlphaCRF::inference(){
     // distribution unary, approx_Q is the meanfield approximation of
     // the proxy-distribution
     MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), approx_Q_old(M_,N_), new_Q(M_,N_);
-// tmp1 and tmp2 are matrix to gather intermediary computations
+    // tmp1 and tmp2 are matrix to gather intermediary computations
     MatrixXf tmp1(M_, N_), tmp2(M_, N_);
 
     std::deque<MatrixXf> previous_Q;
@@ -83,6 +88,11 @@ MatrixXf AlphaCRF::inference(){
         proxy_unary = true_unary_part + approx_part;
         //// Pairwise term are created when we set up the CRF because they
         //// are going to remain the same
+        // WARNING: numerical trick - we normalize the unaries, which
+        // shouldn't change anything.  This consist in making the
+        // smallest term 0, so that exp(-unary) isn't already way too
+        // big.
+        normalize(proxy_unary);
         D("Done constructing the proxy distribution");;
 
         //estimate_marginals(approx_Q, approx_Q_old, tmp1, tmp2);
@@ -115,6 +125,12 @@ MatrixXf AlphaCRF::inference(){
     D("Done with alpha-divergence minimization");
     return Q;
 }
+
+
+    if (monitor_mode) {
+        double ad = compute_alpha_divergence(unary, pairwise_features, pairwise_weights, Q, alpha);
+        alpha_divergences.push_back(ad);
+    }
 
 // Reuse the same tempvariables at all step.
 void AlphaCRF::mf_for_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2) {
