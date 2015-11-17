@@ -104,6 +104,7 @@ MatrixXf brute_force_marginals(const MatrixXf & unaries, const std::vector<Matri
     int N_ = unaries.cols();
 
     MatrixXf marginals(M_, N_);
+    marginals.fill(0);
 
     double conf_un_proba;
     VectorXi current_labeling(N_);
@@ -121,7 +122,7 @@ MatrixXf brute_force_marginals(const MatrixXf & unaries, const std::vector<Matri
 
     // Normalize the marginals
     VectorXf norm_constants = marginals.colwise().sum();
-    std::cout << norm_constants << '\n';
+    marginals.array().rowwise() /= norm_constants.array().transpose();
 
     return marginals;
 }

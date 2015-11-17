@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 {
     std::srand(1337); // Set the seed
     int nb_variables = 5;
-    int nb_labels = 5;
+    int nb_labels = 9;
     int nb_features = 5;
     float alpha = 10;
 

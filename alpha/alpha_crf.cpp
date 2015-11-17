@@ -81,12 +81,12 @@ MatrixXf AlphaCRF::inference(){
         MatrixXf true_unary_part = alpha* unary;
         MatrixXf approx_part = -1 * (1-alpha) * Q.array().log();
         proxy_unary = true_unary_part + approx_part;
-
         //// Pairwise term are created when we set up the CRF because they
         //// are going to remain the same
         D("Done constructing the proxy distribution");;
 
-        estimate_marginals(approx_Q, approx_Q_old, tmp1, tmp2);
+        //estimate_marginals(approx_Q, approx_Q_old, tmp1, tmp2);
+        marginals_bf(approx_Q);
 
         D("Estimate the update rule parameters");
         tmp1 = Q.array().pow(alpha-1);
@@ -157,4 +157,13 @@ void AlphaCRF::estimate_marginals(MatrixXf & approx_Q, MatrixXf & approx_Q_old, 
         ++ nb_marginal_estimation;
     }
     D("Finished MF marginals estimation");
+}
+
+void AlphaCRF::marginals_bf(MatrixXf & approx_Q){
+    std::vector<float> proxy_weights;
+    for (int i = 0; i < pairwise_weights.size(); i++) {
+        proxy_weights.push_back(pairwise_weights[i] * alpha);
+    }
+    approx_Q = brute_force_marginals(proxy_unary, pairwise_features, proxy_weights);
+
 }
