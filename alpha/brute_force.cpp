@@ -95,7 +95,7 @@ double compute_probability(const VectorXi& labeling, const MatrixXf & unaries, c
 
         }
     }
-    return exp(energy)/Z;
+    return exp(-energy)/Z;
 }
 
 
