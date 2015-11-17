@@ -44,6 +44,10 @@ void AlphaCRF::damp_updates(float damping_factor){
     damping_factor = damping_factor;
 }
 
+
+void AlphaCRF::compute_exact_marginals(){
+    exact_marginals_mode = true;
+}
 ////////////////////
 // Inference Code //
 ////////////////////
@@ -95,8 +99,11 @@ MatrixXf AlphaCRF::inference(){
         normalize(proxy_unary);
         D("Done constructing the proxy distribution");;
 
-        //estimate_marginals(approx_Q, approx_Q_old, tmp1, tmp2);
-        marginals_bf(approx_Q);
+        if (exact_marginals_mode) {
+            marginals_bf(approx_Q);
+        } else{
+            estimate_marginals(approx_Q, approx_Q_old, tmp1, tmp2);
+        }
 
         D("Estimate the update rule parameters");
         tmp1 = Q.array().pow(alpha-1);

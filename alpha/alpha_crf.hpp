@@ -20,13 +20,15 @@ protected:
     bool use_damping = false;
     float damping_factor = 1e-3;
 
-    // History of all the alpha divergences that we went through
-    std::vector<double> alpha_divergences;
-    bool monitor_mode = false;
     // Useful to have to compute the alpha-divergences
     std::vector<float> pairwise_weights;
     std::vector<MatrixXf> pairwise_features;
 
+    // Brute-force the marginals or update them with Alpha-divergences
+    bool exact_marginals_mode = false;
+    // History of all the alpha divergences that we went through
+    bool monitor_mode = false;
+    std::vector<double> alpha_divergences;
 
 public:
     AlphaCRF(int W, int H, int M, float alpha);
@@ -36,6 +38,7 @@ public:
     MatrixXf inference();
     void keep_track_of_steps();
     void damp_updates(float damping_factor);
+    void compute_exact_marginals();
 protected:
     void mf_for_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2);
     void estimate_marginals(MatrixXf & approx_Q, MatrixXf & approx_Q_old, MatrixXf & tmp1, MatrixXf & tmp2);
