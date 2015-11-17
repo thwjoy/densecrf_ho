@@ -40,15 +40,15 @@ int main(int argc, char *argv[])
     int nb_features = 5;
     float alpha = 10;
 
-    MatrixXf unaries = get_unaries(nb_variables, nb_features);
-    std::vector<MatrixXf*> all_pairwise = get_pairwise(nb_variables, nb_labels);
+    MatrixXf unaries = get_unaries(nb_variables, nb_labels);
+    std::vector<MatrixXf*> all_pairwise = get_pairwise(nb_variables, nb_features);
 
     AlphaCRF crf(1, nb_variables, nb_labels, alpha);
     crf.keep_track_of_steps();
 
     crf.setUnaryEnergy(unaries);
     for (int filter = 0; filter < all_pairwise.size() ; filter++) {
-        crf.addPairwiseEnergy(*(all_pairwise[filter]), new PottsCompatibility(10));
+        crf.addPairwiseEnergy(*(all_pairwise[filter]), new PottsCompatibility(1));
     }
     //crf.damp_updates(0.5);
 
