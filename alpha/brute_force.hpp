@@ -8,3 +8,4 @@ double compute_probability(const VectorXi& labeling,const MatrixXf & unaries, co
 
 double compute_approx_proba(const VectorXi& labeling, const MatrixXf & approximation);
 
+MatrixXf brute_force_marginals(const MatrixXf & unaries, const std::vector<MatrixXf> & pairwise, const std::vector<float> & pairwise_weight);

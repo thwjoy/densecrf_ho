@@ -97,3 +97,31 @@ double compute_probability(const VectorXi& labeling, const MatrixXf & unaries, c
     }
     return exp(energy)/Z;
 }
+
+
+MatrixXf brute_force_marginals(const MatrixXf & unaries, const std::vector<MatrixXf> & pairwise, const std::vector<float> & pairwise_weight) {
+    int M_ = unaries.rows();
+    int N_ = unaries.cols();
+
+    MatrixXf marginals(M_, N_);
+
+    double conf_un_proba;
+    VectorXi current_labeling(N_);
+    current_labeling.fill(0);
+    bool all_conf_done=false;
+
+    // Get the unnormalized marginals.
+    while(not all_conf_done){
+        conf_un_proba = compute_probability(current_labeling, unaries, pairwise, pairwise_weight, 1);
+        for (int i=0; i < N_; i++) {
+            marginals(current_labeling(i), i) += conf_un_proba;
+        }
+        all_conf_done = get_next_labeling(current_labeling, M_);
+    }
+
+    // Normalize the marginals
+    VectorXf norm_constants = marginals.colwise().sum();
+    std::cout << norm_constants << '\n';
+
+    return marginals;
+}
