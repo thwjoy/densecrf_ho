@@ -1,12 +1,12 @@
 #include "inference.hpp"
 #include "alpha_crf.hpp"
-
+#include <iostream>
 #include <string>
 
 using namespace Eigen;
 
 void minimize_dense_alpha_divergence(std::string path_to_image, std::string path_to_unaries, std::string path_to_output, float alpha) {
-
+    std::cout << path_to_output << '\n';
     img_size size;
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);

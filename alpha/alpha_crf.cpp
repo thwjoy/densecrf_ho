@@ -2,6 +2,7 @@
 #include "brute_force.hpp"
 #include <iostream>
 #include <deque>
+#include <limits>
 
 void normalize(MatrixXf & in){
     for (int i=0; i<in.cols(); i++) {
@@ -115,13 +116,18 @@ MatrixXf AlphaCRF::inference(){
         } else {
             Q = new_Q;
         }
+
+        float min_Q_change = std::numeric_limits<float>::max();
         for (std::deque<MatrixXf>::reverse_iterator prev = previous_Q.rbegin(); prev != previous_Q.rend(); prev++) {
             Q_change = (*prev - Q).squaredNorm();
-            continue_minimizing_alpha_div = (Q_change > 0.001);
+            min_Q_change = min_Q_change < Q_change ? min_Q_change : Q_change;
+            continue_minimizing_alpha_div = (min_Q_change > 0.001);
             if(not continue_minimizing_alpha_div){
                 break;
             }
         }
+        std::cout << '\r' <<  min_Q_change;
+        std::cout.flush();
         previous_Q.push_back(Q);
         if(previous_Q.size()>5){
             previous_Q.pop_front();
@@ -129,15 +135,16 @@ MatrixXf AlphaCRF::inference(){
         D("Updated our approximation");
         ++nb_approximate_distribution;
     }
+    std::cout << '\n'; // Flush the Q_change monitoring line
     D("Done with alpha-divergence minimization");
-    return Q;
-}
-
-
     if (monitor_mode) {
         double ad = compute_alpha_divergence(unary, pairwise_features, pairwise_weights, Q, alpha);
         alpha_divergences.push_back(ad);
     }
+
+    return Q;
+}
+
 
 // Reuse the same tempvariables at all step.
 void AlphaCRF::mf_for_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2) {
