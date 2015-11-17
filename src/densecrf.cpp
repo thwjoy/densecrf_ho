@@ -116,8 +116,8 @@ void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q ) 
 		out.col(i) = b.array().sum()*q - b;
 	}
 }
+
 MatrixXf DenseCRF::inference ( int n_iterations ) const {
-	std::cout << "Starting Standard inference" << std::endl;
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
 	unary.fill(0);
 	if( unary_ ){
@@ -132,6 +132,31 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 			tmp1 -= tmp2;
 		}
 		expAndNormalize( Q, tmp1 );
+	}
+	return Q;
+}
+
+MatrixXf DenseCRF::inference () const {
+	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_);
+	unary.fill(0);
+	if( unary_ ){
+		unary = unary_->get();
+	}
+	expAndNormalize( Q, -unary );
+
+	bool keep_inferring = true;
+	old_Q = Q;
+	while(keep_inferring) {
+		tmp1 = -unary;
+		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+			pairwise_[k]->apply( tmp2, Q );
+			tmp1 -= tmp2;
+		}
+		expAndNormalize( Q, tmp1 );
+
+		float Q_change = (old_Q - Q).squaredNorm();
+		keep_inferring = (Q_change > 0.001);
+		old_Q = Q;
 	}
 	return Q;
 }

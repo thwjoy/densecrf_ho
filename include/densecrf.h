@@ -75,6 +75,7 @@ public:
 
 	// Run inference and return the probabilities
 	MatrixXf inference( int n_iterations ) const;
+	MatrixXf inference() const;
 
 	// Run the inference with gradually lower lambda values.
 	MatrixXf grad_inference(int n_iterations, int nb_lambdas) const;

@@ -5,7 +5,7 @@
 
 using namespace Eigen;
 
-void minimize_dense_alpha_divergence(std::string path_to_image, std::string path_to_unaries, std::string path_to_output, float alpha, int nb_iterations) {
+void minimize_dense_alpha_divergence(std::string path_to_image, std::string path_to_unaries, std::string path_to_output, float alpha) {
 
     img_size size;
     // Load the unaries potentials for our image.
@@ -27,7 +27,7 @@ void minimize_dense_alpha_divergence(std::string path_to_image, std::string path
 
 }
 
-void minimize_mean_field(std::string path_to_image, std::string path_to_unaries, std::string path_to_output, int nb_iterations) {
+void minimize_mean_field(std::string path_to_image, std::string path_to_unaries, std::string path_to_output) {
 
     img_size size;
     // Load the unaries potentials for our image.
@@ -41,11 +41,9 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     crf.addPairwiseGaussian(3, 3, new PottsCompatibility(3));
 
     crf.addPairwiseBilateral( 80, 80, 13, 13, 13, img, new PottsCompatibility(10));
-    MatrixXf Q = crf.inference(nb_iterations);
+    MatrixXf Q = crf.inference();
 
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output);
-
-
 }

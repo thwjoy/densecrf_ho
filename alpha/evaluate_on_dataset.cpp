@@ -8,7 +8,7 @@
 #include <opencv2/opencv.hpp>
 #include <sys/stat.h>
 #include <limits>
-
+#include <sstream>
 
 #include "inference.hpp"
 
@@ -20,8 +20,8 @@
 
 static inline std::string &rtrim(std::string &s)
 {
-        s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-        return s;
+    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+    return s;
 }
 
 std::string stringreplace(std::string s,
@@ -35,6 +35,20 @@ std::string stringreplace(std::string s,
   return s;
 }
 
+std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        elems.push_back(item);
+    }
+    return elems;
+}
+void make_dir(std::string dir_name){
+    struct stat resdir_stat;
+    if (stat(dir_name.c_str(), &resdir_stat) == -1) {
+        mkdir(dir_name.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    }
+}
 
 /////////////////
 // Color Index //
@@ -214,7 +228,8 @@ void save_vector(const std::vector<T>& vector, const std::string& filename)
 //////////////////////////////
 
 void do_inference(std::string path_to_images, std::string path_to_unaries,
-                  std::string path_to_results, std::string image_name)
+                  std::string path_to_results, std::string image_name,
+                  std::string to_minimize)
 {
     std::string image_path = path_to_images + image_name;
     std::string unaries_path = path_to_unaries + image_name;
@@ -224,8 +239,12 @@ void do_inference(std::string path_to_images, std::string path_to_unaries,
 
     struct stat path_stat;
     if(stat(output_path.c_str(), &path_stat)!=0){
-        minimize_dense_alpha_divergence(image_path, unaries_path, output_path, 20, 1);
-        //minimize_mean_field(image_path, unaries_path, output_path, 20);
+        if (to_minimize != "mf") {
+            float alpha = stof(to_minimize);
+            minimize_dense_alpha_divergence(image_path, unaries_path, output_path, alpha);
+        } else{
+            minimize_mean_field(image_path, unaries_path, output_path);
+        }
     }
 }
 
@@ -288,53 +307,60 @@ int main(int argc, char *argv[])
 {
     if (argc<3) {
         std::cout << "evaluate split path_to_dataset path_to_results" << '\n';
-        std::cout << "Example: evaluate Validation /home/rudy/datasets/MSRC/ ./validation/" << '\n';
+        std::cout << "Example: ./evaluate Train /home/rudy/datasets/MSRC/ ./train/ -10:-3:-1:2:10:mf" << '\n';
         return 1;
     }
 
     init_map();
 
-    std::string split = argv[1];
+    std::string dataset_split = argv[1];
     std::string path_to_dataset = argv[2];
     std::string path_to_results = argv[3];
+    std::string all_alphas = argv[4];
 
-    struct stat resdir_stat;
-    if (stat(path_to_results.c_str(), &resdir_stat) == -1) {
-        mkdir(path_to_results.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    }
-
-
-    std::vector<std::string> test_images = get_all_test_files(path_to_dataset, split);
+    std::vector<std::string> test_images = get_all_test_files(path_to_dataset, dataset_split);
     std::string path_to_images = path_to_dataset + "MSRC_ObjCategImageDatabase_v2/Images/";
     std::string path_to_unaries = path_to_dataset + "texton_unaries/";
     std::string path_to_ground_truths = path_to_dataset + "MSRC_ObjCategImageDatabase_v2/GroundTruth/";
 
-    // Inference
-    for (std::vector<std::string>::iterator image_name = test_images.begin(); image_name != test_images.end(); ++image_name) {
-        do_inference(path_to_images, path_to_unaries, path_to_results, *image_name);
-    }
 
+    std::vector<std::string> alphas_to_do;
+    split(all_alphas, ':', alphas_to_do);
 
-    // Confusion evaluation
-    std::vector<int> totalConfMat(NUMLABELS * NUMLABELS, 0);
-    std::vector<int> conf_mat(NUMLABELS * NUMLABELS, 0);
-    std::vector<double> meanIous;
-    for(std::vector<std::string>::iterator image_name = test_images.begin(); image_name != test_images.end(); ++image_name) {
-        std::fill(conf_mat.begin(), conf_mat.end(), 0);
-        evaluate_segmentation(path_to_ground_truths, path_to_results, *image_name, conf_mat);
+    make_dir(path_to_results);
 
-        for(int j = 0; j < NUMLABELS * NUMLABELS; ++j)
-        {
-            totalConfMat[j] += conf_mat[j];
+    for(std::vector<std::string>::iterator alpha_s = alphas_to_do.begin(); alpha_s!= alphas_to_do.end(); alpha_s++){
+        std::string path_to_generated = path_to_results + *alpha_s + '/';
+
+        make_dir(path_to_generated);
+
+        // Inference
+        for (std::vector<std::string>::iterator image_name = test_images.begin(); image_name != test_images.end(); ++image_name) {
+            do_inference(path_to_images, path_to_unaries, path_to_generated, *image_name, *alpha_s);
         }
 
-        meanIous.push_back( compute_mean_iou(conf_mat, NUMLABELS));
+
+        // Confusion evaluation
+        std::vector<int> totalConfMat(NUMLABELS * NUMLABELS, 0);
+        std::vector<int> conf_mat(NUMLABELS * NUMLABELS, 0);
+        std::vector<double> meanIous;
+        for(std::vector<std::string>::iterator image_name = test_images.begin(); image_name != test_images.end(); ++image_name) {
+            std::fill(conf_mat.begin(), conf_mat.end(), 0);
+            evaluate_segmentation(path_to_ground_truths, path_to_generated, *image_name, conf_mat);
+
+            for(int j = 0; j < NUMLABELS * NUMLABELS; ++j)
+            {
+                totalConfMat[j] += conf_mat[j];
+            }
+
+            meanIous.push_back( compute_mean_iou(conf_mat, NUMLABELS));
+
+        }
+
+
+        save_confusion_matrix(totalConfMat, path_to_generated + "conf_mat.csv", NUMLABELS);
+        save_vector(meanIous, path_to_generated + "mean_iou_per_image.csv");
 
     }
-
-
-    save_confusion_matrix(totalConfMat, path_to_results + "conf_mat.csv", NUMLABELS);
-    save_vector(meanIous, path_to_results + "mean_iou_per_image.csv");
-
     return 0;
 }
