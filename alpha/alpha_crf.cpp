@@ -128,9 +128,6 @@ MatrixXf AlphaCRF::inference(){
         std::cout << '\r' <<  min_Q_change;
         std::cout.flush();
         previous_Q.push_back(Q);
-        if(previous_Q.size()>5){
-            previous_Q.pop_front();
-        }
         D("Updated our approximation");
         ++nb_approximate_distribution;
     }
@@ -192,9 +189,6 @@ void AlphaCRF::estimate_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf
             }
         }
         previous_Q.push_back(approx_Q);
-        if(previous_Q.size()>5){
-            previous_Q.pop_front();
-        }
         ++ nb_marginal_estimation;
     }
     D("Finished MF marginals estimation");
