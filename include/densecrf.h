@@ -78,13 +78,10 @@ public:
 	MatrixXf inference() const;
 
 	// Run the inference with gradually lower lambda values.
-	MatrixXf grad_inference(int n_iterations, int nb_lambdas) const;
+	MatrixXf grad_inference() const;
 
 	// Run MAP inference and return the map for each pixel
 	VectorXs map( int n_iterations ) const;
-
-	// Run MAP inference with gradually lower lambda values.
-	VectorXs grad_map( int n_iterations, int nb_lambdas) const;
 
 	// Step by step inference
 	MatrixXf startInference() const;

@@ -239,11 +239,14 @@ void do_inference(std::string path_to_images, std::string path_to_unaries,
 
     struct stat path_stat;
     if(stat(output_path.c_str(), &path_stat)!=0){
-        if (to_minimize != "mf") {
+        std::cout << output_path << '\n';
+        if (to_minimize == "mf") {
+            minimize_mean_field(image_path, unaries_path, output_path);
+        } else if(to_minimize == "grad"){
+            gradually_minimize_mean_field(image_path, unaries_path, output_path);
+        } else{
             float alpha = stof(to_minimize);
             minimize_dense_alpha_divergence(image_path, unaries_path, output_path, alpha);
-        } else{
-            minimize_mean_field(image_path, unaries_path, output_path);
         }
     }
 }
@@ -307,7 +310,7 @@ int main(int argc, char *argv[])
 {
     if (argc<3) {
         std::cout << "evaluate split path_to_dataset path_to_results" << '\n';
-        std::cout << "Example: ./evaluate Train /home/rudy/datasets/MSRC/ ./train/ -10:-3:-1:2:10:mf" << '\n';
+        std::cout << "Example: ./evaluate Train /home/rudy/datasets/MSRC/ ./train/ -10:-3:-1:2:10:mf:grad" << '\n';
         return 1;
     }
 

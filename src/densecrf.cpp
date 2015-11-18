@@ -161,21 +161,24 @@ MatrixXf DenseCRF::inference () const {
 	return Q;
 }
 
-MatrixXf DenseCRF::grad_inference( int n_iterations, int nb_lambdas ) const {
-
-	std::cout << "Starting gradual inference" << std::endl;
-	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
+MatrixXf DenseCRF::grad_inference() const {
+	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_), Q_prev_lambda(M_, N_);
 	unary.fill(0);
-	if( unary_ )
+	if( unary_ ) {
 		unary = unary_->get();
+	}
 	expAndNormalize( Q, -unary );
 
+	bool keep_decreasing_lambda = true;
+	float lambda = 1;
+	Q_prev_lambda = Q;
+	while(keep_decreasing_lambda){
+		lambda /= 1.1;
 
-	for(int  lambda_pow=0; lambda_pow < nb_lambdas; lambda_pow++){
-		// We want to make lambda go to zero.
-		float lambda = 1/pow(1.1,lambda_pow);
-
-		for( int it=0; it<n_iterations; it++ ) {
+		int count = 0;
+		bool keep_inferring = true;
+		old_Q = Q;
+		while(keep_inferring) {
 			tmp1 = -unary;
 			for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 				pairwise_[k]->apply( tmp2, Q );
@@ -184,12 +187,22 @@ MatrixXf DenseCRF::grad_inference( int n_iterations, int nb_lambdas ) const {
 			tmp1 = (1/lambda) * tmp1;
 			expAndNormalize( Q, tmp1 );
 
-			double KL = klDivergence(Q);
-			VectorXs temp_map = currentMap(Q);
-			double map_energy = assignment_energy(temp_map);
-			std::cout << "KL-div: " << KL << "\t MAP Energy: " << map_energy << std::endl;
+			float Q_change = (old_Q - Q).squaredNorm();
+			keep_inferring = (Q_change > 0.001);
+			old_Q = Q;
+			++count;
 		}
+
+		float Q_lambda_change = (Q_prev_lambda - Q).squaredNorm();
+		keep_decreasing_lambda = (Q_lambda_change > 0.001);
+		Q_prev_lambda = Q;
+
+        std::cout << '\r' <<  Q_lambda_change;
+        std::cout.flush();
 	}
+
+	std::cout  << '\n';
+
 	return Q;
 }
 
@@ -200,15 +213,6 @@ VectorXs DenseCRF::map ( int n_iterations ) const {
 	// Find the map
 	return currentMap( Q );
 }
-
-VectorXs DenseCRF::grad_map ( int n_iterations, int nb_lambdas ) const {
-	// Run inference
-	MatrixXf Q = grad_inference( n_iterations, nb_lambdas);
-	// Find the map
-	return currentMap( Q );
-}
-
-
 
 ///////////////////
 /////  Debug  /////

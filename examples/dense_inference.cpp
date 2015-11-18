@@ -96,17 +96,11 @@ int main( int argc, char* argv[]){
 	// weight = 10
 	crf.addPairwiseBilateral( 80, 80, 13, 13, 13, im, new PottsCompatibility( 10 ) );
 
-	// Do map inference
-//	MatrixXf Q = crf.startInference(), t1, t2;
-//	printf("kl = %f\n", crf.klDivergence(Q) );
-//	for( int it=0; it<5; it++ ) {
-//		crf.stepInference( Q, t1, t2 );
-//		printf("kl = %f\n", crf.klDivergence(Q) );
-//	}
-//	VectorXs map = crf.currentMap(Q);
+	MatrixXf approx = crf.inference();
+	VectorXs map = crf.currentMap(approx);
 
-	VectorXs map = crf.map(40);
-	VectorXs grad_map = crf.grad_map(1, 40);
+	MatrixXf grad_approx = crf.grad_inference();
+	VectorXs grad_map = crf.currentMap(grad_approx);
 
 	// Store the result
 	unsigned char *res = colorize( map, W, H );
