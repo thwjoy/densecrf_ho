@@ -58,12 +58,11 @@ MatrixXf AlphaCRF::inference(){
     // Q contains our approximation, unary contains the true
     // distribution unary, approx_Q is the meanfield approximation of
     // the proxy-distribution
-    MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), approx_Q_old(M_,N_), new_Q(M_,N_);
-    // tmp1 and tmp2 are matrix to gather intermediary computations
+    MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), new_Q(M_,N_);
+// tmp1 and tmp2 are matrix to gather intermediary computations
     MatrixXf tmp1(M_, N_), tmp2(M_, N_);
 
     std::deque<MatrixXf> previous_Q;
-
     if(!unary_){
         unary.fill(0);
     } else {
@@ -103,7 +102,7 @@ MatrixXf AlphaCRF::inference(){
         if (exact_marginals_mode) {
             marginals_bf(approx_Q);
         } else{
-            estimate_marginals(approx_Q, approx_Q_old, tmp1, tmp2);
+            estimate_marginals(approx_Q, tmp1, tmp2);
         }
 
         D("Estimate the update rule parameters");
@@ -158,7 +157,7 @@ void AlphaCRF::mf_for_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf &
     expAndNormalize(approx_Q, tmp1);
 }
 
-void AlphaCRF::estimate_marginals(MatrixXf & approx_Q, MatrixXf & approx_Q_old, MatrixXf & tmp1, MatrixXf & tmp2){
+void AlphaCRF::estimate_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2){
     /**
      * approx_Q is a M_ by N_ matrix containing all our marginals that we want to estimate.
      * approx_Q_old .... that contains the previous marginals estimation so that we can estimate convergences.
@@ -169,21 +168,33 @@ void AlphaCRF::estimate_marginals(MatrixXf & approx_Q, MatrixXf & approx_Q_old, 
     // Starting value.
     //expAndNormalize(approx_Q, -proxy_unary); // Initialization by the unaries
     approx_Q.fill(1/(float)M_);// Uniform initialization
+
+    std::deque<MatrixXf> previous_Q;
+    previous_Q.push_back(approx_Q);
+
     // Setup the checks for convergence.
     bool continue_estimating_marginals = true;
-    approx_Q_old = approx_Q;
     float marginal_change;
     int nb_marginal_estimation = 0;
 
     while(continue_estimating_marginals) {
         // Perform one meanfield iteration to update our approximation
         mf_for_marginals(approx_Q, tmp1, tmp2);
-        // Evaluate how much our distribution changed
-        marginal_change = (approx_Q - approx_Q_old).squaredNorm();
         // If we stopped changing a lot, stop the loop and
         // consider we have some good marginals
-        approx_Q_old = approx_Q;
-        continue_estimating_marginals = (marginal_change > 0.001);
+        float min_Q_change = std::numeric_limits<float>::max();
+        for (std::deque<MatrixXf>::reverse_iterator prev = previous_Q.rbegin(); prev != previous_Q.rend(); prev++) {
+            marginal_change = (*prev - approx_Q).squaredNorm();
+            min_Q_change = min_Q_change < marginal_change ? min_Q_change : marginal_change;
+            continue_estimating_marginals = (min_Q_change > 0.001);
+            if(not continue_estimating_marginals){
+                break;
+            }
+        }
+        previous_Q.push_back(approx_Q);
+        if(previous_Q.size()>5){
+            previous_Q.pop_front();
+        }
         ++ nb_marginal_estimation;
     }
     D("Finished MF marginals estimation");

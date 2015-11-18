@@ -41,6 +41,6 @@ public:
     void compute_exact_marginals();
 protected:
     void mf_for_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2);
-    void estimate_marginals(MatrixXf & approx_Q, MatrixXf & approx_Q_old, MatrixXf & tmp1, MatrixXf & tmp2);
+    void estimate_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2);
     void marginals_bf(MatrixXf & approx_Q);
 };
