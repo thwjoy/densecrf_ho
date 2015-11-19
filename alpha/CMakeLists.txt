@@ -2,6 +2,13 @@ include_directories(../external/ProbImage ../external/ppm)
 
 find_package(OpenCV REQUIRED)
 
+find_package(OpenMP)
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
+
+
 add_library(brute_force brute_force.cpp)
 
 add_library(inference inference.cpp file_storage.cpp alpha_crf.cpp)
