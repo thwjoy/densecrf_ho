@@ -244,6 +244,8 @@ void do_inference(std::string path_to_images, std::string path_to_unaries,
             minimize_mean_field(image_path, unaries_path, output_path);
         } else if(to_minimize == "grad"){
             gradually_minimize_mean_field(image_path, unaries_path, output_path);
+        } else if(to_minimize == "unaries") {
+            unaries_baseline(unaries_path, output_path);
         } else{
             float alpha = stof(to_minimize);
             minimize_dense_alpha_divergence(image_path, unaries_path, output_path, alpha);

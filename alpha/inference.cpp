@@ -65,3 +65,9 @@ void gradually_minimize_mean_field(std::string path_to_image, std::string path_t
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output);
 }
+
+void unaries_baseline(std::string path_to_unaries, std::string path_to_output){
+    img_size size;
+    MatrixXf unaries = load_unary(path_to_unaries, size);
+    save_map(unaries, size, path_to_output);
+}
