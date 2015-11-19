@@ -11,7 +11,6 @@ void normalize(MatrixXf & in){
     }
 }
 
-
 //////////////////////////////////
 // Constructors and Destructors //
 //////////////////////////////////
@@ -125,13 +124,11 @@ MatrixXf AlphaCRF::inference(){
                 break;
             }
         }
-        std::cout << '\r' <<  min_Q_change;
-        std::cout.flush();
         previous_Q.push_back(Q);
         D("Updated our approximation");
         ++nb_approximate_distribution;
     }
-    std::cout << '\n'; // Flush the Q_change monitoring line
+
     D("Done with alpha-divergence minimization");
     if (monitor_mode) {
         double ad = compute_alpha_divergence(unary, pairwise_features, pairwise_weights, Q, alpha);

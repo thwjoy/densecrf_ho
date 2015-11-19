@@ -1,8 +1,9 @@
+#include <omp.h>
 #include <stdexcept>
 #include <unordered_map>
 #include <string>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <vector>
 #include <set>
 #include <opencv2/opencv.hpp>
@@ -339,6 +340,7 @@ int main(int argc, char *argv[])
 
         make_dir(path_to_generated);
 
+#pragma omp parallel for
         // Inference
         for (std::vector<std::string>::iterator image_name = test_images.begin(); image_name != test_images.end(); ++image_name) {
             do_inference(path_to_images, path_to_unaries, path_to_generated, *image_name, *alpha_s);

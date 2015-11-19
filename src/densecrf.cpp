@@ -197,11 +197,7 @@ MatrixXf DenseCRF::grad_inference() const {
 		keep_decreasing_lambda = (Q_lambda_change > 0.001);
 		Q_prev_lambda = Q;
 
-        std::cout << '\r' <<  Q_lambda_change;
-        std::cout.flush();
 	}
-
-	std::cout  << '\n';
 
 	return Q;
 }
