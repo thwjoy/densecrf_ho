@@ -3,7 +3,67 @@
 #include "probimage.h"
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include <fstream>
 
+static inline std::string &rtrim(std::string &s)
+{
+    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+    return s;
+}
+
+
+std::vector<std::string> get_all_split_files(std::string path_to_dataset, std::string split)
+{
+    std::string path_to_split = path_to_dataset + "split/" + split+ ".txt";
+
+    std::vector<std::string> split_images;
+    std::string next_img_name;
+    std::ifstream file(path_to_split.c_str());
+
+    while(getline(file, next_img_name)){
+        split_images.push_back(rtrim(next_img_name));
+    }
+
+    return split_images;
+}
+
+std::string stringreplace(std::string s,
+                          std::string toReplace,
+                          std::string replaceWith)
+{
+    if (s.find(toReplace) != std::string::npos){
+        return(s.replace(s.find(toReplace), toReplace.length(), replaceWith));
+    }
+
+    return s;
+}
+
+
+std::string  get_unaries_path(const std::string & path_to_dataset, const std::string & image_name){
+    std::string unaries_path = path_to_dataset + "texton_unaries/";
+    unaries_path = unaries_path + image_name;
+    unaries_path = stringreplace(unaries_path, ".bmp", ".c_unary");
+    return unaries_path;
+}
+
+std::string  get_image_path(const std::string & path_to_dataset, const std::string & image_name){
+    std::string image_path = path_to_dataset +"MSRC_ObjCategImageDatabase_v2/Images/";
+    image_path = image_path + image_name;
+    return image_path;
+}
+
+std::string  get_ground_truth_path(const std::string & path_to_dataset, const std::string & image_name){
+    std::string ground_truth_path = path_to_dataset +"MSRC_ObjCategImageDatabase_v2/GroundTruth/";
+    ground_truth_path = ground_truth_path + image_name;
+    ground_truth_path = stringreplace(ground_truth_path, ".bmp", "_GT.bmp");
+    return ground_truth_path;
+}
+
+std::string get_output_path(const std::string & path_to_results_folder, const std::string & image_name){
+    std::string output_path = path_to_results_folder + image_name;
+    output_path = stringreplace(output_path, ".bmp", "_res.bmp");
+    return output_path;
+}
 
 unsigned char * load_image( const std::string & path_to_image, img_size size){
     cv::Mat img = cv::imread(path_to_image);

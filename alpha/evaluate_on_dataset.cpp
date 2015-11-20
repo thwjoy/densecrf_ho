@@ -2,7 +2,6 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <string>
-#include <fstream>
 #include <iostream>
 #include <vector>
 #include <set>
@@ -19,23 +18,6 @@
 ///////////////////////////////////
 // String Manipulation Functions //
 ///////////////////////////////////
-
-static inline std::string &rtrim(std::string &s)
-{
-    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-    return s;
-}
-
-std::string stringreplace(std::string s,
-                          std::string toReplace,
-                          std::string replaceWith)
-{
-  if (s.find(toReplace) != std::string::npos){
-    return(s.replace(s.find(toReplace), toReplace.length(), replaceWith));
-  }
-
-  return s;
-}
 
 std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
     std::stringstream ss(s);
@@ -172,15 +154,12 @@ void save_vector(const std::vector<T>& vector, const std::string& filename)
 // Performing the inference //
 //////////////////////////////
 
-void do_inference(std::string path_to_images, std::string path_to_unaries,
-                  std::string path_to_results, std::string image_name,
-                  std::string to_minimize)
+void do_inference(std::string path_to_dataset, std::string path_to_results,
+                  std::string image_name, std::string to_minimize)
 {
-    std::string image_path = path_to_images + image_name;
-    std::string unaries_path = path_to_unaries + image_name;
-    unaries_path = stringreplace(unaries_path, ".bmp", ".c_unary");
-    std::string output_path = path_to_results + image_name;
-    output_path = stringreplace(output_path, ".bmp", "_res.bmp");
+    std::string image_path = get_image_path(path_to_dataset, image_name);
+    std::string unaries_path = get_unaries_path(path_to_dataset, image_name);
+    std::string output_path = get_output_path(path_to_results, image_name);
 
     struct stat path_stat;
     if(stat(output_path.c_str(), &path_stat)!=0){
@@ -202,12 +181,10 @@ void do_inference(std::string path_to_images, std::string path_to_unaries,
 /////////////////////////////
 // Evalutating the results //
 /////////////////////////////
-void evaluate_segmentation(std::string path_to_ground_truths, std::string path_to_results, std::string image_name, std::vector<int>& confMat)
+void evaluate_segmentation(std::string path_to_dataset, std::string path_to_results, std::string image_name, std::vector<int>& confMat)
 {
-    std::string gt_path = path_to_ground_truths + image_name;
-    gt_path = stringreplace(gt_path, ".bmp", "_GT.bmp");
-    std::string output_path = path_to_results + image_name;
-    output_path = stringreplace(output_path, ".bmp", "_res.bmp");
+    std::string gt_path = get_ground_truth_path(path_to_dataset, image_name);
+    std::string output_path = get_output_path(path_to_dataset, image_name);
 
     cv::Mat gtImg = cv::imread(output_path);
     cv::Mat crfImg = cv::imread(gt_path);
@@ -233,26 +210,6 @@ void evaluate_segmentation(std::string path_to_ground_truths, std::string path_t
 }
 
 
-//////////////////////////
-// Convenience function //
-//////////////////////////
-std::vector<std::string> get_all_test_files(std::string path_to_dataset, std::string split)
-{
-    std::string path_to_testlist = path_to_dataset + "split/" + split+ ".txt";
-
-    std::vector<std::string> test_images;
-    std::string next_img_name;
-    std::ifstream file(path_to_testlist.c_str());
-
-    while(getline(file, next_img_name)){
-        test_images.push_back(rtrim(next_img_name));
-    }
-
-    return test_images;
-}
-
-
-
 int main(int argc, char *argv[])
 {
     if (argc<3) {
@@ -267,17 +224,12 @@ int main(int argc, char *argv[])
     std::string all_alphas = argv[4];
 
     std::vector<std::string> test_images = get_all_test_files(path_to_dataset, dataset_split);
-    std::string path_to_images = path_to_dataset + "MSRC_ObjCategImageDatabase_v2/Images/";
-    std::string path_to_unaries = path_to_dataset + "texton_unaries/";
-    std::string path_to_ground_truths = path_to_dataset + "MSRC_ObjCategImageDatabase_v2/GroundTruth/";
-
-
     std::vector<std::string> alphas_to_do;
     split(all_alphas, ':', alphas_to_do);
 
     make_dir(path_to_results);
 
-    for(std::vector<std::string>::iterator alpha_s = alphas_to_do.begin(); alpha_s!= alphas_to_do.end(); alpha_s++){
+    for(std::vector<std::string>::iterator alpha_s = alphas_to_do.begin(); alpha_s!= alphas_to_do.end(); ++alpha_s){
         std::string path_to_generated = path_to_results + *alpha_s + '/';
 
         make_dir(path_to_generated);
@@ -285,7 +237,7 @@ int main(int argc, char *argv[])
         // Inference
 #pragma omp parallel for
         for(int i=0; i< test_images.size(); ++i){
-            do_inference(path_to_images, path_to_unaries, path_to_generated, test_images[i], *alpha_s);
+            do_inference(path_to_dataset, path_to_results, test_images[i], *alpha_s);
         }
 
         // Confusion evaluation
@@ -294,7 +246,7 @@ int main(int argc, char *argv[])
         std::vector<double> meanIous;
         for(std::vector<std::string>::iterator image_name = test_images.begin(); image_name != test_images.end(); ++image_name) {
             std::fill(conf_mat.begin(), conf_mat.end(), 0);
-            evaluate_segmentation(path_to_ground_truths, path_to_generated, *image_name, conf_mat);
+            evaluate_segmentation(path_to_dataset, path_to_generated, *image_name, conf_mat);
 
             for(int j = 0; j < NUMLABELS * NUMLABELS; ++j)
             {

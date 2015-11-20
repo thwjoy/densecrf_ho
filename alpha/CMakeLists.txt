@@ -29,4 +29,4 @@ add_executable(evaluate evaluate_on_dataset.cpp)
 target_link_libraries(evaluate inference file_storage color_to_label)
 
 add_executable(learn_pairwise pairwise_learning.cpp)
-target_link_libraries(learn_pairwise inference file_storage)
+target_link_libraries(learn_pairwise inference file_storage optimization)
