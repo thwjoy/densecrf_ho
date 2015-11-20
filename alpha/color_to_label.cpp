@@ -1,7 +1,7 @@
 #include "color_to_label.hpp"
 
 
-labelindex  init_map(){
+labelindex  init_color_to_label_map(){
     labelindex color_to_label;
 
     color_to_label[cv::Vec3b(128,0,0)] = 0;

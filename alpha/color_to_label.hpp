@@ -14,5 +14,5 @@ struct vec3bcomp{
 };
 
 typedef std::map<cv::Vec3b, int, vec3bcomp> labelindex;
-labelindex  init_map();
+labelindex  init_color_to_label_map();
 int lookup_label_index(labelindex color_to_label, cv::Vec3b gtVal);

@@ -1,10 +1,11 @@
 #include "file_storage.hpp"
+#include "color_to_label.hpp"
 #include "probimage.h"
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
 
-unsigned char * load_image( const std::string path_to_image, img_size size){
+unsigned char * load_image( const std::string & path_to_image, img_size size){
     cv::Mat img = cv::imread(path_to_image);
 
     if(size.height != img.rows || size.width != img.cols) {
@@ -24,7 +25,7 @@ unsigned char * load_image( const std::string path_to_image, img_size size){
     return char_img;
 }
 
-MatrixXf load_unary( const std::string path_to_unary, img_size& size) {
+MatrixXf load_unary( const std::string & path_to_unary, img_size& size) {
 
     ProbImage texton;
     texton.decompress(path_to_unary.c_str());
@@ -50,26 +51,27 @@ MatrixXf load_unary( const std::string path_to_unary, img_size& size) {
     return unaries;
 }
 
-VectorXi read_labeling(const std::string path_to_labels, img_size& size){
-    VectorXi labeling(size.width * size.height);
+Matrix<short,Dynamic,1> load_labeling(const std::string & path_to_labels, img_size& size){
+    Matrix<short,Dynamic,1> labeling(size.width * size.height);
 
     cv::Mat img = cv::imread(path_to_labels);
     if(size.height != img.rows || size.width != img.cols) {
         std::cout << "Dimension doesn't correspond to labeling" << std::endl;
     }
 
+    labelindex lbl_idx = init_color_to_label_map();
+
     for (int j=0; j < size.height; j++) {
         for (int i=0; i < size.width; i++) {
             cv::Vec3b intensity = img.at<cv::Vec3b>(j,i); // this comes in BGR
-
+            labeling(j*size.width+i) = lookup_label_index(lbl_idx, intensity);
         }
     }
 
-
-
+    return labeling;
 }
 
-void save_map(const MatrixXf estimates, const img_size size, const std::string path_to_output) {
+void save_map(const MatrixXf & estimates, const img_size & size, const std::string & path_to_output) {
     std::vector<short> labeling(estimates.cols());
 
     // MAP estimation

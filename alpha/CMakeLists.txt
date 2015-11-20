@@ -13,7 +13,7 @@ add_library(brute_force brute_force.cpp)
 add_library(color_to_label color_to_label.cpp)
 
 add_library(file_storage file_storage.cpp)
-target_link_libraries(file_storage probimage)
+target_link_libraries(file_storage probimage color_to_label)
 
 
 add_library(inference inference.cpp alpha_crf.cpp)

@@ -55,7 +55,7 @@ void make_dir(std::string dir_name){
 /////////////////
 // Color Index //
 /////////////////
-labelindex color_to_label = init_map();
+labelindex color_to_label = init_color_to_label_map();
 
 ///////////////////////////////////
 // Confusion Matrix manipulation //
@@ -260,8 +260,6 @@ int main(int argc, char *argv[])
         std::cout << "Example: ./evaluate Train /home/rudy/datasets/MSRC/ ./train/ -10:-3:-1:2:10:mf:grad" << '\n';
         return 1;
     }
-
-    init_map();
 
     std::string dataset_split = argv[1];
     std::string path_to_dataset = argv[2];
