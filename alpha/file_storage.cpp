@@ -50,6 +50,25 @@ MatrixXf load_unary( const std::string path_to_unary, img_size& size) {
     return unaries;
 }
 
+VectorXi read_labeling(const std::string path_to_labels, img_size& size){
+    VectorXi labeling(size.width * size.height);
+
+    cv::Mat img = cv::imread(path_to_labels);
+    if(size.height != img.rows || size.width != img.cols) {
+        std::cout << "Dimension doesn't correspond to labeling" << std::endl;
+    }
+
+    for (int j=0; j < size.height; j++) {
+        for (int i=0; i < size.width; i++) {
+            cv::Vec3b intensity = img.at<cv::Vec3b>(j,i); // this comes in BGR
+
+        }
+    }
+
+
+
+}
+
 void save_map(const MatrixXf estimates, const img_size size, const std::string path_to_output) {
     std::vector<short> labeling(estimates.cols());
 

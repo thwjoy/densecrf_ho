@@ -12,6 +12,7 @@
 #include <sstream>
 
 #include "inference.hpp"
+#include "color_to_label.hpp"
 
 #define NUMLABELS 22
 
@@ -54,64 +55,7 @@ void make_dir(std::string dir_name){
 /////////////////
 // Color Index //
 /////////////////
-struct vec3bcomp{
-    bool operator() (const cv::Vec3b& lhs, const cv::Vec3b& rhs) const
-        {
-            for (int i = 0; i < 3; i++) {
-                if(lhs[i]!=rhs[i]){
-                    return lhs.val[i]<rhs.val[i];
-                }
-            }
-            return false;
-        }
-};
-
-std::map<cv::Vec3b, int, vec3bcomp> color_to_label;
-
-void init_map(){
-    color_to_label[cv::Vec3b(128,0,0)] = 0;
-    color_to_label[cv::Vec3b(0,128,0)] = 1;
-    color_to_label[cv::Vec3b(128,128,0)] = 2;
-    color_to_label[cv::Vec3b(0,0,128)] = 3;
-    color_to_label[cv::Vec3b(0,128,128)] = 4;
-    color_to_label[cv::Vec3b(128,128,128)] = 5;
-    color_to_label[cv::Vec3b(192,0,0)] = 6;
-    color_to_label[cv::Vec3b(64,128,0)] = 7;
-    color_to_label[cv::Vec3b(192,128,0)] = 8;
-    color_to_label[cv::Vec3b(64,0,128)] = 9;
-    color_to_label[cv::Vec3b(192,0,128)] = 10;
-    color_to_label[cv::Vec3b(64,128,128)] = 11;
-    color_to_label[cv::Vec3b(192,128,128)] = 12;
-    color_to_label[cv::Vec3b(0,64,0)] = 13;
-    color_to_label[cv::Vec3b(128,64,0)] = 14;
-    color_to_label[cv::Vec3b(0,192,0)] = 15;
-    color_to_label[cv::Vec3b(128,64,128)] = 16;
-    color_to_label[cv::Vec3b(0,192,128)] = 17;
-    color_to_label[cv::Vec3b(128,192,128)] = 18;
-    color_to_label[cv::Vec3b(64,64,0)] = 19;
-    color_to_label[cv::Vec3b(192,64,0)] = 20;
-    color_to_label[cv::Vec3b(0,0,0)] = 21;
-
-    // Ignored labels
-    color_to_label[cv::Vec3b(64,0,0)] = 21;
-    color_to_label[cv::Vec3b(128,0,128)] = 21;
-}
-
-int lookup_label_index(cv::Vec3b gtVal)
-{
-    int label=-1;
-    try {
-        label = color_to_label.at(gtVal);
-    } catch( std::out_of_range) {
-        std::cout << gtVal << '\n';
-    }
-    if (label != -1) {
-        return label;
-    } else {
-        return 21;
-    }
-}
-
+labelindex color_to_label = init_map();
 
 ///////////////////////////////////
 // Confusion Matrix manipulation //
@@ -189,8 +133,8 @@ double compute_mean_iou (const std::vector<int> & confusionMatrix, int numLabels
 
         iouPerClass.push_back(iou);
     }
-     // Necessary because in the case of a label not present in a GT,
-     // this would mean an IoU of zero which is exagerated
+    // Necessary because in the case of a label not present in a GT,
+    // this would mean an IoU of zero which is exagerated
     find_blank_gt (rowSums, indicesNotConsider);
     double mean = mean_vector(iouPerClass, indicesNotConsider);
 
@@ -280,8 +224,8 @@ void evaluate_segmentation(std::string path_to_ground_truths, std::string path_t
             cv::Vec3b crfVal = crfImg.at<cv::Vec3b>(p);
             std::swap(gtVal[0], gtVal[2]); // since OpenCV uses BGR instead of RGB
             std::swap(crfVal[0], crfVal[2]);
-            int gtIndex = lookup_label_index(gtVal);
-            int crfIndex = lookup_label_index(crfVal);
+            int gtIndex = lookup_label_index(color_to_label, gtVal);
+            int crfIndex = lookup_label_index(color_to_label, crfVal);
             ++confMat[gtIndex * NUMLABELS + crfIndex];
         }
     }
