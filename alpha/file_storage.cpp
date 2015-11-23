@@ -4,6 +4,23 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <fstream>
+#include <sys/stat.h>
+
+// Directory and file stuff
+
+void make_dir(std::string dir_name){
+    struct stat resdir_stat;
+    if (stat(dir_name.c_str(), &resdir_stat) == -1) {
+        mkdir(dir_name.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    }
+}
+
+
+bool file_exist(std::string file_path){
+    struct stat path_stat;
+    return stat(file_path.c_str(),&path_stat)!=0;
+}
+
 
 static inline std::string &rtrim(std::string &s)
 {

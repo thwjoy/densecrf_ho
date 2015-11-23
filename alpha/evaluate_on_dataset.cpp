@@ -1,14 +1,11 @@
-#include <omp.h>
-#include <stdexcept>
-#include <unordered_map>
-#include <string>
+#include <fstream>
 #include <iostream>
-#include <vector>
-#include <set>
-#include <opencv2/opencv.hpp>
-#include <sys/stat.h>
 #include <limits>
-#include <sstream>
+#include <omp.h>
+#include <opencv2/opencv.hpp>
+#include <set>
+#include <string>
+#include <vector>
 
 #include "inference.hpp"
 #include "color_to_label.hpp"
@@ -26,12 +23,6 @@ std::vector<std::string> &split(const std::string &s, char delim, std::vector<st
         elems.push_back(item);
     }
     return elems;
-}
-void make_dir(std::string dir_name){
-    struct stat resdir_stat;
-    if (stat(dir_name.c_str(), &resdir_stat) == -1) {
-        mkdir(dir_name.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    }
 }
 
 /////////////////
@@ -161,8 +152,7 @@ void do_inference(std::string path_to_dataset, std::string path_to_results,
     std::string unaries_path = get_unaries_path(path_to_dataset, image_name);
     std::string output_path = get_output_path(path_to_results, image_name);
 
-    struct stat path_stat;
-    if(stat(output_path.c_str(), &path_stat)!=0){
+    if(file_exist(output_path)){
         std::cout << output_path << '\n';
         if (to_minimize == "mf") {
             minimize_mean_field(image_path, unaries_path, output_path);
@@ -223,7 +213,7 @@ int main(int argc, char *argv[])
     std::string path_to_results = argv[3];
     std::string all_alphas = argv[4];
 
-    std::vector<std::string> test_images = get_all_test_files(path_to_dataset, dataset_split);
+    std::vector<std::string> test_images = get_all_split_files(path_to_dataset, dataset_split);
     std::vector<std::string> alphas_to_do;
     split(all_alphas, ':', alphas_to_do);
 

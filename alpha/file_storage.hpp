@@ -34,8 +34,8 @@ const unsigned char legend[22*3] = {
                                    0,0,0
                                     };
 
-
-
+bool file_exist(std::string file_path);
+void make_dir(std::string dir_path);
 std::vector<std::string> get_all_split_files(const std::string & path_to_dataset, const std::string & dataset_split);
 std::string get_image_path(const std::string & path_to_dataset, const std::string & image_name);
 std::string get_unaries_path(const std::string & path_to_dataset, const std::string & image_name);
