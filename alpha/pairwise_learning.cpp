@@ -3,6 +3,8 @@
 #include "file_storage.hpp"
 #include <iostream>
 
+#define NUM_LABELS 21
+
 class DenseCRFEnergy: public EnergyFunction {
 
 protected:
@@ -50,7 +52,6 @@ public:
             dx += l2_norm_ * x;
             r += 0.5*l2_norm_ * (x.dot(x));
         }
-
         return r;
     }
 
@@ -100,6 +101,7 @@ void training_crf(const std::string & path_to_image, const std::string & path_to
     crf.setKernelParameters(parameters.segment(pos, kernel_size));
     pos += kernel_size;
 
+
     assert(pos == parameters.size());
 
 
@@ -108,12 +110,13 @@ void training_crf(const std::string & path_to_image, const std::string & path_to
     int nb_iter = 5;
 
     DenseCRFEnergy energy(crf, objective, nb_iter, train_pairwise, train_kernel);
-    energy.setL2Norm(1e-3);
+    //energy.setL2Norm(1e-3);
 
     bool verbose = true;
     VectorXf optimized = minimizeLBFGS(energy, 2, verbose );
 
-    //TODO: update parameters with the content of optimized
+    parameters = optimized;
+
 }
 
 
@@ -121,7 +124,7 @@ int main(int argc, char *argv[])
 {
     if (argc<3) {
         std::cout << "learn_pairwise split path_to_dataset" << '\n';
-        std::cout << "Example: ./evaluate Train /home/rudy/datasets/MSRC/" << '\n';
+        std::cout << "Example: ./learn_pairwise Train /home/rudy/datasets/MSRC/" << '\n';
         return 1;
     }
 
@@ -129,27 +132,40 @@ int main(int argc, char *argv[])
     std::string dataset_split = argv[1];
     std::string path_to_dataset = argv[2];
 
+    std::string init_parameters = "parameters.csv";
+    std::string learned_parameters = "learned_parameters.csv";
+    std::string last_learned_parameters = "last_learned_parameters.csv";
+
     std::vector<std::string> split_images = get_all_split_files(path_to_dataset, dataset_split);
-    std::string path_to_images = path_to_dataset + "MSRC_ObjCategImageDatabase_v2/Images/";
-    std::string path_to_unaries = path_to_dataset + "texton_unaries/";
-    std::string path_to_ground_truths = path_to_dataset + "MSRC_ObjCategImageDatabase_v2/GroundTruth/";
 
     // initialize parameters
-
+    VectorXf parameters;
+    if(file_exist(init_parameters)){
+        parameters = load_matrix(init_parameters);
+    } else {
+        // Poor initialization, should be improved.
+        int nb_parameters = 2 +      // spatial Gaussian std-dev
+            NUM_LABELS * (NUM_LABELS + 1) + // Label compatibility for both the spatial and bilateral
+            5;                      // Bilateral Gaussian std-dev
+        parameters = VectorXf::Constant(nb_parameters, 1);
+    }
 
     for(int i=0; i< split_images.size(); ++i){
         std::string image_name = split_images[i];
-        std::string image_path = get_image_path(path_to_dataset, image_name);
+        std::cout << image_name << '\n';
         std::string unaries_path = get_unaries_path(path_to_dataset, image_name);
-        std::string gt_path = get_ground_truth_path(path_to_results_folder, image_name);
+        std::string image_path = get_image_path(path_to_dataset, image_name);
+        std::string gt_path = get_ground_truth_path(path_to_dataset, image_name);
 
+        training_crf(image_path, unaries_path, gt_path, true, true, parameters);
+
+        save_matrix(last_learned_parameters, parameters);
 
         // ToDo: piecewise training
-        training_crf(image_path, unaries_path, gt_path, true, true, parameters);
     }
 
-    // Write-down parameters
-
+// Write-down parameters
+    save_matrix(learned_parameters, parameters);
 
 
     return 0;

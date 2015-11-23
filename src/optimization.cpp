@@ -80,7 +80,7 @@ VectorXf minimizeLBFGS( EnergyFunction & efun, int restart, bool verbose ) {
 	lbfgs_parameter_init(&param);
 	// You might want to adjust the parameters to your problem
 	param.epsilon = 1e-6;
-	param.max_iterations = 50;
+	param.max_iterations = 10;
 	
 	double last_f = 1e100;
 	int ret;

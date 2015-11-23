@@ -12,19 +12,6 @@
 
 #define NUMLABELS 22
 
-///////////////////////////////////
-// String Manipulation Functions //
-///////////////////////////////////
-
-std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
-    std::stringstream ss(s);
-    std::string item;
-    while (std::getline(ss, item, delim)) {
-        elems.push_back(item);
-    }
-    return elems;
-}
-
 /////////////////
 // Color Index //
 /////////////////
@@ -152,7 +139,7 @@ void do_inference(std::string path_to_dataset, std::string path_to_results,
     std::string unaries_path = get_unaries_path(path_to_dataset, image_name);
     std::string output_path = get_output_path(path_to_results, image_name);
 
-    if(file_exist(output_path)){
+    if(not file_exist(output_path)){
         std::cout << output_path << '\n';
         if (to_minimize == "mf") {
             minimize_mean_field(image_path, unaries_path, output_path);
@@ -215,7 +202,7 @@ int main(int argc, char *argv[])
 
     std::vector<std::string> test_images = get_all_split_files(path_to_dataset, dataset_split);
     std::vector<std::string> alphas_to_do;
-    split(all_alphas, ':', alphas_to_do);
+    split_string(all_alphas, ':', alphas_to_do);
 
     make_dir(path_to_results);
 

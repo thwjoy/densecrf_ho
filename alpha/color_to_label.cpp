@@ -37,11 +37,12 @@ labelindex  init_color_to_label_map(){
 int lookup_label_index(labelindex color_to_label, cv::Vec3b gtVal)
 {
     int label=-1;
-    //try {
-    label = color_to_label.at(gtVal);
-    // } catch( std::out_of_range) {
-    //     std::cout << gtVal << '\n';
-    //}
+    try {
+        label = color_to_label.at(gtVal);
+    } catch( std::out_of_range) {
+        //std::cout << gtVal << '\n';
+        (void)0;
+    }
     if (label != -1) {
         return label;
     } else {

@@ -7,7 +7,6 @@
 #include <sys/stat.h>
 
 // Directory and file stuff
-
 void make_dir(std::string dir_name){
     struct stat resdir_stat;
     if (stat(dir_name.c_str(), &resdir_stat) == -1) {
@@ -18,7 +17,7 @@ void make_dir(std::string dir_name){
 
 bool file_exist(std::string file_path){
     struct stat path_stat;
-    return stat(file_path.c_str(),&path_stat)!=0;
+    return stat(file_path.c_str(),&path_stat)==0;
 }
 
 
@@ -29,7 +28,15 @@ static inline std::string &rtrim(std::string &s)
 }
 
 
-std::vector<std::string> get_all_split_files(std::string path_to_dataset, std::string split)
+void split_string(const std::string &s, const char delim, std::vector<std::string> &elems) {
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        elems.push_back(item);
+    }
+}
+
+std::vector<std::string> get_all_split_files(const std::string & path_to_dataset, const std::string & split)
 {
     std::string path_to_split = path_to_dataset + "split/" + split+ ".txt";
 
@@ -172,4 +179,40 @@ void save_map(const MatrixXf & estimates, const img_size & size, const std::stri
     }
 
     cv::imwrite(path_to_output, img);
+}
+
+MatrixXf load_matrix(std::string path_to_matrix){
+    std::ifstream infile(path_to_matrix.c_str());
+
+    std::string read;
+    int nb_rows, nb_cols;
+
+    std::getline(infile, read, '\t');
+    nb_rows = stoi(read);
+    std::getline(infile, read);
+    nb_cols = stoi(read);
+
+    MatrixXf loaded(nb_rows, nb_cols);
+
+    std::string line;
+    std::vector<std::string> all_floats;
+    for (int i=0; i < nb_rows; i++) {
+        std::getline(infile, line);
+        split_string(line, ',', all_floats);
+        for (int j=0; j< nb_cols; j++) {
+            float new_elt = stof(all_floats[j]);
+            loaded(i,j) = new_elt;
+        }
+        all_floats.resize(0);
+    }
+    return loaded;
+}
+
+
+void save_matrix(std::string path_to_output, MatrixXf matrix){
+    std::ofstream file(path_to_output.c_str());
+    const static IOFormat CSVFormat(StreamPrecision, DontAlignCols, ", ", "\n");
+    file << matrix.rows() << "\t" << matrix.cols() << std::endl;
+    file << matrix.format(CSVFormat);
+    file.close();
 }
