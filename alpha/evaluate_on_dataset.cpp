@@ -133,7 +133,7 @@ void save_vector(const std::vector<T>& vector, const std::string& filename)
 //////////////////////////////
 
 void do_inference(std::string path_to_dataset, std::string path_to_results,
-                  std::string image_name, std::string to_minimize)
+                  std::string image_name, std::string path_to_parameters, std::string to_minimize)
 {
     std::string image_path = get_image_path(path_to_dataset, image_name);
     std::string unaries_path = get_unaries_path(path_to_dataset, image_name);
@@ -142,14 +142,14 @@ void do_inference(std::string path_to_dataset, std::string path_to_results,
     if(not file_exist(output_path)){
         std::cout << output_path << '\n';
         if (to_minimize == "mf") {
-            minimize_mean_field(image_path, unaries_path, output_path);
+            minimize_mean_field(image_path, unaries_path, output_path, path_to_parameters);
         } else if(to_minimize == "grad"){
-            gradually_minimize_mean_field(image_path, unaries_path, output_path);
+            gradually_minimize_mean_field(image_path, unaries_path, output_path, path_to_parameters);
         } else if(to_minimize == "unaries") {
             unaries_baseline(unaries_path, output_path);
         } else{
             float alpha = stof(to_minimize);
-            minimize_dense_alpha_divergence(image_path, unaries_path, output_path, alpha);
+            //minimize_dense_alpha_divergence(image_path, unaries_path, output_path, alpha);
         }
     }
 }
@@ -191,14 +191,15 @@ int main(int argc, char *argv[])
 {
     if (argc<3) {
         std::cout << "evaluate split path_to_dataset path_to_results" << '\n';
-        std::cout << "Example: ./evaluate Train /home/rudy/datasets/MSRC/ ./train/ -10:-3:-1:2:10:mf:grad" << '\n';
+        std::cout << "Example: ./evaluate Train /home/rudy/datasets/MSRC/ ./train/ learned_parameters.csv -10:-3:-1:2:10:mf:grad" << '\n';
         return 1;
     }
 
     std::string dataset_split = argv[1];
     std::string path_to_dataset = argv[2];
     std::string path_to_results = argv[3];
-    std::string all_alphas = argv[4];
+    std::string path_to_parameters = argv[4];
+    std::string all_alphas = argv[5];
 
     std::vector<std::string> test_images = get_all_split_files(path_to_dataset, dataset_split);
     std::vector<std::string> alphas_to_do;
@@ -214,7 +215,7 @@ int main(int argc, char *argv[])
         // Inference
 #pragma omp parallel for
         for(int i=0; i< test_images.size(); ++i){
-            do_inference(path_to_dataset, path_to_results, test_images[i], *alpha_s);
+            do_inference(path_to_dataset, path_to_results, test_images[i], path_to_parameters, *alpha_s);
         }
 
         // Confusion evaluation

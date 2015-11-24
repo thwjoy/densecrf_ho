@@ -41,13 +41,14 @@ void initialize_crf_parameters(){
 
     DenseCRF2D crf(size.height, size.width, M);
     // Add simple pairwise potts terms
-    crf.addPairwiseGaussian( 1, 1, new MatrixCompatibility(MatrixXf::Identity(M,M)));
+
+    crf.addPairwiseGaussian( 1, 1, new MatrixCompatibility(-MatrixXf::Identity(M,M)));
     // Add a longer range label compatibility term
-    crf.addPairwiseBilateral(1,1,1,1,1, img, new MatrixCompatibility( 10 * MatrixXf::Identity(M,M) ));
+    crf.addPairwiseBilateral(1,1,1,1,1, img, new MatrixCompatibility(-10 * MatrixXf::Identity(M,M) ));
 
     // The kernel parameters can't be initialized directly because teh addPairwise function pre-computes the features
     VectorXf kp(7);
-    kp<< 1,1,80,80,13,13,13;
+    kp<< 3,3,80,80,13,13,13;
     crf.setKernelParameters(kp);
 
 
