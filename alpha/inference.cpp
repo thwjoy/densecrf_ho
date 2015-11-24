@@ -62,7 +62,7 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     crf.setKernelParameters(pairwise_parameters.segment(pos, kernel_size));
 
 
-    MatrixXf Q = crf.inference(5);
+    MatrixXf Q = crf.inference();
     std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
