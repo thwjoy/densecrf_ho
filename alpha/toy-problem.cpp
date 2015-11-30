@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
     int nb_variables = 5;
     int nb_labels = 9;
     int nb_features = 5;
-    float alpha = -1;
+    float alpha = 0.5;
 
     MatrixXf unaries = get_unaries(nb_variables, nb_labels);
     std::vector<MatrixXf*> all_pairwise = get_pairwise(nb_variables, nb_features);

@@ -135,6 +135,7 @@ void save_vector(const std::vector<T>& vector, const std::string& filename)
 void do_inference(std::string path_to_dataset, std::string path_to_results,
                   std::string image_name, std::string path_to_parameters, std::string to_minimize)
 {
+
     std::string image_path = get_image_path(path_to_dataset, image_name);
     std::string unaries_path = get_unaries_path(path_to_dataset, image_name);
     std::string output_path = get_output_path(path_to_results, image_name);
@@ -149,7 +150,7 @@ void do_inference(std::string path_to_dataset, std::string path_to_results,
             unaries_baseline(unaries_path, output_path);
         } else{
             float alpha = stof(to_minimize);
-            //minimize_dense_alpha_divergence(image_path, unaries_path, output_path, alpha);
+            minimize_dense_alpha_divergence(image_path, unaries_path, output_path, path_to_parameters, alpha);
         }
     }
 }
@@ -161,7 +162,7 @@ void do_inference(std::string path_to_dataset, std::string path_to_results,
 void evaluate_segmentation(std::string path_to_dataset, std::string path_to_results, std::string image_name, std::vector<int>& confMat)
 {
     std::string gt_path = get_ground_truth_path(path_to_dataset, image_name);
-    std::string output_path = get_output_path(path_to_dataset, image_name);
+    std::string output_path = get_output_path(path_to_results, image_name);
 
     cv::Mat gtImg = cv::imread(output_path);
     cv::Mat crfImg = cv::imread(gt_path);
@@ -215,7 +216,7 @@ int main(int argc, char *argv[])
         // Inference
 #pragma omp parallel for
         for(int i=0; i< test_images.size(); ++i){
-            do_inference(path_to_dataset, path_to_results, test_images[i], path_to_parameters, *alpha_s);
+            do_inference(path_to_dataset, path_to_generated, test_images[i], path_to_parameters, *alpha_s);
         }
 
         // Confusion evaluation
