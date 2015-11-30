@@ -44,16 +44,18 @@ int main(int argc, char *argv[])
     std::vector<MatrixXf*> all_pairwise = get_pairwise(nb_variables, nb_features);
 
     AlphaCRF crf(1, nb_variables, nb_labels, alpha); // width, height, nb_labels, alpha
-    crf.keep_track_of_steps();
-    crf.compute_exact_marginals();
+    //crf.keep_track_of_steps();
+    //crf.compute_exact_marginals();
 
     crf.setUnaryEnergy(unaries);
     for (int filter = 0; filter < all_pairwise.size() ; filter++) {
         crf.addPairwiseEnergy(*(all_pairwise[filter]), new PottsCompatibility(1));
     }
+
     //crf.damp_updates(0.5);
 
-    crf.inference();
+    // crf.inference();
+    crf.sequential_inference();
 
     return 0;
 }

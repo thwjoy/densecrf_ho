@@ -152,8 +152,8 @@ MatrixXf AlphaCRF::sequential_inference(){
     unary = unary_->get();
 
     D("Initializing the approximating distribution");
-    expAndNormalize( Q, -unary); // Initialization by the unaries
-    //Q.fill(1/(float)M_); // Initialization to a uniform distribution
+    //expAndNormalize( Q, -unary); // Initialization by the unaries
+    Q.fill(1/(float)M_); // Initialization to a uniform distribution
     D("Got initial estimates of the distribution");
 
     bool continue_minimizing_alpha_div = true;
@@ -166,7 +166,7 @@ MatrixXf AlphaCRF::sequential_inference(){
             // The computation of the probability will sum it, then negate it as part of the energy (so positive contribution)
             // So when we divide by Q^(1-alpha), after the marginalisation, it will cancel out fine
             MatrixXf approx_part = - (1-alpha) * (Q.array().log());
-            MatrixXf true_unary_part = -alpha * unary;
+            MatrixXf true_unary_part =  alpha * unary;
             proxy_unary = true_unary_part + approx_part;
             normalize_unaries(proxy_unary);
 
