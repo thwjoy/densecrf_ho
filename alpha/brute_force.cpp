@@ -36,25 +36,25 @@ double compute_alpha_divergence(const MatrixXf & unaries,const std::vector<Matri
         Z += conf_proba;
         all_conf_done = get_next_labeling(current_labeling, M_);
     }
-
-
     // We have the proper value of Z
     current_labeling.fill(0);
     all_conf_done=false;
     double approx_proba;
     double D_alpha = 0;
 
-
     while (not all_conf_done) {
         conf_proba = compute_probability(current_labeling, unaries, pairwise, pairwise_weight, Z);
         approx_proba = compute_approx_proba(current_labeling, approximation);
 
-        D_alpha += (-1) * (1/(float)(alpha * (1-alpha))) * (pow(conf_proba, alpha) * pow(approx_proba, 1-alpha) +
-                                                     alpha* conf_proba +
-                                                     (1-alpha) * approx_proba);
+        D_alpha += -pow(conf_proba, alpha) * pow(approx_proba, 1-alpha) +
+            alpha* conf_proba +
+            (1-alpha) * approx_proba;
+        //D_alpha += -pow(conf_proba, alpha) * pow(approx_proba, 1-alpha);
         all_conf_done = get_next_labeling(current_labeling, M_);
     }
-    std::cout << D_alpha  << '\n';
+    D_alpha = (1/(alpha * (1-alpha))) * D_alpha;
+
+    std::cout << D_alpha << '\n';
     return D_alpha;
 }
 
@@ -110,6 +110,7 @@ MatrixXf brute_force_marginals(const MatrixXf & unaries, const std::vector<Matri
     VectorXi current_labeling(N_);
     current_labeling.fill(0);
     bool all_conf_done=false;
+    double norm = 0;
 
     // Get the unnormalized marginals.
     while(not all_conf_done){
@@ -117,12 +118,12 @@ MatrixXf brute_force_marginals(const MatrixXf & unaries, const std::vector<Matri
         for (int i=0; i < N_; i++) {
             marginals(current_labeling(i), i) += conf_un_proba;
         }
+        norm += conf_un_proba;
         all_conf_done = get_next_labeling(current_labeling, M_);
     }
 
-    // Normalize the marginals
-    VectorXf norm_constants = marginals.colwise().sum();
-    marginals.array().rowwise() /= norm_constants.array().transpose();
+    // Normalize the marginals (shouldn't be necessary)
+    marginals.array() /= norm;
 
     return marginals;
 }

@@ -34,7 +34,7 @@
 
 void expAndNormalize( MatrixXf & out, const MatrixXf & in);
 void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q);
-
+void normalize(MatrixXf & out, const MatrixXf & in);
 
 /**** DenseCRF ****/
 class DenseCRF{

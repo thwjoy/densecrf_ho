@@ -99,6 +99,12 @@ UnaryEnergy* DenseCRF::getUnaryEnergy() {
 ///////////////////////
 /////  Inference  /////
 ///////////////////////
+void normalize(MatrixXf & out, const MatrixXf & in){
+	out.resize(in.rows(), in.cols());
+	VectorXf norm_constants = in.colwise().sum();
+	out = in.array().rowwise() / norm_constants.array().transpose();
+}
+
 void expAndNormalize ( MatrixXf & out, const MatrixXf & in ) {
 	out.resize( in.rows(), in.cols() );
 	for( int i=0; i<out.cols(); i++ ){

@@ -4,7 +4,7 @@
 #include <deque>
 #include <limits>
 
-void normalize(MatrixXf & in){
+void normalize_unaries(MatrixXf & in){
     for (int i=0; i<in.cols(); i++) {
         float col_min = in.col(i).minCoeff();
         in.col(i).array() -= col_min;
@@ -58,7 +58,7 @@ MatrixXf AlphaCRF::inference(){
     // distribution unary, approx_Q is the meanfield approximation of
     // the proxy-distribution
     MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), new_Q(M_,N_);
-// tmp1 and tmp2 are matrix to gather intermediary computations
+    // tmp1 and tmp2 are matrix to gather intermediary computations
     MatrixXf tmp1(M_, N_), tmp2(M_, N_);
 
     std::deque<MatrixXf> previous_Q;
@@ -95,7 +95,7 @@ MatrixXf AlphaCRF::inference(){
         // shouldn't change anything.  This consist in making the
         // smallest term 0, so that exp(-unary) isn't already way too
         // big.
-        normalize(proxy_unary);
+        normalize_unaries(proxy_unary);
         D("Done constructing the proxy distribution");;
 
         if (exact_marginals_mode) {
@@ -108,6 +108,8 @@ MatrixXf AlphaCRF::inference(){
         tmp1 = Q.array().pow(alpha-1);
         tmp2 = tmp1.cwiseProduct(approx_Q);
         tmp2 = tmp2.array().pow(1/alpha);
+
+        // WARNING: WE SHOULDN'T EXPANDNORMALIZE HERE, JUST NORMALIZE
         expAndNormalize(new_Q, tmp2);
         if(use_damping){
             Q = Q.array().pow(damping_factor) * new_Q.array().pow(1-damping_factor);
@@ -133,6 +135,55 @@ MatrixXf AlphaCRF::inference(){
     if (monitor_mode) {
         double ad = compute_alpha_divergence(unary, pairwise_features, pairwise_weights, Q, alpha);
         alpha_divergences.push_back(ad);
+    }
+
+    return Q;
+}
+
+MatrixXf AlphaCRF::sequential_inference(){
+    D("Starting inference to minimize alpha-divergence.");
+    // Q contains our approximation, unary contains the true
+    // distribution unary, approx_Q is the meanfield approximation of
+    // the proxy-distribution
+    MatrixXf Q(M_, N_), unary(M_, N_), marginals(M_, N_);
+    // tmp1 and tmp2 are matrix to gather intermediary computations
+    MatrixXf tmp1(1,N_), tmp2(1,N_);
+
+    unary = unary_->get();
+
+    D("Initializing the approximating distribution");
+    expAndNormalize( Q, -unary); // Initialization by the unaries
+    //Q.fill(1/(float)M_); // Initialization to a uniform distribution
+    D("Got initial estimates of the distribution");
+
+    bool continue_minimizing_alpha_div = true;
+    double previous_ad = std::numeric_limits<double>::max();
+    double ad;
+    while(continue_minimizing_alpha_div){
+        ad = compute_alpha_divergence(unary, pairwise_features, pairwise_weights, Q, alpha);
+        for (int var = 0; var < N_; var++) {
+            // This needs to be a minus, so that it can be compensated
+            // The computation of the probability will sum it, then negate it as part of the energy (so positive contribution)
+            // So when we divide by Q^(1-alpha), after the marginalisation, it will cancel out fine
+            MatrixXf approx_part = - (1-alpha) * (Q.array().log());
+            MatrixXf true_unary_part = -alpha * unary;
+            proxy_unary = true_unary_part + approx_part;
+            normalize_unaries(proxy_unary);
+
+            marginals_bf(marginals);
+
+            tmp1 = Q.col(var).array().pow(1-alpha);
+            tmp2 = marginals.col(var).cwiseQuotient(tmp1);
+            tmp2 = tmp2.array().pow(1/alpha);
+            normalize(tmp1, tmp2);
+            Q.col(var) = tmp1;
+
+            ad = compute_alpha_divergence(unary, pairwise_features, pairwise_weights, Q, alpha);
+            alpha_divergences.push_back(ad);
+        }
+        std::cout << "\t\t\t" << ad << '\n';
+        continue_minimizing_alpha_div = (previous_ad != ad);
+        previous_ad = ad;
     }
 
     return Q;
@@ -197,5 +248,4 @@ void AlphaCRF::marginals_bf(MatrixXf & approx_Q){
         proxy_weights.push_back(pairwise_weights[i] * alpha);
     }
     approx_Q = brute_force_marginals(proxy_unary, pairwise_features, proxy_weights);
-
 }

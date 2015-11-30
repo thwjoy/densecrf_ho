@@ -14,7 +14,7 @@ protected:
     //no pairwise because we store them in pairwise_, as they don't need to be modified.
 
     // Alpha for which we minimize the alpha-divergence.
-    float alpha;
+    const float alpha;
 
     // Use damping or not, when updating the approximation
     bool use_damping = false;
@@ -36,6 +36,7 @@ public:
     void addPairwiseEnergy( const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type=DIAG_KERNEL, NormalizationType normalization_type=NORMALIZE_SYMMETRIC );
 
     MatrixXf inference();
+    MatrixXf sequential_inference();
     void keep_track_of_steps();
     void damp_updates(float damping_factor);
     void compute_exact_marginals();
