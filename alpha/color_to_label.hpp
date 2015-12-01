@@ -1,3 +1,7 @@
+#ifndef COLOR_TO_LABEL_H
+#define COLOR_TO_LABEL_H
+
+
 #include <opencv2/opencv.hpp>
 #include <unordered_map>
 
@@ -12,7 +16,12 @@ struct vec3bcomp{
             return false;
         }
 };
+typedef std::vector<std::vector<int>> label_matrix;
 
 typedef std::map<cv::Vec3b, int, vec3bcomp> labelindex;
 labelindex  init_color_to_label_map();
 int lookup_label_index(labelindex color_to_label, cv::Vec3b gtVal);
+label_matrix labels_from_lblimg(cv::Mat lbl_img, labelindex color_to_label);
+
+
+#endif /* COLOR_TO_LABEL_H */

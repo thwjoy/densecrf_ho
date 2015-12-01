@@ -9,18 +9,23 @@ if (OPENMP_FOUND)
 endif()
 
 
+# Libraries
 add_library(brute_force brute_force.cpp)
+
 add_library(color_to_label color_to_label.cpp)
+
+add_library(evaluation evaluation.cpp)
+target_link_libraries(evaluation ${OpenCV_LIBS})
 
 add_library(file_storage file_storage.cpp)
 target_link_libraries(file_storage probimage color_to_label ${OpenCV_LIBS})
 
-
-add_executable(run throwaway.cpp)
-target_link_libraries(run file_storage densecrf)
-
 add_library(inference inference.cpp alpha_crf.cpp)
 target_link_libraries(inference densecrf brute_force file_storage)
+
+# Executables
+add_executable(run throwaway.cpp)
+target_link_libraries(run file_storage densecrf)
 
 add_executable(example_inference  example_inference.cpp)
 target_link_libraries(example_inference inference file_storage)
@@ -29,7 +34,7 @@ add_executable(toy-problem toy-problem.cpp)
 target_link_libraries(toy-problem inference)
 
 add_executable(evaluate evaluate_on_dataset.cpp)
-target_link_libraries(evaluate inference file_storage color_to_label)
+target_link_libraries(evaluate inference file_storage color_to_label evaluation)
 
 add_executable(learn_pairwise pairwise_learning.cpp)
 target_link_libraries(learn_pairwise inference file_storage optimization)

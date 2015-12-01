@@ -1,12 +1,10 @@
 #include <fstream>
 #include <iostream>
-#include <limits>
 #include <omp.h>
 #include <opencv2/opencv.hpp>
-#include <set>
-#include <string>
 #include <vector>
 
+#include "evaluation.hpp"
 #include "inference.hpp"
 #include "color_to_label.hpp"
 
@@ -17,90 +15,6 @@
 /////////////////
 labelindex color_to_label = init_color_to_label_map();
 
-///////////////////////////////////
-// Confusion Matrix manipulation //
-///////////////////////////////////
-
-void sum_along_row (const std::vector<int> & matrix, int n_rows, int n_cols, std::vector<int>& sums)
-{
-    sums.clear();
-    sums.assign(n_rows, 0);
-
-    for (size_t row = 0; row < n_rows; ++row){
-        for (size_t col = 0; col < n_cols; ++col){
-            sums[row] += matrix[row*n_rows + col];
-        }
-    }
-}
-
-void sum_along_col (const std::vector<int> & matrix, int n_rows, int n_cols, std::vector<int>& sums)
-{
-    sums.clear();
-    sums.assign(n_cols, 0);
-
-    for (size_t col = 0; col < n_cols; ++col){
-        for (size_t row = 0; row < n_rows; ++row){
-            sums[col] += matrix[row*n_rows + col];
-        }
-    }
-}
-
-template <typename T>
-double mean_vector (const std::vector<T> & vector, std::set<int> & indicesNotConsider)
-{
-    double mean = 0;
-    double N = 0;
-
-    for (size_t i = 0; i < vector.size(); ++i){
-        if ( indicesNotConsider.find(i) == indicesNotConsider.end() ){
-            mean = mean + ( (double) vector[i] );
-            ++N;
-        }
-    }
-
-    return mean/N;
-}
-
-
-void find_blank_gt (const std::vector<int> & rowSums, std::set<int> & indicesNotConsider)
-{
-    for (int i = 0; i < rowSums.size(); ++i){
-        if (rowSums[i] == 0) {
-            indicesNotConsider.insert(i);
-        }
-    }
-}
-
-
-double compute_mean_iou (const std::vector<int> & confusionMatrix, int numLabels)
-{
-    std::set<int> indicesNotConsider;
-    indicesNotConsider.insert(21); // no void labels
-
-    std::vector<int> rowSums;
-    std::vector<int> colSums;
-
-    std::vector<double> iouPerClass;
-    iouPerClass.clear();
-
-    sum_along_row (confusionMatrix, numLabels, numLabels, rowSums);
-    sum_along_col (confusionMatrix, numLabels, numLabels, colSums);
-
-    for (size_t i = 0; i < numLabels; ++i){
-        size_t uni = rowSums[i] + colSums[i] - confusionMatrix[numLabels * i + i]; // "union" is a c++ reserved word
-        size_t intersection = confusionMatrix[numLabels * i + i];
-        double iou = intersection/ ((double) (uni + std::numeric_limits<double>::epsilon() ));
-
-        iouPerClass.push_back(iou);
-    }
-    // Necessary because in the case of a label not present in a GT,
-    // this would mean an IoU of zero which is exagerated
-    find_blank_gt (rowSums, indicesNotConsider);
-    double mean = mean_vector(iouPerClass, indicesNotConsider);
-
-    return mean;
-}
-
 
 ////////////////////////////////////////////////////////
 // Save the results for analysis of the Segmentation  //
@@ -108,11 +22,11 @@ double compute_mean_iou (const std::vector<int> & confusionMatrix, int numLabels
 
 void save_confusion_matrix(const std::vector<int>& confMat, const std::string& filename, const size_t num_labels)
 {
-  std::ofstream fs(filename.c_str());
-  for(int i = 0; i < num_labels * num_labels; ++i)
-  {
-    fs << confMat[i] << (i % num_labels == (num_labels-1) ? '\n' : ',');
-  }
+    std::ofstream fs(filename.c_str());
+    for(int i = 0; i < num_labels * num_labels; ++i)
+    {
+        fs << confMat[i] << (i % num_labels == (num_labels-1) ? '\n' : ',');
+    }
 }
 
 template <typename T>
@@ -159,7 +73,7 @@ void do_inference(std::string path_to_dataset, std::string path_to_results,
 /////////////////////////////
 // Evalutating the results //
 /////////////////////////////
-void evaluate_segmentation(std::string path_to_dataset, std::string path_to_results, std::string image_name, std::vector<int>& confMat)
+void evaluate_segmentation_files(std::string path_to_dataset, std::string path_to_results, std::string image_name, std::vector<int>& confMat)
 {
     std::string gt_path = get_ground_truth_path(path_to_dataset, image_name);
     std::string output_path = get_output_path(path_to_results, image_name);
@@ -167,26 +81,48 @@ void evaluate_segmentation(std::string path_to_dataset, std::string path_to_resu
     cv::Mat gtImg = cv::imread(output_path);
     cv::Mat crfImg = cv::imread(gt_path);
 
-    assert(gtImg.rows == crfImg.rows);
-    assert(gtImg.cols == crfImg.cols);
+    label_matrix gt_labels = labels_from_lblimg(gtImg, color_to_label);
+    label_matrix crf_labels = labels_from_lblimg(crfImg, color_to_label);
 
-    for(int y = 0; y < gtImg.rows; ++y)
-    {
-        for(int x = 0; x < gtImg.cols; ++x)
-        {
-            cv::Point p(x,y);
-            cv::Vec3b gtVal = gtImg.at<cv::Vec3b>(p);
-            cv::Vec3b crfVal = crfImg.at<cv::Vec3b>(p);
-            std::swap(gtVal[0], gtVal[2]); // since OpenCV uses BGR instead of RGB
-            std::swap(crfVal[0], crfVal[2]);
-            int gtIndex = lookup_label_index(color_to_label, gtVal);
-            int crfIndex = lookup_label_index(color_to_label, crfVal);
-            ++confMat[gtIndex * NUMLABELS + crfIndex];
-        }
+    evaluate_segmentation(gt_labels, crf_labels, confMat, NUMLABELS);
+}
+double compute_pixel_accuracy(std::string dataset_split, std::string path_to_dataset,
+                              std::string path_to_generated, std::string path_to_parameters,
+                              std::string to_minimize){
+
+    std::vector<std::string> test_images = get_all_split_files(path_to_dataset, dataset_split);
+
+    // Inference
+#pragma omp parallel for
+    for(int i=0; i< test_images.size(); ++i){
+        do_inference(path_to_dataset, path_to_generated, test_images[i], path_to_parameters, to_minimize);
     }
 
-}
+// Confusion evaluation
+    std::vector<int> totalConfMat(NUMLABELS * NUMLABELS, 0);
+    std::vector<int> conf_mat(NUMLABELS * NUMLABELS, 0);
+    std::vector<double> meanIous;
+#pragma omp parallel for
+    for(int i=0; i < test_images.size(); ++i) {
+        std::string image_name = test_images[i];
+        std::fill(conf_mat.begin(), conf_mat.end(), 0);
+        evaluate_segmentation_files(path_to_dataset, path_to_generated, image_name, conf_mat);
 
+        for(int j = 0; j < NUMLABELS * NUMLABELS; ++j)
+        {
+            totalConfMat[j] += conf_mat[j];
+        }
+
+        meanIous.push_back( compute_mean_iou(conf_mat, NUMLABELS));
+
+    }
+
+    save_confusion_matrix(totalConfMat, path_to_generated + "conf_mat.csv", NUMLABELS);
+    save_vector(meanIous, path_to_generated + "mean_iou_per_image.csv");
+
+    return pixwise_acc_from_confmat(totalConfMat, NUMLABELS);
+    
+}
 
 int main(int argc, char *argv[])
 {
@@ -202,7 +138,6 @@ int main(int argc, char *argv[])
     std::string path_to_parameters = argv[4];
     std::string all_alphas = argv[5];
 
-    std::vector<std::string> test_images = get_all_split_files(path_to_dataset, dataset_split);
     std::vector<std::string> alphas_to_do;
     split_string(all_alphas, ':', alphas_to_do);
 
@@ -210,36 +145,10 @@ int main(int argc, char *argv[])
 
     for(std::vector<std::string>::iterator alpha_s = alphas_to_do.begin(); alpha_s!= alphas_to_do.end(); ++alpha_s){
         std::string path_to_generated = path_to_results + *alpha_s + '/';
-
         make_dir(path_to_generated);
 
-        // Inference
-#pragma omp parallel for
-        for(int i=0; i< test_images.size(); ++i){
-            do_inference(path_to_dataset, path_to_generated, test_images[i], path_to_parameters, *alpha_s);
-        }
-
-        // Confusion evaluation
-        std::vector<int> totalConfMat(NUMLABELS * NUMLABELS, 0);
-        std::vector<int> conf_mat(NUMLABELS * NUMLABELS, 0);
-        std::vector<double> meanIous;
-        for(std::vector<std::string>::iterator image_name = test_images.begin(); image_name != test_images.end(); ++image_name) {
-            std::fill(conf_mat.begin(), conf_mat.end(), 0);
-            evaluate_segmentation(path_to_dataset, path_to_generated, *image_name, conf_mat);
-
-            for(int j = 0; j < NUMLABELS * NUMLABELS; ++j)
-            {
-                totalConfMat[j] += conf_mat[j];
-            }
-
-            meanIous.push_back( compute_mean_iou(conf_mat, NUMLABELS));
-
-        }
-
-
-        save_confusion_matrix(totalConfMat, path_to_generated + "conf_mat.csv", NUMLABELS);
-        save_vector(meanIous, path_to_generated + "mean_iou_per_image.csv");
-
+        double accuracy = compute_pixel_accuracy(dataset_split, path_to_dataset, path_to_generated, path_to_parameters, *alpha_s);
+        std::cout << accuracy << '\n';
+        return 0;
     }
-    return 0;
 }

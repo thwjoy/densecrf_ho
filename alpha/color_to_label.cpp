@@ -49,3 +49,22 @@ int lookup_label_index(labelindex color_to_label, cv::Vec3b gtVal)
         return 21;
     }
 }
+
+
+label_matrix labels_from_lblimg(cv::Mat lbl_img, labelindex color_to_label){
+    label_matrix res(lbl_img.rows, std::vector<int>(lbl_img.cols));
+
+    for(int y = 0; y < lbl_img.rows; ++y)
+    {
+        for(int x = 0; x < lbl_img.cols; ++x)
+        {
+            cv::Point p(x,y);
+            cv::Vec3b val = lbl_img.at<cv::Vec3b>(p);
+            // since OpenCV uses BGR instead of RGB
+            std::swap(val[0], val[2]);
+            int lbl = lookup_label_index(color_to_label, val);
+            res[y][x]= lbl;
+        }
+    }
+    return res;
+}
