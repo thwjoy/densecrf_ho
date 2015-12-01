@@ -21,18 +21,10 @@ void minimize_dense_alpha_divergence(std::string path_to_image, std::string path
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3,3, new PottsCompatibility(3));
     crf.addPairwiseBilateral( 50,50,15,15,15, img, new PottsCompatibility(5));
-    // int pos=0;
-    // int pairwise_size = crf.labelCompatibilityParameters().rows();
-    // crf.setLabelCompatibilityParameters(pairwise_parameters.segment(pos, pairwise_size)); // Need to handle these properly
-    // pos += pairwise_size;
-    // int kernel_size = crf.kernelParameters().rows();
-    // crf.setKernelParameters(pairwise_parameters.segment(pos, kernel_size));
-
-
     MatrixXf Q = crf.inference();
 
-// Perform the MAP estimation on the fully factorized distribution
-// and write the results to an image file with a dumb color code
+    // Perform the MAP estimation on the fully factorized distribution
+    // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output);
 
 }
@@ -52,18 +44,11 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3,3, new PottsCompatibility(3));
     crf.addPairwiseBilateral(160,160,160,3,3, img, new PottsCompatibility(5));
-    // int pos=0;
-    // int pairwise_size = crf.labelCompatibilityParameters().rows();
-    // crf.setLabelCompatibilityParameters(pairwise_parameters.segment(pos, pairwise_size));
-    // pos += pairwise_size;
-    // int kernel_size = crf.kernelParameters().rows();
-    // crf.setKernelParameters(pairwise_parameters.segment(pos, kernel_size));
-
 
     MatrixXf Q = crf.inference();
     std::cout << "Done with inference"<< '\n';
-// Perform the MAP estimation on the fully factorized distribution
-// and write the results to an image file with a dumb color code
+    // Perform the MAP estimation on the fully factorized distribution
+    // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output);
 }
 
@@ -82,18 +67,11 @@ void gradually_minimize_mean_field(std::string path_to_image, std::string path_t
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3,3,new PottsCompatibility(3));
     crf.addPairwiseBilateral(50,50,15,15,15, img, new PottsCompatibility(5));
-    int pos=0;
-    int pairwise_size = crf.labelCompatibilityParameters().rows();
-    crf.setLabelCompatibilityParameters(pairwise_parameters.segment(pos, pairwise_size));
-    pos += pairwise_size;
-    int kernel_size = crf.kernelParameters().rows();
-    crf.setKernelParameters(pairwise_parameters.segment(pos, kernel_size));
-
 
     MatrixXf Q = crf.grad_inference();
 
-// Perform the MAP estimation on the fully factorized distribution
-// and write the results to an image file with a dumb color code
+    // Perform the MAP estimation on the fully factorized distribution
+    // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output);
 }
 
