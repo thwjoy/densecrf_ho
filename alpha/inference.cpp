@@ -82,3 +82,26 @@ void unaries_baseline(std::string path_to_unaries, std::string path_to_output){
     expAndNormalize(Q, -unaries);
     save_map(Q, size, path_to_output);
 }
+
+
+void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
+                         std::string path_to_output, float w1, float sigma_alpha, float sigma_beta) {
+    img_size size;
+    // Load the unaries potentials for our image.
+    MatrixXf unaries = load_unary(path_to_unaries, size);
+    unsigned char * img = load_image(path_to_image, size);
+
+    // Load a crf
+    DenseCRF2D crf(size.width, size.height, unaries.rows());
+
+    int M = unaries.rows();
+    crf.setUnaryEnergy(unaries);
+    crf.addPairwiseGaussian(3,3, new PottsCompatibility(3));
+    crf.addPairwiseBilateral(sigma_alpha, sigma_alpha, sigma_beta, sigma_beta, sigma_beta, img, new PottsCompatibility(w1));
+
+    MatrixXf Q = crf.inference();
+    std::cout << "Done with inference"<< '\n';
+    // Perform the MAP estimation on the fully factorized distribution
+    // and write the results to an image file with a dumb color code
+    save_map(Q, size, path_to_output);
+}
