@@ -57,7 +57,7 @@ MatrixXf AlphaCRF::inference(){
     // Q contains our approximation, unary contains the true
     // distribution unary, approx_Q is the meanfield approximation of
     // the proxy-distribution
-    MatrixXf Q(M_, N_), unary(M_, N_), approx_Q(M_, N_), new_Q(M_,N_);
+    MatrixXf Q(M_, N_), unary(M_, N_), marginals(M_, N_), new_Q(M_,N_);
     // tmp1 and tmp2 are matrix to gather intermediary computations
     MatrixXf tmp1(M_, N_), tmp2(M_, N_);
 
@@ -87,7 +87,13 @@ MatrixXf AlphaCRF::inference(){
         // Compute the factors for the approximate distribution
         //Unaries
         MatrixXf true_unary_part = alpha* unary;
-        MatrixXf approx_part = -1 * (1-alpha) * Q.array().log();
+        MatrixXf approx_part = - (1-alpha) * Q.array().log();
+        // This needs to be a minus, so that it can be compensated The
+        // computation of the probability will sum it, then negate it
+        // as part of the energy (so positive contribution) So when we
+        // divide by Q^(1-alpha), after the marginalisation, it will
+        // cancel out fine
+
         proxy_unary = true_unary_part + approx_part;
         //// Pairwise term are created when we set up the CRF because they
         //// are going to remain the same
@@ -99,18 +105,17 @@ MatrixXf AlphaCRF::inference(){
         D("Done constructing the proxy distribution");;
 
         if (exact_marginals_mode) {
-            marginals_bf(approx_Q);
+            marginals_bf(marginals);
         } else{
-            estimate_marginals(approx_Q, tmp1, tmp2);
+            estimate_marginals(marginals, tmp1, tmp2);
         }
 
         D("Estimate the update rule parameters");
-        tmp1 = Q.array().pow(alpha-1);
-        tmp2 = tmp1.cwiseProduct(approx_Q);
+        tmp1 = Q.array().pow(1-alpha); // TODO: CHECK that this is the proper power that is used.
+        tmp2 = marginals.cwiseQuotient(tmp1);
         tmp2 = tmp2.array().pow(1/alpha);
+        normalize(new_Q, tmp2);
 
-        // WARNING: WE SHOULDN'T EXPANDNORMALIZE HERE, JUST NORMALIZE
-        expAndNormalize(new_Q, tmp2);
         if(use_damping){
             Q = Q.array().pow(damping_factor) * new_Q.array().pow(1-damping_factor);
         } else {
