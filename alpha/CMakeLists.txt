@@ -38,3 +38,6 @@ target_link_libraries(evaluate inference file_storage color_to_label evaluation)
 
 add_executable(learn_pairwise pairwise_learning.cpp)
 target_link_libraries(learn_pairwise inference file_storage optimization)
+
+add_executable(grid_search grid_search.cpp)
+target_link_libraries(grid_search inference evaluation file_storage)

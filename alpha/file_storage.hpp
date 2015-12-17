@@ -54,7 +54,7 @@ Matrix<short,Dynamic,1> load_labeling(const std::string & path_to_labels, img_si
 MatrixXf load_unary(const std::string & path_to_unary, img_size& size);
 void save_map(const MatrixXf & estimates, const img_size &  size, const std::string &  path_to_output);
 
-label_matrix load_label_matrix(const std::string & path_to_labels, img_size & size);
+label_matrix load_label_matrix(const std::string & path_to_labels);
 label_matrix get_label_matrix(const MatrixXf & estimates, const img_size & size);
 
 
