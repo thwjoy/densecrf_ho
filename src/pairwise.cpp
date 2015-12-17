@@ -161,6 +161,10 @@ public:
 			return p;
 		}
 	}
+
+	virtual MatrixXf features() const {
+		return f_;
+	}
 };
 
 PairwisePotential::~PairwisePotential(){
@@ -204,4 +208,8 @@ VectorXf PairwisePotential::kernelGradient( const MatrixXf & b, const MatrixXf &
 	// You could reuse the filtered_b from applyTranspose
 	compatibility_->apply( lbl_Q, Q );
 	return kernel_->gradient(b,lbl_Q);
+}
+
+MatrixXf PairwisePotential::features() const {
+	return kernel_->features();
 }

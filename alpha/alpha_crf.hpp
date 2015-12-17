@@ -11,7 +11,6 @@ protected:
 
     //factors of the proxy-distribution that we are minimizing for.
     MatrixXf proxy_unary;
-    //no pairwise because we store them in pairwise_, as they don't need to be modified.
 
     // Alpha for which we minimize the alpha-divergence.
     const float alpha;
@@ -19,10 +18,6 @@ protected:
     // Use damping or not, when updating the approximation
     bool use_damping = false;
     float damping_factor = 1e-3;
-
-    // Useful to have to compute the alpha-divergences
-    std::vector<float> pairwise_weights;
-    std::vector<MatrixXf> pairwise_features;
 
     // Brute-force the marginals or update them with Alpha-divergences
     bool exact_marginals_mode = false;
@@ -33,15 +28,16 @@ protected:
 public:
     AlphaCRF(int W, int H, int M, float alpha);
     virtual ~AlphaCRF();
-    void addPairwiseEnergy( const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type=DIAG_KERNEL, NormalizationType normalization_type=NORMALIZE_SYMMETRIC );
 
     MatrixXf inference();
     MatrixXf sequential_inference();
     void keep_track_of_steps();
-    void damp_updates(float damping_factor);
+    void damp_updates(float damp_coeff);
     void compute_exact_marginals();
 protected:
-    void mf_for_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2);
-    void estimate_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2);
-    void marginals_bf(MatrixXf & approx_Q);
+    void mfiter_for_proxy_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2);
+    void estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2);
+    void proxy_marginals_bf(MatrixXf & approx_Q);
+    void weight_pairwise(float coeff);
+    double alpha_div(const MatrixXf & approx_Q, float alpha) const;
 };

@@ -49,6 +49,7 @@ public:
 	virtual VectorXf parameters() const = 0;
 	virtual void setParameters( const VectorXf & p ) = 0;
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const = 0;
+	virtual MatrixXf features() const = 0;
 };
 
 class PairwisePotential{
@@ -66,6 +67,7 @@ public:
 	// Get the parameters
 	virtual VectorXf parameters() const;
 	virtual VectorXf kernelParameters() const;
+	virtual MatrixXf features() const;
 	virtual void setParameters( const VectorXf & v );
 	virtual void setKernelParameters( const VectorXf & v );
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const;
