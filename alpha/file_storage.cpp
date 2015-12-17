@@ -1,5 +1,4 @@
 #include "file_storage.hpp"
-#include "color_to_label.hpp"
 #include "probimage.h"
 #include <iostream>
 #include <opencv2/opencv.hpp>
@@ -153,6 +152,18 @@ Matrix<short,Dynamic,1> load_labeling(const std::string & path_to_labels, img_si
     }
 
     return labeling;
+}
+
+label_matrix get_label_matrix(const MatrixXf & estimates, const img_size & size){
+    label_matrix res(size.height, std::vector<int>(size.width));
+    for(int i=0; i<estimates.cols(); ++i) {
+        int lbl;
+        estimates.col(i).maxCoeff( &lbl);
+        int col = i % size.width;
+        int row = (i - col)/size.width;
+        res[row][col] = lbl;
+    }
+    return res;
 }
 
 void save_map(const MatrixXf & estimates, const img_size & size, const std::string & path_to_output) {

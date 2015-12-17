@@ -111,7 +111,7 @@ MatrixXf AlphaCRF::inference(){
         }
 
         D("Estimate the update rule parameters");
-        tmp1 = Q.array().pow(1-alpha); // TODO: CHECK that this is the proper power that is used.
+        tmp1 = Q.array().pow(1-alpha);
         tmp2 = marginals.cwiseQuotient(tmp1);
         tmp2 = tmp2.array().pow(1/alpha);
         normalize(new_Q, tmp2);

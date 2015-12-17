@@ -1,5 +1,6 @@
 #include "inference.hpp"
 #include "alpha_crf.hpp"
+#include "color_to_label.hpp"
 #include <iostream>
 #include <string>
 
@@ -84,8 +85,8 @@ void unaries_baseline(std::string path_to_unaries, std::string path_to_output){
 }
 
 
-void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
-                         std::string path_to_output, float w1, float sigma_alpha, float sigma_beta) {
+label_matrix minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
+                                 float w1, float sigma_alpha, float sigma_beta) {
     img_size size;
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
@@ -100,8 +101,7 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     crf.addPairwiseBilateral(sigma_alpha, sigma_alpha, sigma_beta, sigma_beta, sigma_beta, img, new PottsCompatibility(w1));
 
     MatrixXf Q = crf.inference();
-    std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    save_map(Q, size, path_to_output);
+    return get_label_matrix(Q, size);
 }
