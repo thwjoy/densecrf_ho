@@ -70,6 +70,12 @@ MatrixXf AlphaCRF::inference(){
         // Compute the factors for the approximate distribution
         //Unaries
         MatrixXf true_unary_part = alpha* unary;
+
+        // Condition the matrix properly so that we can obtain the
+        // unaries corresponding to the approximation
+        if (Q.minCoeff()<=0) {
+            Q += std::numeric_limits<float>::epsilon() * MatrixXf::Ones(Q.rows(), Q.cols());
+        }
         MatrixXf approx_part = - (1-alpha) * Q.array().log();
         // This needs to be a minus, so that it can be compensated The
         // computation of the probability will sum it, then negate it
@@ -85,7 +91,7 @@ MatrixXf AlphaCRF::inference(){
         // smallest term 0, so that exp(-unary) isn't already way too
         // big.
         normalize_unaries(proxy_unary);
-        D("Done constructing the proxy distribution");;
+        D("Done constructing the proxy distribution");
 
         if (exact_marginals_mode) {
             proxy_marginals_bf(marginals);
