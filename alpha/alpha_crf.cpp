@@ -212,9 +212,7 @@ void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, Ma
     //expAndNormalize(approx_Q, -proxy_unary); // Initialization by the unaries
     approx_Q.fill(1/(float)M_);// Uniform initialization
 
-    std::deque<MatrixXf> previous_Q;
-    previous_Q.push_back(approx_Q);
-
+    MatrixXf previous_Q = approx_Q;
 
     // Setup the checks for convergence.
     bool continue_estimating_marginals = true;
@@ -226,16 +224,10 @@ void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, Ma
         mfiter_for_proxy_marginals(approx_Q, tmp1, tmp2);
         // If we stopped changing a lot, stop the loop and
         // consider we have some good marginals
-        float min_Q_change = std::numeric_limits<float>::max();
-        for (std::deque<MatrixXf>::reverse_iterator prev = previous_Q.rbegin(); prev != previous_Q.rend(); ++prev) {
-            marginal_change = (*prev - approx_Q).squaredNorm();
-            min_Q_change = min_Q_change < marginal_change ? min_Q_change : marginal_change;
-            continue_estimating_marginals = (min_Q_change > 0.001);
-            if(not continue_estimating_marginals){
-                break;
-            }
-        }
-        previous_Q.push_back(approx_Q);
+        float Q_change = (previous_Q - approx_Q).squaredNorm();
+        continue_estimating_marginals = (Q_change > 0.001);
+        //std::cout << Q_change << '\n';
+        previous_Q = approx_Q;
         ++ nb_marginal_estimation;
     }
 
