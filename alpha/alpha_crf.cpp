@@ -212,13 +212,12 @@ void AlphaCRF::cccpiter_for_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1
     Cste += MatrixXf::Ones(approx_Q.rows(), approx_Q.cols());
 
     for(int var=0; var<N_; ++var){
-        std::cout <<var  << '\n';
         VectorXf state(M_ + 1);
         state.head(M_) = Q_old.col(var);
         state(M_) = 1;
 
         newton_cccp(state, Cste.col(var), lambda_eig);
-
+        approx_Q.col(var) = state.head(M_);
     }
 
 
@@ -232,7 +231,7 @@ void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, Ma
      * We pass all of these so that there is no need to reallocate / deallocate.
      */
     D("Starting to estimate the marginals of the distribution");
-
+    std::cout << "Proxy-marginals" << '\n';
     // Set the pairwise terms to their weighted version
     weight_pairwise(alpha);
 
@@ -255,7 +254,6 @@ void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, Ma
         // consider we have some good marginals
         float Q_change = (previous_Q - approx_Q).squaredNorm();
         continue_estimating_marginals = (Q_change > 0.001);
-        std::cout << Q_change << '\n';
         previous_Q = approx_Q;
         ++ nb_marginal_estimation;
     }

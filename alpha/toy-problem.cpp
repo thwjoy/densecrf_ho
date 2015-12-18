@@ -38,13 +38,13 @@ int main(int argc, char *argv[])
     int nb_variables = 5;
     int nb_labels = 9;
     int nb_features = 5;
-    float alpha = 0.5;
+    float alpha = 10;
 
     MatrixXf unaries = get_unaries(nb_variables, nb_labels);
     std::vector<MatrixXf*> all_pairwise = get_pairwise(nb_variables, nb_features);
 
     AlphaCRF crf(1, nb_variables, nb_labels, alpha); // width, height, nb_labels, alpha
-    //crf.keep_track_of_steps();
+    crf.keep_track_of_steps();
     //crf.compute_exact_marginals();
 
     crf.setUnaryEnergy(unaries);
@@ -52,10 +52,10 @@ int main(int argc, char *argv[])
         crf.addPairwiseEnergy(*(all_pairwise[filter]), new PottsCompatibility(1));
     }
 
-    //crf.damp_updates(0.5);
 
-    // crf.inference();
-    crf.sequential_inference();
+    //crf.damp_updates(0.5);
+    crf.inference();
+    //crf.sequential_inference();
 
     return 0;
 }

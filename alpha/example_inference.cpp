@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
 
     std::string path_to_parameters = "/home/rudy/workspace/densecrf/build/alpha/learned_parameters.csv";
 
-    minimize_dense_alpha_divergence(path_to_image, path_to_unaries, path_to_output, path_to_parameters, 10);
-    unaries_baseline(path_to_unaries, path_to_unoutput);
-    minimize_mean_field(path_to_image, path_to_unaries,  path_to_mf_output, path_to_parameters);
+    minimize_dense_alpha_divergence(path_to_image, path_to_unaries, path_to_output, path_to_parameters, 5);
+    //    unaries_baseline(path_to_unaries, path_to_unoutput);
+    //    minimize_mean_field(path_to_image, path_to_unaries,  path_to_mf_output, path_to_parameters);
 }

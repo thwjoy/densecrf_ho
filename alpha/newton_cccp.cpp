@@ -1,7 +1,5 @@
 #include "newton_cccp.hpp"
 #include "eigen_utils.hpp"
-#include <iostream>
-
 
 void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
     int M_ = cste.size();
@@ -10,9 +8,7 @@ void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
     kkts.head(M_) += state.head(M_).array().log().matrix();
     kkts.head(M_) += cste + state(M_) * VectorXf::Ones(M_);
     kkts(M_) = state.head(M_).sum() - 1;
-
     while (not all_close_to_zero(kkts, 0.001)) {
-        std::cout << kkts  << '\n';
         // Compute J-1
         VectorXf inv_proba(M_);
         float z_norm = 0;
@@ -21,9 +17,14 @@ void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
             z_norm += inv_proba(l);
         }
         MatrixXf J1(M_+1, M_+1); // TODO: this matrix is in fact symmetric, so can take advantage of it for generation
+        for (int l=0; l < M_; l++) {
+            J1(l,l) = (1-inv_proba(l)/z_norm) * inv_proba(l);
+        }
         for (int l1=0; l1 < M_; l1++) {
-            for (int l2=0; l2< M_; l2++) {
-                J1(l1,l2) = (l1==l2 - inv_proba(l2)/z_norm) * inv_proba(l1);
+            for (int l2=l1+1; l2< M_; l2++) {
+                float temp = (- inv_proba(l2)/z_norm) * inv_proba(l1);
+                J1(l1,l2) = temp;
+                J1(l2,l1) = temp;
             }
         }
         for (int l=0; l<M_; l++) {
@@ -51,7 +52,6 @@ void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
         kkts.head(M_) += state.head(M_).array().log().matrix();
         kkts.head(M_) += cste + state(M_) * VectorXf::Ones(M_);
         kkts(M_) = state.head(M_).sum() - 1;
-
     }
 
 }

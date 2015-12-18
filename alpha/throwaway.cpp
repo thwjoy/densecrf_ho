@@ -2,6 +2,7 @@
 #include <Eigen/Core>
 #include "file_storage.hpp"
 #include <iostream>
+#include "newton_cccp.hpp"
 
 void test_writing(){
 
@@ -74,8 +75,31 @@ void initialize_crf_parameters(){
 }
 
 
+void test_cccp(){
+    VectorXf initial_proba(5);
+    initial_proba << 0.2, 0.3, 0.4, 0.05, 0.05;
+
+    float lbda = 3;
+
+    VectorXf cste(5);
+    cste << 2, 3, 4, 5, 6;
+
+    VectorXf state(6);
+    state.head(5) = initial_proba;
+    state(5) = 1;
+
+    newton_cccp(state, cste, lbda);
+
+
+
+}
+
+
+
+
+
 int main(int argc, char *argv[])
 {
-    initialize_crf_parameters();
+    test_cccp();
     return 0;
 }

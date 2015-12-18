@@ -54,7 +54,7 @@ double compute_alpha_divergence(const MatrixXf & unaries,const std::vector<Matri
     }
     D_alpha = (1/(alpha * (1-alpha))) * D_alpha;
 
-    std::cout << D_alpha << '\n';
+    std::cout <<"Alpha-divergence:\t" <<D_alpha << '\n';
     return D_alpha;
 }
 
