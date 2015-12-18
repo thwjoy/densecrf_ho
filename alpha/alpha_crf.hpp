@@ -36,6 +36,7 @@ public:
     void compute_exact_marginals();
 protected:
     void mfiter_for_proxy_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2);
+    void cccpiter_for_proxy_marginals(MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2);
     void estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2);
     void proxy_marginals_bf(MatrixXf & approx_Q);
     void weight_pairwise(float coeff);

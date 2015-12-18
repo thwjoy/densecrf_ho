@@ -1,5 +1,6 @@
 #include "alpha_crf.hpp"
 #include "brute_force.hpp"
+#include "newton_cccp.hpp"
 #include <iostream>
 #include <deque>
 #include <limits>
@@ -196,6 +197,33 @@ void AlphaCRF::mfiter_for_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, 
     expAndNormalize(approx_Q, tmp1);
 }
 
+void AlphaCRF::cccpiter_for_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2){
+    // TO DO: Adapt the Eigenvalue properly
+    float lambda_eig = 3;
+
+    // Compute the constant
+    MatrixXf Q_old = approx_Q;
+    MatrixXf Cste = proxy_unary;
+    for (int i=0; i < pairwise_.size(); i++) {
+        pairwise_[i]->apply(tmp1, Q_old);
+        Cste += tmp1;
+    }
+    Cste -= 2 * lambda_eig * Q_old;
+    Cste += MatrixXf::Ones(approx_Q.rows(), approx_Q.cols());
+
+    for(int var=0; var<N_; ++var){
+        std::cout <<var  << '\n';
+        VectorXf state(M_ + 1);
+        state.head(M_) = Q_old.col(var);
+        state(M_) = 1;
+
+        newton_cccp(state, Cste.col(var), lambda_eig);
+
+    }
+
+
+}
+
 void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2){
     /**
      * approx_Q is a M_ by N_ matrix containing all our marginals that we want to estimate.
@@ -221,12 +249,13 @@ void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, Ma
 
     while(continue_estimating_marginals) {
         // Perform one meanfield iteration to update our approximation
-        mfiter_for_proxy_marginals(approx_Q, tmp1, tmp2);
+        //mfiter_for_proxy_marginals(approx_Q, tmp1, tmp2);
+        cccpiter_for_proxy_marginals(approx_Q, tmp1, tmp2);
         // If we stopped changing a lot, stop the loop and
         // consider we have some good marginals
         float Q_change = (previous_Q - approx_Q).squaredNorm();
         continue_estimating_marginals = (Q_change > 0.001);
-        //std::cout << Q_change << '\n';
+        std::cout << Q_change << '\n';
         previous_Q = approx_Q;
         ++ nb_marginal_estimation;
     }

@@ -10,6 +10,11 @@ endif()
 
 
 # Libraries
+add_library(eigen_utils eigen_utils.cpp)
+
+add_library(newton_cccp newton_cccp.cpp)
+target_link_libraries(newton_cccp eigen_utils)
+
 add_library(brute_force brute_force.cpp)
 
 add_library(color_to_label color_to_label.cpp)
@@ -21,7 +26,7 @@ add_library(file_storage file_storage.cpp)
 target_link_libraries(file_storage probimage color_to_label ${OpenCV_LIBS})
 
 add_library(inference inference.cpp alpha_crf.cpp)
-target_link_libraries(inference densecrf brute_force file_storage)
+target_link_libraries(inference densecrf brute_force file_storage eigen_utils newton_cccp)
 
 # Executables
 add_executable(run throwaway.cpp)
