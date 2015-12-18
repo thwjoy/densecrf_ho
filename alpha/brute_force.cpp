@@ -1,4 +1,5 @@
 #include "brute_force.hpp"
+#include <algorithm>
 #include <iostream>
 
 bool get_next_labeling(VectorXi & labeling, int nb_labels){
@@ -17,14 +18,10 @@ bool get_next_labeling(VectorXi & labeling, int nb_labels){
     return labeling(labeling.size()-1) == nb_labels;
 }
 
-
-double compute_alpha_divergence(const MatrixXf & unaries,const std::vector<MatrixXf> & pairwise_feats, const std::vector<MatrixXf> & label_compatibility, const MatrixXf & approximation, float alpha){
-
+double compute_partition_function(const MatrixXf & unaries, const std::vector<MatrixXf> & pairwise_feats,
+                                  const std::vector<MatrixXf> & label_compatibility) {
     int M_ = unaries.rows();
     int N_ = unaries.cols();
-
-
-    // Compute the partition function of P
     double Z = 0;
     double conf_proba;
     VectorXi current_labeling(N_);
@@ -36,10 +33,26 @@ double compute_alpha_divergence(const MatrixXf & unaries,const std::vector<Matri
         Z += conf_proba;
         all_conf_done = get_next_labeling(current_labeling, M_);
     }
+
+    return Z;
+}
+
+double compute_alpha_divergence(const MatrixXf & unaries,const std::vector<MatrixXf> & pairwise_feats,
+                                const std::vector<MatrixXf> & label_compatibility,
+                                const MatrixXf & approximation, float alpha){
+
+    int M_ = unaries.rows();
+    int N_ = unaries.cols();
+
+    // Compute the partition function of P
+    double Z = compute_partition_function(unaries, pairwise_feats, label_compatibility);
+
     // We have the proper value of Z
+    VectorXi current_labeling(N_);
     current_labeling.fill(0);
-    all_conf_done=false;
+    bool all_conf_done=false;
     double approx_proba;
+    double conf_proba;
     double D_alpha = 0;
 
     while (not all_conf_done) {
@@ -56,6 +69,36 @@ double compute_alpha_divergence(const MatrixXf & unaries,const std::vector<Matri
 
     std::cout <<"Alpha-divergence:\t" <<D_alpha << '\n';
     return D_alpha;
+}
+
+double compute_kl_div(const MatrixXf & unaries, const std::vector<MatrixXf> & pairwise_feats,
+                      const std::vector<MatrixXf> & label_compatibility, const MatrixXf & approximation){
+    int M_ = unaries.rows();
+    int N_ = unaries.cols();
+
+
+    double Z = compute_partition_function(unaries, pairwise_feats, label_compatibility);
+
+    VectorXi current_labeling(N_);
+    current_labeling.fill(0);
+    bool all_conf_done = false;
+    double approx_proba;
+    double conf_proba;
+    double kl = 0;
+
+    while(not all_conf_done) {
+        conf_proba = compute_probability(current_labeling, unaries, pairwise_feats, label_compatibility, Z);
+        approx_proba = compute_approx_proba(current_labeling, approximation);
+
+        double term = approx_proba * log(std::max(approx_proba/std::max(conf_proba, 1e-20), 1e-20));
+        if(term != term){
+            std::cout << term << '\n';
+        }
+        kl = kl + term;
+        all_conf_done = get_next_labeling(current_labeling, M_);
+    }
+    std::cout << "KL-divergence:\t " << kl << '\n';
+    return kl;
 }
 
 double compute_approx_proba(const VectorXi & labeling, const MatrixXf & approximation) {

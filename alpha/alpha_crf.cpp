@@ -63,7 +63,7 @@ MatrixXf AlphaCRF::inference(){
     while(continue_minimizing_alpha_div){
 
         if (monitor_mode) {
-            double ad = alpha_div(Q, alpha);
+            double ad = alpha_div(Q);
             alpha_divergences.push_back(ad);
         }
 
@@ -128,7 +128,7 @@ MatrixXf AlphaCRF::inference(){
 
     D("Done with alpha-divergence minimization");
     if (monitor_mode) {
-        double ad = alpha_div(Q, alpha);
+        double ad = alpha_div(Q);
         alpha_divergences.push_back(ad);
     }
 
@@ -155,7 +155,7 @@ MatrixXf AlphaCRF::sequential_inference(){
     double previous_ad = std::numeric_limits<double>::max();
     double ad;
     while(continue_minimizing_alpha_div){
-        ad = alpha_div(Q, alpha);
+        ad = alpha_div(Q);
         for (int var = 0; var < N_; var++) {
             // This needs to be a minus, so that it can be compensated
             // The computation of the probability will sum it, then negate it as part of the energy (so positive contribution)
@@ -173,7 +173,7 @@ MatrixXf AlphaCRF::sequential_inference(){
             normalize(tmp1, tmp2);
             Q.col(var) = tmp1;
 
-            ad = alpha_div(Q, alpha);
+            ad = alpha_div(Q);
             alpha_divergences.push_back(ad);
         }
         std::cout << "\t\t\t" << ad << '\n';
@@ -208,7 +208,6 @@ void AlphaCRF::cccpiter_for_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1
         pairwise_[i]->apply(tmp1, Q_old);
         Cste += tmp1;
     }
-    Cste -= 2 * lambda_eig * Q_old;
     Cste += MatrixXf::Ones(approx_Q.rows(), approx_Q.cols());
 
     for(int var=0; var<N_; ++var){
@@ -219,8 +218,6 @@ void AlphaCRF::cccpiter_for_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1
         newton_cccp(state, Cste.col(var), lambda_eig);
         approx_Q.col(var) = state.head(M_);
     }
-
-
 }
 
 void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2){
@@ -252,6 +249,7 @@ void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, Ma
         cccpiter_for_proxy_marginals(approx_Q, tmp1, tmp2);
         // If we stopped changing a lot, stop the loop and
         // consider we have some good marginals
+        kl_div(approx_Q);
         float Q_change = (previous_Q - approx_Q).squaredNorm();
         continue_estimating_marginals = (Q_change > 0.001);
         previous_Q = approx_Q;
@@ -274,7 +272,8 @@ void AlphaCRF::proxy_marginals_bf(MatrixXf & approx_Q){
     approx_Q = brute_force_marginals(proxy_unary, pairwise_features, proxy_weights);
 }
 
-double AlphaCRF::alpha_div(const MatrixXf & approx_Q, float alpha) const{
+
+double AlphaCRF::alpha_div(const MatrixXf & approx_Q) const{
     MatrixXf unary = unary_->get();
     std::vector<MatrixXf> pairwise_features;
     std::vector<MatrixXf> pairwise_weights;
@@ -283,6 +282,19 @@ double AlphaCRF::alpha_div(const MatrixXf & approx_Q, float alpha) const{
         pairwise_weights.push_back(pairwise_[i]->parameters());
     }
     return compute_alpha_divergence(unary, pairwise_features, pairwise_weights, approx_Q, alpha);
+}
+
+double AlphaCRF::kl_div(const MatrixXf & approx_Q) const{
+    // Measure the KL divergence between approx_Q and the proxy distribution
+    // This hangs on the fact that the pairwise terms have been appropriately weighted.
+    std::vector<MatrixXf> pairwise_features;
+    std::vector<MatrixXf> proxy_weights;
+    for (int i = 0; i < pairwise_.size(); i++) {
+        pairwise_features.push_back(pairwise_[i]->features());
+        proxy_weights.push_back(pairwise_[i]->parameters());
+    }
+    compute_kl_div(proxy_unary, pairwise_features, proxy_weights, approx_Q);
+
 }
 
 void AlphaCRF::weight_pairwise(float coeff){

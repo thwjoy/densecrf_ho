@@ -40,5 +40,6 @@ protected:
     void estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2);
     void proxy_marginals_bf(MatrixXf & approx_Q);
     void weight_pairwise(float coeff);
-    double alpha_div(const MatrixXf & approx_Q, float alpha) const;
+    double alpha_div(const MatrixXf & approx_Q) const;
+    double kl_div(const MatrixXf & approx_Q) const;
 };
