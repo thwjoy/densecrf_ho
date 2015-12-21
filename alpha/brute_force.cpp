@@ -91,9 +91,6 @@ double compute_kl_div(const MatrixXf & unaries, const std::vector<MatrixXf> & pa
         approx_proba = compute_approx_proba(current_labeling, approximation);
 
         double term = approx_proba * log(std::max(approx_proba/std::max(conf_proba, 1e-20), 1e-20));
-        if(term != term){
-            std::cout << term << '\n';
-        }
         kl = kl + term;
         all_conf_done = get_next_labeling(current_labeling, M_);
     }

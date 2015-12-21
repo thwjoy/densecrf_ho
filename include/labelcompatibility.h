@@ -30,7 +30,7 @@ using namespace Eigen;
 
 /**** LabelCompatibility models a function \mu(a,b) ****/
 // To create your own label compatibility implement an "apply" function
-// than computes out(a) = sum_{x_j} \mu( a, b ) Q(b) (where Q(b) is the mean-field
+// than computes out(a) = sum_{b} \mu( a, b ) Q(b) (where Q(b) is the mean-field
 // marginal of a specific variable)
 // See below for examples
 class LabelCompatibility {
@@ -41,7 +41,8 @@ public:
 	// for parameter learning
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const;
 	
-	// Training and parameters
+	// Training and parametersn
+	virtual MatrixXf matrixForm(int nb_labels) const;
 	virtual VectorXf parameters() const;
 	virtual void setParameters( const VectorXf & v );
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const;
@@ -56,6 +57,7 @@ public:
 	
 	// Training and parameters
 	virtual VectorXf parameters() const;
+	virtual MatrixXf matrixForm(int nb_labels) const;
 	virtual void setParameters( const VectorXf & v );
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const;
 };
@@ -69,6 +71,7 @@ public:
 	
 	// Training and parameters
 	virtual VectorXf parameters() const;
+	virtual MatrixXf matrixForm(int nb_labels) const;
 	virtual void setParameters( const VectorXf & v );
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const;
 };
@@ -83,6 +86,7 @@ public:
 	
 	// Training and parameters
 	virtual VectorXf parameters() const;
+	virtual MatrixXf matrixForm(int nb_labels) const;
 	virtual void setParameters( const VectorXf & v );
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const;
 };

@@ -242,7 +242,7 @@ void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, Ma
     bool continue_estimating_marginals = true;
     float marginal_change;
     int nb_marginal_estimation = 0;
-
+    kl_div(approx_Q);
     while(continue_estimating_marginals) {
         // Perform one meanfield iteration to update our approximation
         //mfiter_for_proxy_marginals(approx_Q, tmp1, tmp2);
@@ -267,19 +267,19 @@ void AlphaCRF::proxy_marginals_bf(MatrixXf & approx_Q){
     std::vector<MatrixXf> proxy_weights;
     for (int i = 0; i < pairwise_.size(); i++) {
         pairwise_features.push_back(pairwise_[i]->features());
-        proxy_weights.push_back(pairwise_[i]->parameters());
+        proxy_weights.push_back(pairwise_[i]->compatibility_matrix(M_));
     }
     approx_Q = brute_force_marginals(proxy_unary, pairwise_features, proxy_weights);
 }
 
-
+// TODO: Handle properly the "get label compatibility matrix stuff."
 double AlphaCRF::alpha_div(const MatrixXf & approx_Q) const{
     MatrixXf unary = unary_->get();
     std::vector<MatrixXf> pairwise_features;
     std::vector<MatrixXf> pairwise_weights;
     for (int i = 0; i < pairwise_.size(); i++) {
         pairwise_features.push_back(pairwise_[i]->features());
-        pairwise_weights.push_back(pairwise_[i]->parameters());
+        pairwise_weights.push_back(pairwise_[i]->compatibility_matrix(M_));
     }
     return compute_alpha_divergence(unary, pairwise_features, pairwise_weights, approx_Q, alpha);
 }
@@ -291,10 +291,9 @@ double AlphaCRF::kl_div(const MatrixXf & approx_Q) const{
     std::vector<MatrixXf> proxy_weights;
     for (int i = 0; i < pairwise_.size(); i++) {
         pairwise_features.push_back(pairwise_[i]->features());
-        proxy_weights.push_back(pairwise_[i]->parameters());
+        proxy_weights.push_back(pairwise_[i]->compatibility_matrix(M_));
     }
-    compute_kl_div(proxy_unary, pairwise_features, proxy_weights, approx_Q);
-
+    return compute_kl_div(proxy_unary, pairwise_features, proxy_weights, approx_Q);
 }
 
 void AlphaCRF::weight_pairwise(float coeff){

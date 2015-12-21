@@ -31,6 +31,9 @@ LabelCompatibility::~LabelCompatibility() {
 void LabelCompatibility::applyTranspose( MatrixXf & out, const MatrixXf & Q ) const {
 	apply( out, Q );
 }
+MatrixXf LabelCompatibility::matrixForm(int nb_label) const {
+	return MatrixXf();
+}
 VectorXf LabelCompatibility::parameters() const {
 	return VectorXf();
 }
@@ -45,6 +48,13 @@ PottsCompatibility::PottsCompatibility( float weight ): w_(weight) {
 }
 void PottsCompatibility::apply( MatrixXf & out, const MatrixXf & Q ) const {
 	out = -w_*Q;
+}
+MatrixXf PottsCompatibility::matrixForm(int nb_labels) const {
+	MatrixXf param = w_ * MatrixXf::Ones(nb_labels, nb_labels);
+	for (int i=0; i < nb_labels; i++) {
+		param(i,i) = 0;
+	}
+	return param;
 }
 VectorXf PottsCompatibility::parameters() const {
 	VectorXf r(1);
@@ -67,6 +77,9 @@ void DiagonalCompatibility::apply( MatrixXf & out, const MatrixXf & Q ) const {
 	assert( w_.rows() == Q.rows() );
 	out = w_.asDiagonal()*Q;
 }
+MatrixXf DiagonalCompatibility::matrixForm(int nb_labels) const {
+	return w_.asDiagonal();
+}
 VectorXf DiagonalCompatibility::parameters() const {
 	return w_;
 }
@@ -84,6 +97,9 @@ void MatrixCompatibility::apply( MatrixXf & out, const MatrixXf & Q ) const {
 }
 void MatrixCompatibility::applyTranspose( MatrixXf & out, const MatrixXf & Q ) const {
 	out = w_.transpose()*Q;
+}
+MatrixXf MatrixCompatibility::matrixForm(int nb_labels) const {
+	return w_;
 }
 VectorXf MatrixCompatibility::parameters() const {
 	VectorXf r( w_.cols()*(w_.rows()+1)/2 );
@@ -106,4 +122,3 @@ VectorXf MatrixCompatibility::gradient( const MatrixXf & b, const MatrixXf & Q )
 			r[k] = g(i,j) + (i!=j?g(j,i):0.f);
 	return r;
 }
-	

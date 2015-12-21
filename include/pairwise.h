@@ -68,6 +68,7 @@ public:
 	virtual VectorXf parameters() const;
 	virtual VectorXf kernelParameters() const;
 	virtual MatrixXf features() const;
+	virtual MatrixXf compatibility_matrix(int nb_labels) const;
 	virtual void setParameters( const VectorXf & v );
 	virtual void setKernelParameters( const VectorXf & v );
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const;

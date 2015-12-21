@@ -209,7 +209,9 @@ VectorXf PairwisePotential::kernelGradient( const MatrixXf & b, const MatrixXf &
 	compatibility_->apply( lbl_Q, Q );
 	return kernel_->gradient(b,lbl_Q);
 }
-
 MatrixXf PairwisePotential::features() const {
 	return kernel_->features();
+}
+MatrixXf PairwisePotential::compatibility_matrix(int nb_labels) const {
+	return compatibility_->matrixForm(nb_labels);
 }
