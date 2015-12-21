@@ -1,5 +1,6 @@
 #include "brute_force.hpp"
 #include <algorithm>
+#include <limits>
 #include <iostream>
 
 bool get_next_labeling(VectorXi & labeling, int nb_labels){
@@ -85,12 +86,12 @@ double compute_kl_div(const MatrixXf & unaries, const std::vector<MatrixXf> & pa
     double approx_proba;
     double conf_proba;
     double kl = 0;
+    double eps = std::numeric_limits<double>::epsilon();
 
     while(not all_conf_done) {
         conf_proba = compute_probability(current_labeling, unaries, pairwise_feats, label_compatibility, Z);
         approx_proba = compute_approx_proba(current_labeling, approximation);
-
-        double term = approx_proba * log(std::max(approx_proba/std::max(conf_proba, 1e-20), 1e-20));
+        double term = approx_proba * log(std::max(approx_proba/std::max(conf_proba, eps), eps));
         kl = kl + term;
         all_conf_done = get_next_labeling(current_labeling, M_);
     }

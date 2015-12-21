@@ -48,6 +48,7 @@ PottsCompatibility::PottsCompatibility( float weight ): w_(weight) {
 }
 void PottsCompatibility::apply( MatrixXf & out, const MatrixXf & Q ) const {
 	out = -w_*Q;
+	//out = matrixForm(Q.rows()) * Q;
 }
 MatrixXf PottsCompatibility::matrixForm(int nb_labels) const {
 	MatrixXf param = w_ * MatrixXf::Ones(nb_labels, nb_labels);

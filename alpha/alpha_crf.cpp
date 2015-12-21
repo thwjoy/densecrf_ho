@@ -198,17 +198,17 @@ void AlphaCRF::mfiter_for_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, 
 }
 
 void AlphaCRF::cccpiter_for_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, MatrixXf & tmp2){
-    // TO DO: Adapt the Eigenvalue properly
-    float lambda_eig = 3;
-
+    float lambda_eig = 0;
     // Compute the constant
     MatrixXf Q_old = approx_Q;
     MatrixXf Cste = proxy_unary;
+    Cste += MatrixXf::Ones(approx_Q.rows(), approx_Q.cols());
     for (int i=0; i < pairwise_.size(); i++) {
+        lambda_eig += pick_lambda_eig(pairwise_[i]->compatibility_matrix(M_));
         pairwise_[i]->apply(tmp1, Q_old);
         Cste += tmp1;
     }
-    Cste += MatrixXf::Ones(approx_Q.rows(), approx_Q.cols());
+    Cste += - 2 * lambda_eig * Q_old;
 
     for(int var=0; var<N_; ++var){
         VectorXf state(M_ + 1);

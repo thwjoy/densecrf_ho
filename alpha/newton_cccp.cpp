@@ -1,5 +1,6 @@
 #include "newton_cccp.hpp"
 #include "eigen_utils.hpp"
+#include <Eigen/Eigenvalues>
 
 void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
     int M_ = cste.size();
@@ -16,7 +17,7 @@ void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
             inv_proba(l) = state(l) / (1+ 2 * lambda_eig * state(l));
             z_norm += inv_proba(l);
         }
-        MatrixXf J1(M_+1, M_+1); // TODO: this matrix is in fact symmetric, so can take advantage of it for generation
+        MatrixXf J1(M_+1, M_+1);
         for (int l=0; l < M_; l++) {
             J1(l,l) = (1-inv_proba(l)/z_norm) * inv_proba(l);
         }
@@ -54,4 +55,14 @@ void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
         kkts(M_) = state.head(M_).sum() - 1;
     }
 
+}
+
+
+float pick_lambda_eig(MatrixXf const & lbl_compatibility){
+    // We make the assumption that the label compatibility is symmetric,
+    // which other places in the code do.
+    VectorXf eigs = lbl_compatibility.selfadjointView<Upper>().eigenvalues();
+    float lambda_eig = eigs.maxCoeff();
+    lambda_eig = lambda_eig > 0? lambda_eig : 0;
+    return lambda_eig;
 }

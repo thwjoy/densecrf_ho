@@ -1,6 +1,7 @@
 #include "densecrf.h"
 #include <Eigen/Core>
 #include "file_storage.hpp"
+#include <Eigen/Eigenvalues>
 #include <iostream>
 #include "newton_cccp.hpp"
 
@@ -76,6 +77,7 @@ void initialize_crf_parameters(){
 
 
 void test_cccp(){
+
     VectorXf initial_proba(5);
     initial_proba << 0.2, 0.3, 0.4, 0.05, 0.05;
 
@@ -94,12 +96,21 @@ void test_cccp(){
 
 }
 
+void matrix_eigenvalues(){
+    MatrixXf test(4,4);
+    test<< 1, 2, 3, 4,
+        4, 3, 2, 1,
+        2, 2, 4, 4,
+        2, 2, 4, 4;
 
+    std::cout << test.eigenvalues() << '\n';
+
+}
 
 
 
 int main(int argc, char *argv[])
 {
-    test_cccp();
+    matrix_eigenvalues();
     return 0;
 }
