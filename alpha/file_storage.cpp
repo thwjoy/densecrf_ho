@@ -168,17 +168,8 @@ label_matrix get_label_matrix(const MatrixXf & estimates, const img_size & size)
 
 label_matrix load_label_matrix(const std::string & path_to_labels){
     cv::Mat img = cv::imread(path_to_labels);
-    label_matrix lbl_mat(img.rows, std::vector<int>(img.cols));
-
-    labelindex lbl_idx = init_color_to_label_map();
-
-    for (int j=0; j < img.rows; j++) {
-        for (int i=0; i < img.cols; i++) {
-            cv::Vec3b intensity = img.at<cv::Vec3b>(j,i); // this comes in BGR
-            lbl_mat[j][i] = lookup_label_index(lbl_idx, intensity);
-        }
-    }
-    return lbl_mat;
+    labelindex color_to_label = init_color_to_label_map();
+    return labels_from_lblimg(img, color_to_label);
 }
 
 void save_map(const MatrixXf & estimates, const img_size & size, const std::string & path_to_output) {

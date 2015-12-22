@@ -107,10 +107,15 @@ void matrix_eigenvalues(){
 
 }
 
+void test_label_matrix_loading(){
+    std::string  path_to_labels = "/home/rudy/datasets/MSRC/GT_by_partition/val/4_11_s_GT.bmp";
+    label_matrix lbl = load_label_matrix(path_to_labels);
+}
+
 
 
 int main(int argc, char *argv[])
 {
-    matrix_eigenvalues();
+    test_label_matrix_loading();
     return 0;
 }
