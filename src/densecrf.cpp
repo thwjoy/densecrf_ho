@@ -151,7 +151,8 @@ MatrixXf DenseCRF::inference () const {
 	expAndNormalize( Q, -unary );
 
 	bool keep_inferring = true;
-	old_Q = Q;
+    old_Q = Q;
+    int count = 0;
 	while(keep_inferring) {
 		tmp1 = -unary;
 		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -162,8 +163,12 @@ MatrixXf DenseCRF::inference () const {
 
 		float Q_change = (old_Q - Q).squaredNorm();
 		keep_inferring = (Q_change > 0.001);
-		old_Q = Q;
-	}
+        old_Q = Q;
+        count++;
+        if(count>100){
+            break;
+        }
+    }
 	return Q;
 }
 
