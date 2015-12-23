@@ -22,9 +22,9 @@ int main(int argc, char *argv[])
 
     std::vector<std::string> test_images = get_all_split_files(path_to_dataset, dataset_split);
 
-    for (float w1 =5; w1< 11; w1++) {
-        for (float sigma_alpha = 50; sigma_alpha<110; sigma_alpha+=10) {
-            for (float sigma_beta=3; sigma_beta<11; sigma_beta++) {
+    for (float w1 =1; w1< 11; w1+=0.5) {
+        for (float sigma_alpha = 30; sigma_alpha<80; sigma_alpha+=5) {
+            for (float sigma_beta=1; sigma_beta<6; sigma_beta+=0.5) {
 
                 std::vector<label_matrix> gts(test_images.size());
                 std::vector<label_matrix> res(test_images.size());
