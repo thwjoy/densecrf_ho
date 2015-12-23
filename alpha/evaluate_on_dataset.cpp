@@ -126,7 +126,7 @@ double compute_pixel_accuracy(std::string dataset_split, std::string path_to_dat
 
 int main(int argc, char *argv[])
 {
-    if (argc<3) {
+    if (argc<6) {
         std::cout << "evaluate split path_to_dataset path_to_results" << '\n';
         std::cout << "Example: ./evaluate Train /home/rudy/datasets/MSRC/ ./train/ learned_parameters.csv -10:-3:-1:2:10:mf:grad" << '\n';
         return 1;
@@ -144,11 +144,11 @@ int main(int argc, char *argv[])
     make_dir(path_to_results);
 
     for(std::vector<std::string>::iterator alpha_s = alphas_to_do.begin(); alpha_s!= alphas_to_do.end(); ++alpha_s){
+        std::cout << *alpha_s  << '\n';
         std::string path_to_generated = path_to_results + *alpha_s + '/';
         make_dir(path_to_generated);
 
         double accuracy = compute_pixel_accuracy(dataset_split, path_to_dataset, path_to_generated, path_to_parameters, *alpha_s);
-        std::cout << accuracy << '\n';
-        return 0;
+        std::cout <<*alpha_s << '\t' << accuracy << '\n';
     }
 }

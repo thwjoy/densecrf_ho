@@ -21,7 +21,7 @@ void minimize_dense_alpha_divergence(std::string path_to_image, std::string path
     int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3,3, new PottsCompatibility(3));
-    crf.addPairwiseBilateral( 50,50,15,15,15, img, new PottsCompatibility(5));
+    crf.addPairwiseBilateral( 40,40,2.5,2.5,2.5, img, new PottsCompatibility(3.5));
     MatrixXf Q = crf.inference();
 
     // Perform the MAP estimation on the fully factorized distribution
@@ -44,7 +44,7 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3,3, new PottsCompatibility(3));
-    crf.addPairwiseBilateral(160,160,160,3,3, img, new PottsCompatibility(5));
+    crf.addPairwiseBilateral(40,40,2.5,2.5,2.5, img, new PottsCompatibility(3.5));
 
     MatrixXf Q = crf.inference();
     std::cout << "Done with inference"<< '\n';
@@ -67,7 +67,7 @@ void gradually_minimize_mean_field(std::string path_to_image, std::string path_t
     int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3,3,new PottsCompatibility(3));
-    crf.addPairwiseBilateral(50,50,15,15,15, img, new PottsCompatibility(5));
+    crf.addPairwiseBilateral(40,40,2.5,2.5,2.5, img, new PottsCompatibility(3.5));
 
     MatrixXf Q = crf.grad_inference();
 

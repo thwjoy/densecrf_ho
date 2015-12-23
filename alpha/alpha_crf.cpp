@@ -113,10 +113,10 @@ MatrixXf AlphaCRF::inference(){
         }
 
         float min_Q_change = std::numeric_limits<float>::max();
-        for (std::deque<MatrixXf>::reverse_iterator prev = previous_Q.rbegin(); prev != previous_Q.rend(); prev++) {
+        for (std::deque<MatrixXf>::reverse_iterator prev = previous_Q.rbegin(); prev != previous_Q.rend(); ++prev) {
             Q_change = (*prev - Q).squaredNorm();
             min_Q_change = min_Q_change < Q_change ? min_Q_change : Q_change;
-            continue_minimizing_alpha_div = (min_Q_change > 0.001);
+            continue_minimizing_alpha_div = (min_Q_change > 1);
             if(not continue_minimizing_alpha_div){
                 break;
             }
@@ -124,6 +124,9 @@ MatrixXf AlphaCRF::inference(){
         previous_Q.push_back(Q);
         D("Updated our approximation");
         ++nb_approximate_distribution;
+        if(nb_approximate_distribution > 50){
+            std::cout << "Too many iterations, exiting" << '\n';
+        }
     }
 
     D("Done with alpha-divergence minimization");
@@ -242,16 +245,21 @@ void AlphaCRF::estimate_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1, Ma
     bool continue_estimating_marginals = true;
     float marginal_change;
     int nb_marginal_estimation = 0;
-    kl_div(approx_Q);
+
+    if(monitor_mode){
+        kl_div(approx_Q);
+    }
     while(continue_estimating_marginals) {
         // Perform one meanfield iteration to update our approximation
         //mfiter_for_proxy_marginals(approx_Q, tmp1, tmp2);
         cccpiter_for_proxy_marginals(approx_Q, tmp1, tmp2);
         // If we stopped changing a lot, stop the loop and
         // consider we have some good marginals
-        kl_div(approx_Q);
+        if (monitor_mode) {
+            kl_div(approx_Q);
+        }
         float Q_change = (previous_Q - approx_Q).squaredNorm();
-        continue_estimating_marginals = (Q_change > 0.001);
+        continue_estimating_marginals = (Q_change > 0.1);
         previous_Q = approx_Q;
         ++ nb_marginal_estimation;
     }
