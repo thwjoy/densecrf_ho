@@ -126,6 +126,7 @@ MatrixXf AlphaCRF::inference(){
         ++nb_approximate_distribution;
         if(nb_approximate_distribution > 50){
             std::cout << "Too many iterations, exiting" << '\n';
+            break;
         }
     }
 
