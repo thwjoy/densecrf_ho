@@ -26,6 +26,7 @@
 */
 
 #include "densecrf.h"
+#include "newton_cccp.hpp"
 #include "permutohedral.h"
 #include "util.h"
 #include "pairwise.h"
@@ -171,6 +172,54 @@ MatrixXf DenseCRF::inference () const {
     }
 	return Q;
 }
+
+MatrixXf DenseCRF::cccp_inference() const {
+	MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
+	unary.fill(0);
+	if(unary_){
+		unary = unary_->get();
+	}
+
+	// Compute the largest eigenvalues
+	float lambda_eig = 0;
+	for (int i=0; i<pairwise_.size(); i++) {
+		lambda_eig += pick_lambda_eig(pairwise_[i]->compatibility_matrix(M_));
+	}
+	expAndNormalize(Q, -unary);
+
+	bool keep_inferring = true;
+	old_Q = Q;
+	int count = 0;
+	while(keep_inferring) {
+		MatrixXf Cste = unary;
+		Cste += MatrixXf::Ones(Q.rows(), Q.cols());
+		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+			pairwise_[k]->apply( tmp2, old_Q);
+			Cste += tmp2;
+		}
+
+		Cste += -2* lambda_eig * old_Q;
+
+		for(int var = 0; var < N_; ++var){
+			VectorXf state(M_ + 1);
+			state.head(M_) = old_Q.col(var);
+			state(M_) = 1;
+
+			newton_cccp(state, Cste.col(var), lambda_eig);
+			Q.col(var) = state.head(M_);
+		}
+
+		float Q_change = (old_Q - Q).squaredNorm();
+		keep_inferring = (Q_change > 0.001);
+        old_Q = Q;
+        count++;
+        if(count>100){
+            break;
+        }
+    }
+	return Q;
+}
+
 
 MatrixXf DenseCRF::grad_inference() const {
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_), Q_prev_lambda(M_, N_);

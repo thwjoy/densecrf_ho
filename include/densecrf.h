@@ -80,6 +80,9 @@ public:
 	// Run the inference with gradually lower lambda values.
 	MatrixXf grad_inference() const;
 
+	// Run the inference with cccp optimization
+	MatrixXf cccp_inference() const;
+
 	// Run MAP inference and return the map for each pixel
 	VectorXs map( int n_iterations ) const;
 
