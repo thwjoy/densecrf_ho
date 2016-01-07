@@ -88,7 +88,7 @@ double pixwise_acc_from_confmat(const std::vector<int> & confMat, int numLabels)
     double nb_of_correct_pixels = 0;
 
     for (int row=0; row < numLabels; row++) {
-        for (int col=0; col<numLabels; col++) {
+        for (int col=0; col < numLabels; col++) {
             if (col==numLabels-1) { // Ignore the "no classification" error
                 continue;
             }
