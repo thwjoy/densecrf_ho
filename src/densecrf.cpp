@@ -145,16 +145,23 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 
 MatrixXf DenseCRF::inference () const {
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_);
+	float old_kl, kl;
 	unary.fill(0);
 	if( unary_ ){
 		unary = unary_->get();
 	}
 	expAndNormalize( Q, -unary );
 
+	if (compute_kl) {
+		old_kl = 0;
+		kl = klDivergence(Q);
+	}
+
 	bool keep_inferring = true;
-    old_Q = Q;
-    int count = 0;
+	old_Q = Q;
+	int count = 0;
 	while(keep_inferring) {
+		old_kl = kl;
 		tmp1 = -unary;
 		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 			pairwise_[k]->apply( tmp2, Q );
@@ -162,19 +169,26 @@ MatrixXf DenseCRF::inference () const {
 		}
 		expAndNormalize( Q, tmp1 );
 
-		float Q_change = (old_Q - Q).squaredNorm();
-		keep_inferring = (Q_change > 0.001);
-        old_Q = Q;
-        count++;
-        if(count>100){
-            break;
-        }
-    }
+
+		if (compute_kl) {
+			kl = klDivergence(Q);
+			float kl_change = old_kl - kl;
+			keep_inferring = (kl_change > 0.001);
+			old_kl = kl;
+		} else {
+			float Q_change = (old_Q - Q).squaredNorm();
+			keep_inferring = (Q_change > 0.001);
+		}
+		old_Q = Q;
+		count++;
+	}
+	std::cout << "Nb of needed iterations: " << count << '\n';
 	return Q;
 }
 
 MatrixXf DenseCRF::cccp_inference() const {
 	MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
+	float old_kl, kl;
 	unary.fill(0);
 	if(unary_){
 		unary = unary_->get();
@@ -188,6 +202,11 @@ MatrixXf DenseCRF::cccp_inference() const {
 	expAndNormalize(Q, -unary);
 
 	bool keep_inferring = true;
+	if (compute_kl) {
+		old_kl = 0;
+		kl = klDivergence(Q);
+	}
+
 	old_Q = Q;
 	int count = 0;
 	while(keep_inferring) {
@@ -208,15 +227,19 @@ MatrixXf DenseCRF::cccp_inference() const {
 			newton_cccp(state, Cste.col(var), lambda_eig);
 			Q.col(var) = state.head(M_);
 		}
-
-		float Q_change = (old_Q - Q).squaredNorm();
-		keep_inferring = (Q_change > 0.001);
-        old_Q = Q;
-        count++;
-        if(count>100){
-            break;
-        }
-    }
+		if (compute_kl) {
+			kl = klDivergence(Q);
+			float kl_change = old_kl - kl;
+			keep_inferring = (kl_change > 0.001);
+			old_kl = kl;
+		} else {
+			float Q_change = (old_Q - Q).squaredNorm();
+			keep_inferring = (Q_change > 0.001);
+		}
+		old_Q = Q;
+		count++;
+	}
+	std::cout << "Nb of needed iterations: " << count << '\n';
 	return Q;
 }
 
@@ -510,4 +533,8 @@ void DenseCRF::setKernelParameters( const VectorXf & v ) {
 		pairwise_[k]->setKernelParameters( v.segment( i, n[k] ) );
 		i += n[k];
 	}	
+}
+
+void DenseCRF::compute_kl_divergence(){
+	compute_kl = true;
 }

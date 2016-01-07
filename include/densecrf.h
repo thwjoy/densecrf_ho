@@ -48,6 +48,9 @@ protected:
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
 
+	// How to stop inference
+	bool compute_kl = false;
+
 	// Don't copy this object, bad stuff will happen
 	DenseCRF( DenseCRF & o ){}
 public:
@@ -109,6 +112,7 @@ public: /* Debugging functions */
 	double klDivergence( const MatrixXf & Q ) const;
 
 public: /* Parameters */
+	void compute_kl_divergence();
 	VectorXf unaryParameters() const;
 	void setUnaryParameters( const VectorXf & v );
 	VectorXf labelCompatibilityParameters() const;
