@@ -51,9 +51,13 @@ void PottsCompatibility::apply( MatrixXf & out, const MatrixXf & Q ) const {
 	//out = matrixForm(Q.rows()) * Q;
 }
 MatrixXf PottsCompatibility::matrixForm(int nb_labels) const {
-	MatrixXf param = w_ * MatrixXf::Ones(nb_labels, nb_labels);
-	for (int i=0; i < nb_labels; i++) {
-		param(i,i) = 0;
+	// MatrixXf param = w_ * MatrixXf::Ones(nb_labels, nb_labels);
+	// for (int i=0; i < nb_labels; i++) {
+	// 	param(i,i) = 0;
+	// }
+	MatrixXf param = MatrixXf::Zero(nb_labels, nb_labels);
+	for (int i= 0; i < nb_labels; i++) {
+		param(i,i) = -w_;
 	}
 	return param;
 }
