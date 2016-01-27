@@ -491,7 +491,8 @@ void Permutohedral::seqCompute ( float* out, const float* in, int value_size, bo
 				values[ o*value_size+k ] += w * in[ i*value_size+k ];
 		}
 	}
-	
+
+	// Blurring
 	for( int j=reverse?d_:0; j<=d_ && j>=0; reverse?j--:j++ ){
 		for( int i=0; i<M_; i++ ){
 			float * old_val = values + (i+1)*value_size;
