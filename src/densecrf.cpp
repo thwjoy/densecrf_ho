@@ -186,6 +186,54 @@ MatrixXf DenseCRF::inference () const {
 	return Q;
 }
 
+MatrixXf DenseCRF::qp_inference() const {
+	MatrixXf Q(M_, N_);
+	// Get initial estimates
+
+	// Build proxy unaries for the added terms
+	// Compute separately the diagonal terms and Gaussian terms of the quadratic part.
+
+
+	// Compute the value of the energy
+
+	// Conditional Gradient Descent loop start, while energy is decreasing
+
+	// Compute the gradient at the current estimates.
+
+	// Get a Descent direction by minimising < \nabla E, s >
+
+	// Solve for the best step size.
+
+	// Take a step of optimal step size.
+
+	// Conditional Gradient Descent loop end
+
+	return Q;
+}
+
+MatrixXf DenseCRF::qp_cccp_inference() const {
+	MatrixXf Q(M_, N_);
+	// Compute the largest eigenvalues necessary to make sure that the problem is convex.
+
+	// TODO: Write down on paper the updates rules for cccp, should just be
+	// a simpler version than the ones for KL-divergence minimisation
+
+
+	// Get initial estimates
+
+	// CCCP loop start, while energy is decreasing
+
+	// Compute the linearisation of the concave part
+
+	// Solve the convex minimisation problem, using conditional gradient descent
+	// This should be really easy to reuse some of the functions in the relaxed qp.
+
+	// CCCP loop end
+
+	return Q;
+}
+
+
 MatrixXf DenseCRF::cccp_inference() const {
 	MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
 	float old_kl, kl;
