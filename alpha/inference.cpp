@@ -1,6 +1,7 @@
 #include "inference.hpp"
 #include "alpha_crf.hpp"
 #include "color_to_label.hpp"
+#include <ctime>
 #include <iostream>
 #include <string>
 
@@ -45,9 +46,16 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(3,3, new PottsCompatibility(3));
     crf.addPairwiseBilateral(40,40,2.5,2.5,2.5, img, new PottsCompatibility(3.5));
+    //crf.compute_kl_divergence();
 
+    clock_t start, end;
+    start = clock();
     MatrixXf Q = crf.inference();
-    std::cout << "Done with inference"<< '\n';
+    end = clock();
+    double timing = (double(end-start)/CLOCKS_PER_SEC);
+    // std::cout << "Time taken: " << timing << '\n';
+    // std::cout << "KL divergence: " << crf.klDivergence(Q) << '\n';
+    // std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output);
@@ -69,8 +77,16 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
     crf.addPairwiseGaussian(3,3, new PottsCompatibility(3));
     crf.addPairwiseBilateral(40,40,2.5,2.5,2.5, img, new PottsCompatibility(3.5));
 
+    //crf.compute_kl_divergence();
+
+    clock_t start, end;
+    start = clock();
     MatrixXf Q = crf.cccp_inference();
-    std::cout << "Done with inference"<< '\n';
+    end = clock();
+    double timing = (double(end-start)/CLOCKS_PER_SEC);
+    // std::cout << "Time taken: " << timing << '\n';
+    // std::cout << "KL divergence: " << crf.klDivergence(Q) << '\n';
+    // std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output);
