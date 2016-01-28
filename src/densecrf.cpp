@@ -197,7 +197,7 @@ MatrixXf DenseCRF::qp_inference() const {
         unary = unary_->get();
 	}
 	// Initialize state to the unaries
-    expAndNormalize(Q, unary);
+    expAndNormalize(Q, -unary);
 
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
