@@ -189,7 +189,7 @@ MatrixXf DenseCRF::inference () const {
 
 MatrixXf DenseCRF::qp_inference() const {
 	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
-		desc(M_,N_), psis(M_,N_);
+        desc(M_,N_), psis(M_,N_), sx(M_,N_);
 
 	// Get initial estimates
 	unary.fill(0);
@@ -228,19 +228,19 @@ MatrixXf DenseCRF::qp_inference() const {
         descent_direction(desc, grad);
 
         // Solve for the best step size. The best step size is
-        // - \frac{x^T \Psi s + 0.5 \phi s}{s^T \Psi s}
-
+        // - \frac{x^T \Psi (s-x) + 0.5 \phi (s-x)}{(s-x)^T \Psi (s-x)}
+        sx = desc - Q;
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp, desc);
+            pairwise_[k]->apply( tmp, sx);
             psis += tmp;
         }
-        psis -= diag_dom * desc;
-        double num =  Q.cwiseProduct(psis).sum() + 0.5 * unary.cwiseProduct(psis).sum();
-        double denom = desc.cwiseProduct(psis).sum();
+        psis -= diag_dom.cwiseProduct(sx);
+        double num =  Q.cwiseProduct(psis).sum() + 0.5 * unary.cwiseProduct(sx).sum();
+        double denom = sx.cwiseProduct(psis).sum();
         double optimal_step_size = - num / denom;
 
         // Take a step
-        Q += optimal_step_size * desc;
+        Q = (1-optimal_step_size)* Q + optimal_step_size * desc;
         energy = compute_LR_QP_value(Q, diag_dom);
     }
     std::cout << energy  << '\n';
