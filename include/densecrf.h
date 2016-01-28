@@ -120,6 +120,9 @@ public: /* Debugging functions */
 	// Compute the energy associated with a relaxation
 	double compute_energy( const MatrixXf & Q) const;
 
+	// Compute the value of a Lafferty-Ravikumar QP
+	double compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const;
+
 public: /* Parameters */
 	void compute_kl_divergence();
 	VectorXf unaryParameters() const;
