@@ -188,6 +188,8 @@ MatrixXf DenseCRF::inference () const {
 }
 
 MatrixXf DenseCRF::qp_inference() const {
+    // Todo: We don't get always decreasing value, which is weird and
+    // shouldn't happen
 	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
         desc(M_,N_), psis(M_,N_), sx(M_,N_);
 
@@ -242,6 +244,11 @@ MatrixXf DenseCRF::qp_inference() const {
         // Take a step
         Q = (1-optimal_step_size)* Q + optimal_step_size * desc;
         energy = compute_LR_QP_value(Q, diag_dom);
+
+        if (energy > old_energy) {
+            std::cout << "This shouldn't happen, fix this shit" << '\n';
+        }
+
     }
     std::cout << energy  << '\n';
 
