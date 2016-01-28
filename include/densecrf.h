@@ -117,6 +117,9 @@ public: /* Debugging functions */
 	// Compute the KL-divergence of a set of marginals
 	double klDivergence( const MatrixXf & Q ) const;
 
+	// Compute the energy associated with a relaxation
+	double compute_energy( const MatrixXf & Q) const;
+
 public: /* Parameters */
 	void compute_kl_divergence();
 	VectorXf unaryParameters() const;

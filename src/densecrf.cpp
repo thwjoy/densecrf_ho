@@ -27,6 +27,7 @@
 
 #include "densecrf.h"
 #include "newton_cccp.hpp"
+#include "qp.hpp"
 #include "permutohedral.h"
 #include "util.h"
 #include "pairwise.h"
@@ -187,26 +188,48 @@ MatrixXf DenseCRF::inference () const {
 }
 
 MatrixXf DenseCRF::qp_inference() const {
-	MatrixXf Q(M_, N_);
+	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_);
+
 	// Get initial estimates
+	unary.fill(0);
+	if(unary_){
+		unary = unary_->get();
+	}
+	// Initialize state to the unaries
+	Q = unary;
 
 	// Build proxy unaries for the added terms
-	// Compute separately the diagonal terms and Gaussian terms of the quadratic part.
-
+	// Compute the dominant diagonal
+	MatrixXf full_ones = MatrixXf::Ones(M_, N_);
+	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+		pairwise_[k]->apply( tmp, full_ones);
+		diag_dom += tmp;
+	}
+	// Update the proxy_unaries
+	unary = unary - diag_dom;
 
 	// Compute the value of the energy
+	double old_energy = std::numeric_limits<double>::max();
+	double energy = compute_energy(Q);
 
-	// Conditional Gradient Descent loop start, while energy is decreasing
+	while( (old_energy - energy) > 1e-3){
 
-	// Compute the gradient at the current estimates.
+		// Compute the gradient at the current estimates.
+		grad = unary;
+		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+			pairwise_[k]->apply( tmp, Q);
+			grad += 2 *tmp;
+		}
+		grad -= 2 * diag_dom * Q;
 
-	// Get a Descent direction by minimising < \nabla E, s >
+		// Get a Descent direction by minimising < \nabla E, s >
+		descent_direction(tmp, grad);
+
+	}
 
 	// Solve for the best step size.
 
 	// Take a step of optimal step size.
-
-	// Conditional Gradient Descent loop end
 
 	return Q;
 }
@@ -456,6 +479,25 @@ double DenseCRF::klDivergence( const MatrixXf & Q ) const {
 		kl += (Q.array()*tmp.array()).sum();
 	}
 	return kl;
+}
+
+double DenseCRF::compute_energy(const MatrixXf & Q) const {
+	double energy = 0;
+	// Add the unary term
+	if( unary_ ) {
+		MatrixXf unary = unary_->get();
+		for( int i=0; i<Q.cols(); i++ )
+			for( int l=0; l<Q.rows(); l++ )
+				energy += unary(l,i)*Q(l,i);
+	}
+	// Add all pairwise terms
+	MatrixXf tmp;
+	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+		pairwise_[k]->apply( tmp, Q );
+		energy += (Q.array()*tmp.array()).sum();
+	}
+
+	return energy;
 }
 
 // Gradient computations
