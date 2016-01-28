@@ -214,7 +214,7 @@ MatrixXf DenseCRF::qp_inference() const {
 	double energy = compute_energy(Q);
 
 	while( (old_energy - energy) > 1e-3){
-
+        old_energy = energy;
         // Compute the gradient at the current estimates.
         grad = unary;
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -240,6 +240,7 @@ MatrixXf DenseCRF::qp_inference() const {
 
         // Take a step
         Q += optimal_step_size * desc;
+        energy = compute_energy(Q);
 	}
 
 	return Q;
