@@ -188,12 +188,13 @@ MatrixXf DenseCRF::inference () const {
 }
 
 MatrixXf DenseCRF::qp_inference() const {
-	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_);
+	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
+		desc(M_,N_), psis(M_,N_);
 
 	// Get initial estimates
 	unary.fill(0);
 	if(unary_){
-		unary = unary_->get();
+        unary = unary_->get();
 	}
 	// Initialize state to the unaries
 	Q = unary;
@@ -202,8 +203,8 @@ MatrixXf DenseCRF::qp_inference() const {
 	// Compute the dominant diagonal
 	MatrixXf full_ones = MatrixXf::Ones(M_, N_);
 	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-		pairwise_[k]->apply( tmp, full_ones);
-		diag_dom += tmp;
+        pairwise_[k]->apply( tmp, full_ones);
+        diag_dom += tmp;
 	}
 	// Update the proxy_unaries
 	unary = unary - diag_dom;
@@ -214,22 +215,32 @@ MatrixXf DenseCRF::qp_inference() const {
 
 	while( (old_energy - energy) > 1e-3){
 
-		// Compute the gradient at the current estimates.
-		grad = unary;
-		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-			pairwise_[k]->apply( tmp, Q);
-			grad += 2 *tmp;
-		}
-		grad -= 2 * diag_dom * Q;
+        // Compute the gradient at the current estimates.
+        grad = unary;
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, Q);
+            grad += 2 *tmp;
+        }
+        grad -= 2 * diag_dom.cwiseProduct(Q);
 
-		// Get a Descent direction by minimising < \nabla E, s >
-		descent_direction(tmp, grad);
+        // Get a Descent direction by minimising < \nabla E, s >
+        descent_direction(desc, grad);
 
+        // Solve for the best step size. The best step size is
+        // - \frac{x^T \Psi s + 0.5 \phi s}{s^T \Psi s}
+
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, desc);
+            psis += tmp;
+        }
+        psis -= diag_dom * desc;
+        double num =  Q.cwiseProduct(psis).sum() + 0.5 * unary.cwiseProduct(psis).sum();
+        double denom = desc.cwiseProduct(psis).sum();
+        double optimal_step_size = - num / denom;
+
+        // Take a step
+        Q += optimal_step_size * desc;
 	}
-
-	// Solve for the best step size.
-
-	// Take a step of optimal step size.
 
 	return Q;
 }
