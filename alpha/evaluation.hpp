@@ -1,4 +1,6 @@
 #include <vector>
+#include <set>
+
 #include "color_to_label.hpp"
 
 
