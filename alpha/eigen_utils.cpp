@@ -11,7 +11,30 @@ bool all_close_to_zero(const Eigen::VectorXf & vec, float ref){
 
 bool all_positive(const Eigen::VectorXf & vec){
     for (int i=0; i < vec.size(); i++) {
+        if(vec(i)< 0){
+            return false;
+        }
+    }
+    return true;
+}
+
+bool all_strict_positive(const Eigen::VectorXf & vec){
+    for (int i=0; i < vec.size(); i++) {
         if(vec(i)<= 0){
+            return false;
+        }
+    }
+    return true;
+}
+
+
+
+bool valid_probability(const Eigen::MatrixXf & proba){
+    for (int i=0; i<proba.cols(); i++) {
+        if (not all_positive(proba.col(i))) {
+            return false;
+        }
+        if (fabs(proba.col(i).sum()-1)>1e-5) {
             return false;
         }
     }

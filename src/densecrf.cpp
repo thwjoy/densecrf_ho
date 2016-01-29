@@ -26,6 +26,7 @@
 */
 
 #include "densecrf.h"
+#include "eigen_utils.hpp"
 #include "newton_cccp.hpp"
 #include "qp.hpp"
 #include "permutohedral.h"
@@ -191,7 +192,7 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
     // Todo: We don't get always decreasing value, which is weird and
     // shouldn't happen
 	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
-        desc(M_,N_), psis(M_,N_), sx(M_,N_);
+        desc(M_,N_), psis(M_,N_), sx(M_,N_), new_Q(M_, N_);
 
 	// Get initial estimates
 	unary.fill(0);
@@ -201,10 +202,17 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
 	// Initialize state to the unaries
     expAndNormalize(Q, -unary);
 
+    if (not valid_probability(Q)) {
+        std::cout << "Initial estimate is an invalid probability" << '\n';
+    }
+
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
     if (not assume_convex) {
-        MatrixXf full_ones = MatrixXf::Ones(M_, N_);
+        // Note: All the terms in the pairwise matrix are negatives
+        // so to get the sum of the abs value, you need to get the
+        // product with the matrix full of -1.
+        MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
             pairwise_[k]->apply( tmp, full_ones);
             diag_dom += tmp;
@@ -224,7 +232,7 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
     }
 
     while( (old_energy - energy) > 1e-3){
-        std::cout << energy  << '\n';
+        std::cout << '\n';
         old_energy = energy;
         // Compute the gradient at the current estimates.
         grad = unary;
@@ -233,7 +241,7 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
             grad += 2 *tmp;
         }
         if (not assume_convex) {
-            grad -= 2 * diag_dom.cwiseProduct(Q);
+            grad += 2 * diag_dom.cwiseProduct(Q);
         }
 
         // Get a Descent direction by minimising < \nabla E, s >
@@ -243,32 +251,41 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
         // - \frac{x^T \Psi (s-x) + 0.5 \phi (s-x)}{(s-x)^T \Psi (s-x)}
         sx = desc - Q;
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp, sx);
+            pairwise_[k]->apply(tmp, sx);
             psis += tmp;
         }
         if (not assume_convex) {
-            psis -= diag_dom.cwiseProduct(sx);
+            psis += diag_dom.cwiseProduct(sx);
         }
 
-        double num =  Q.cwiseProduct(psis).sum() + 0.5 * unary.cwiseProduct(sx).sum();
-        double denom = sx.cwiseProduct(psis).sum();
+        double num =  2 * Q.cwiseProduct(psis).sum() + unary.cwiseProduct(sx).sum();
+        double denom = 2* sx.cwiseProduct(psis).sum();
+        std::cout << "Polynom parameters: " << num << '\t' << denom << '\n';
         double optimal_step_size = - num / denom;
+        std::cout << "Optimal step size: " << optimal_step_size  << '\n';
+
+        if (optimal_step_size > 1) {
+            optimal_step_size = 1;
+        }
 
         // Take a step
-        Q = (1-optimal_step_size)* Q + optimal_step_size * desc;
+        new_Q = Q + optimal_step_size * sx;
         if(not assume_convex){
-            energy = compute_LR_QP_value(Q, diag_dom);
+            energy = compute_LR_QP_value(new_Q, diag_dom);
         } else{
-            energy = compute_energy(Q);
+            energy = compute_energy(new_Q);
         }
-
+        if (not valid_probability(new_Q)) {
+            std::cout << "Invalid probability" << '\n';
+        }
+        std::cout << "Diminution: " << old_energy - energy  << '\n';
         if (energy > old_energy) {
             std::cout << "This shouldn't happen, fix this shit" << '\n';
+            std::cout << compute_energy(Q) << '\n';
+            std::cout << compute_energy(new_Q) << '\n';
         }
-
+        Q = new_Q;
     }
-    std::cout << energy  << '\n';
-
     return Q;
 }
 
@@ -402,121 +419,115 @@ VectorXs DenseCRF::map ( int n_iterations ) const {
     return currentMap( Q );
 }
 
-///////////////////
-/////  Debug  /////
-///////////////////
-    double DenseCRF::assignment_energy( const VectorXs & l) const {
-        VectorXf unary = unaryEnergy(l);
-        VectorXf pairwise = pairwiseEnergy(l);
+double DenseCRF::assignment_energy( const VectorXs & l) const {
+    VectorXf unary = unaryEnergy(l);
+    VectorXf pairwise = pairwiseEnergy(l);
 
-        VectorXf total_energy = unary + pairwise;
+    VectorXf total_energy = unary + pairwise;
 
-        assert( total_energy.rows() == N_);
-        double ass_energy = 0;
-        for( int i=0; i< N_; ++i) {
-            ass_energy += total_energy[i];
-        }
-
-        return ass_energy;
+    assert( total_energy.rows() == N_);
+    double ass_energy = 0;
+    for( int i=0; i< N_; ++i) {
+        ass_energy += total_energy[i];
     }
 
+    return ass_energy;
+}
 
+VectorXf DenseCRF::unaryEnergy(const VectorXs & l) const{
+    assert( l.rows() == N_ );
+    VectorXf r( N_ );
+    r.fill(0.f);
+    if( unary_ ) {
+        MatrixXf unary = unary_->get();
 
-
-    VectorXf DenseCRF::unaryEnergy(const VectorXs & l) const{
-        assert( l.rows() == N_ );
-        VectorXf r( N_ );
-        r.fill(0.f);
-        if( unary_ ) {
-            MatrixXf unary = unary_->get();
-
-            for( int i=0; i<N_; i++ )
-                if ( 0 <= l[i] && l[i] < M_ )
-                    r[i] = unary( l[i], i );
-        }
-        return r;
-    }
-    VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
-        assert( l.rows() == N_ );
-        VectorXf r( N_ );
-        r.fill(0.f);
-
-        if( term == -1 ) {
-            for( unsigned int i=0; i<pairwise_.size(); i++ )
-                r += pairwiseEnergy( l, i );
-            return r;
-        }
-
-        MatrixXf Q( M_, N_ );
-        // Build the current belief [binary assignment]
-        for( int i=0; i<N_; i++ )
-            for( int j=0; j<M_; j++ )
-                Q(j,i) = (l[i] == j);
-        pairwise_[ term ]->apply( Q, Q );
         for( int i=0; i<N_; i++ )
             if ( 0 <= l[i] && l[i] < M_ )
-                r[i] =-0.5*Q(l[i],i );
-            else
-                r[i] = 0;
+                r[i] = unary( l[i], i );
+    }
+    return r;
+}
+VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
+    assert( l.rows() == N_ );
+    VectorXf r( N_ );
+    r.fill(0.f);
+
+    if( term == -1 ) {
+        for( unsigned int i=0; i<pairwise_.size(); i++ )
+            r += pairwiseEnergy( l, i );
         return r;
     }
-    MatrixXf DenseCRF::startInference() const{
-        MatrixXf Q( M_, N_ );
-        Q.fill(0);
+
+    MatrixXf Q( M_, N_ );
+    // Build the current belief [binary assignment]
+    for( int i=0; i<N_; i++ )
+        for( int j=0; j<M_; j++ )
+            Q(j,i) = (l[i] == j);
+    pairwise_[ term ]->apply( Q, Q );
+    for( int i=0; i<N_; i++ )
+        if ( 0 <= l[i] && l[i] < M_ )
+            r[i] =-0.5*Q(l[i],i );
+        else
+            r[i] = 0;
+    return r;
+}
+MatrixXf DenseCRF::startInference() const{
+    MatrixXf Q( M_, N_ );
+    Q.fill(0);
 	
-        // Initialize using the unary energies
-        if( unary_ )
-            expAndNormalize( Q, -unary_->get() );
-        return Q;
+    // Initialize using the unary energies
+    if( unary_ )
+        expAndNormalize( Q, -unary_->get() );
+    return Q;
+}
+void DenseCRF::stepInference( MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2 ) const{
+    tmp1.resize( Q.rows(), Q.cols() );
+    tmp1.fill(0);
+    if( unary_ )
+        tmp1 -= unary_->get();
+	
+    // Add up all pairwise potentials
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        pairwise_[k]->apply( tmp2, Q );
+        tmp1 -= tmp2;
     }
-    void DenseCRF::stepInference( MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2 ) const{
-        tmp1.resize( Q.rows(), Q.cols() );
-        tmp1.fill(0);
-        if( unary_ )
-            tmp1 -= unary_->get();
 	
-        // Add up all pairwise potentials
-        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp2, Q );
-		tmp1 -= tmp2;
-	}
-	
-	// Exponentiate and normalize
-	expAndNormalize( Q, tmp1 );
+    // Exponentiate and normalize
+    expAndNormalize( Q, tmp1 );
 }
 VectorXs DenseCRF::currentMap( const MatrixXf & Q ) const{
-	VectorXs r(Q.cols());
-	// Find the map
-	for( int i=0; i<N_; i++ ){
-		int m;
-		Q.col(i).maxCoeff( &m );
-		r[i] = m;
-	}
-	return r;
+    VectorXs r(Q.cols());
+    // Find the map
+    for( int i=0; i<N_; i++ ){
+        int m;
+        Q.col(i).maxCoeff( &m );
+        r[i] = m;
+    }
+    return r;
 }
 
-// Compute the KL-divergence of a set of marginals
 double DenseCRF::klDivergence( const MatrixXf & Q ) const {
-	double kl = 0;
-	// Add the entropy term
-	for( int i=0; i<Q.cols(); i++ )
-		for( int l=0; l<Q.rows(); l++ )
-			kl += Q(l,i)*log(std::max( Q(l,i), 1e-20f) );
-	// Add the unary term
-	if( unary_ ) {
-		MatrixXf unary = unary_->get();
-		for( int i=0; i<Q.cols(); i++ )
-			for( int l=0; l<Q.rows(); l++ )
-				kl += unary(l,i)*Q(l,i);
-	}
+    // Compute the KL-divergence of a set of marginals
+    double kl = 0;
+    // Add the entropy term
+    for( int i=0; i<Q.cols(); i++ )
+        for( int l=0; l<Q.rows(); l++ )
+            kl += Q(l,i)*log(std::max( Q(l,i), 1e-20f) );
+    // Add the unary term
+    if( unary_ ) {
+        MatrixXf unary = unary_->get();
+        for( int i=0; i<Q.cols(); i++ )
+            for( int l=0; l<Q.rows(); l++ )
+                kl += unary(l,i)*Q(l,i);
+    }
 	
-	// Add all pairwise terms
-	MatrixXf tmp;
-	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-		pairwise_[k]->apply( tmp, Q );
-		kl += (Q.array()*tmp.array()).sum();
-	}
-	return kl;
+    // Add all pairwise terms
+    MatrixXf tmp;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        pairwise_[k]->apply( tmp, Q );
+        kl += (Q.array()*tmp.array()).sum();
+    }
+    return kl;
 }
 
 double DenseCRF::compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const{
@@ -524,7 +535,7 @@ double DenseCRF::compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_d
     // Add the unary term
     MatrixXf unary = unary_->get();
     energy += unary.cwiseProduct(Q).sum();
-    energy += diag_dom.cwiseProduct(Q).sum();
+    energy -= diag_dom.cwiseProduct(Q).sum();
 
     // Add all pairwise terms
     MatrixXf tmp;
@@ -532,7 +543,7 @@ double DenseCRF::compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_d
         pairwise_[k]->apply( tmp, Q );
         energy += Q.cwiseProduct(tmp).sum();
     }
-    energy -= Q.cwiseProduct(diag_dom.cwiseProduct(Q)).sum();
+    energy += Q.cwiseProduct(diag_dom.cwiseProduct(Q)).sum();
     return energy;
 }
 
@@ -556,8 +567,8 @@ double DenseCRF::compute_energy(const MatrixXf & Q) const {
     return energy;
 }
 
-// Gradient computations
 double DenseCRF::gradient( int n_iterations, const ObjectiveFunction & objective, VectorXf * unary_grad, VectorXf * lbl_cmp_grad, VectorXf * kernel_grad) const {
+    // Gradient computations
     // Run inference
     std::vector< MatrixXf > Q(n_iterations+1);
     MatrixXf tmp1, unary( M_, N_ ), tmp2;
