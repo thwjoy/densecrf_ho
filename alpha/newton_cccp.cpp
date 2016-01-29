@@ -1,5 +1,4 @@
 #include "newton_cccp.hpp"
-#include "eigen_utils.hpp"
 #include <Eigen/Eigenvalues>
 
 void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
@@ -58,7 +57,7 @@ void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
 }
 
 
-float pick_lambda_eig(MatrixXf const & lbl_compatibility){
+float pick_lambda_eig_to_concave(MatrixXf const & lbl_compatibility){
     // We make the assumption that the label compatibility is symmetric,
     // which other places in the code do.
     VectorXf eigs = lbl_compatibility.selfadjointView<Upper>().eigenvalues();

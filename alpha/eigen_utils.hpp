@@ -1,6 +1,9 @@
 #include <Eigen/Core>
 
-bool all_close_to_zero(const Eigen::VectorXf & vect, float ref);
-bool all_positive(const Eigen::VectorXf & vect);
-bool all_strict_positive(const Eigen::VectorXf & vect);
-bool valid_probability(const Eigen::MatrixXf & proba);
+using namespace Eigen;
+
+
+bool all_close_to_zero(const VectorXf & vect, float ref);
+bool all_positive(const VectorXf & vect);
+bool all_strict_positive(const VectorXf & vect);
+bool valid_probability(const MatrixXf & proba);
