@@ -187,7 +187,7 @@ MatrixXf DenseCRF::inference () const {
 	return Q;
 }
 
-MatrixXf DenseCRF::qp_inference() const {
+MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
     // Todo: We don't get always decreasing value, which is weird and
     // shouldn't happen
 	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
@@ -203,17 +203,25 @@ MatrixXf DenseCRF::qp_inference() const {
 
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
-    MatrixXf full_ones = MatrixXf::Ones(M_, N_);
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, full_ones);
-        diag_dom += tmp;
+    if (not assume_convex) {
+        MatrixXf full_ones = MatrixXf::Ones(M_, N_);
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, full_ones);
+            diag_dom += tmp;
+        }
+        // Update the proxy_unaries
+        unary = unary - diag_dom;
     }
-    // Update the proxy_unaries
-    unary = unary - diag_dom;
 
     // Compute the value of the energy
     double old_energy = std::numeric_limits<double>::max();
-    double energy = compute_LR_QP_value(Q, diag_dom);
+    double energy;
+
+    if(not assume_convex){
+        energy = compute_LR_QP_value(Q, diag_dom);
+    } else{
+        energy = compute_energy(Q);
+    }
 
     while( (old_energy - energy) > 1e-3){
         std::cout << energy  << '\n';
@@ -224,7 +232,9 @@ MatrixXf DenseCRF::qp_inference() const {
             pairwise_[k]->apply( tmp, Q);
             grad += 2 *tmp;
         }
-        grad -= 2 * diag_dom.cwiseProduct(Q);
+        if (not assume_convex) {
+            grad -= 2 * diag_dom.cwiseProduct(Q);
+        }
 
         // Get a Descent direction by minimising < \nabla E, s >
         descent_direction(desc, grad);
@@ -236,14 +246,21 @@ MatrixXf DenseCRF::qp_inference() const {
             pairwise_[k]->apply( tmp, sx);
             psis += tmp;
         }
-        psis -= diag_dom.cwiseProduct(sx);
+        if (not assume_convex) {
+            psis -= diag_dom.cwiseProduct(sx);
+        }
+
         double num =  Q.cwiseProduct(psis).sum() + 0.5 * unary.cwiseProduct(sx).sum();
         double denom = sx.cwiseProduct(psis).sum();
         double optimal_step_size = - num / denom;
 
         // Take a step
         Q = (1-optimal_step_size)* Q + optimal_step_size * desc;
-        energy = compute_LR_QP_value(Q, diag_dom);
+        if(not assume_convex){
+            energy = compute_LR_QP_value(Q, diag_dom);
+        } else{
+            energy = compute_energy(Q);
+        }
 
         if (energy > old_energy) {
             std::cout << "This shouldn't happen, fix this shit" << '\n';

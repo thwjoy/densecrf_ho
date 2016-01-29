@@ -80,7 +80,7 @@ void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
 
     clock_t start, end;
     start = clock();
-    MatrixXf Q = crf.qp_inference();
+    MatrixXf Q = crf.qp_inference(false);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     // std::cout << "Time taken: " << timing << '\n';
