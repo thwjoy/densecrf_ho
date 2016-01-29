@@ -82,7 +82,7 @@ public:
 
 	// Run the energy minimisation on the QP
 	// First one is the Lafferty-Ravikumar version of the QP
-	MatrixXf qp_inference(bool assume_convex = false) const;
+	MatrixXf qp_inference() const;
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
 	MatrixXf qp_cccp_inference() const;
 

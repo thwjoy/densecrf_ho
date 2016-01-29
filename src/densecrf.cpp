@@ -188,7 +188,7 @@ MatrixXf DenseCRF::inference () const {
 	return Q;
 }
 
-MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
+MatrixXf DenseCRF::qp_inference() const {
     // Todo: We don't get always decreasing value, which is weird and
     // shouldn't happen
 	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
@@ -204,28 +204,23 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
 
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
-    if (not assume_convex) {
-        // Note: All the terms in the pairwise matrix are negatives
-        // so to get the sum of the abs value, you need to get the
-        // product with the matrix full of -1.
-        MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
-        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp, full_ones);
-            diag_dom += tmp;
-        }
-        // Update the proxy_unaries
-        unary = unary - diag_dom;
+
+    // Note: All the terms in the pairwise matrix are negatives
+    // so to get the sum of the abs value, you need to get the
+    // product with the matrix full of -1.
+    MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        pairwise_[k]->apply( tmp, full_ones);
+        diag_dom += tmp;
     }
+    // Update the proxy_unaries
+    unary = unary - diag_dom;
 
     // Compute the value of the energy
     double old_energy = std::numeric_limits<double>::max();
     double energy;
 
-    if(not assume_convex){
-        energy = compute_LR_QP_value(Q, diag_dom);
-    } else{
-        energy = compute_energy(Q);
-    }
+    energy = compute_LR_QP_value(Q, diag_dom);
 
     while( (old_energy - energy) > 1e-3){
         old_energy = energy;
@@ -235,9 +230,7 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
             pairwise_[k]->apply( tmp, Q);
             grad += 2 *tmp;
         }
-        if (not assume_convex) {
-            grad += 2 * diag_dom.cwiseProduct(Q);
-        }
+        grad += 2 * diag_dom.cwiseProduct(Q);
 
         // Get a Descent direction by minimising < \nabla E, s >
         descent_direction(desc, grad);
@@ -250,10 +243,7 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
             pairwise_[k]->apply(tmp, sx);
             psis += tmp;
         }
-        if (not assume_convex) {
-            psis += diag_dom.cwiseProduct(sx);
-        }
-
+        psis += diag_dom.cwiseProduct(sx);
         double num =  2 * Q.cwiseProduct(psis).sum() + unary.cwiseProduct(sx).sum();
         double denom = 2* sx.cwiseProduct(psis).sum();
         double optimal_step_size = - num / denom;
@@ -263,12 +253,9 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
 
         // Take a step
         Q += optimal_step_size * sx;
-        if(not assume_convex){
-            energy = compute_LR_QP_value(Q, diag_dom);
-        } else{
-            energy = compute_energy(Q);
-        }
+        energy = compute_LR_QP_value(Q, diag_dom);
     }
+    std::cout << compute_energy(Q) << '\n';
     return Q;
 }
 
