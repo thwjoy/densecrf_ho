@@ -192,19 +192,15 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
     // Todo: We don't get always decreasing value, which is weird and
     // shouldn't happen
 	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
-        desc(M_,N_), psis(M_,N_), sx(M_,N_), new_Q(M_, N_);
+        desc(M_,N_), psis(M_,N_), sx(M_,N_);
 
-	// Get initial estimates
-	unary.fill(0);
-	if(unary_){
+    // Get initial estimates
+    unary.fill(0);
+    if(unary_){
         unary = unary_->get();
-	}
-	// Initialize state to the unaries
-    expAndNormalize(Q, -unary);
-
-    if (not valid_probability(Q)) {
-        std::cout << "Initial estimate is an invalid probability" << '\n';
     }
+    // Initialize state to the unaries
+    expAndNormalize(Q, -unary);
 
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
@@ -232,7 +228,6 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
     }
 
     while( (old_energy - energy) > 1e-3){
-        std::cout << '\n';
         old_energy = energy;
         // Compute the gradient at the current estimates.
         grad = unary;
@@ -250,6 +245,7 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
         // Solve for the best step size. The best step size is
         // - \frac{x^T \Psi (s-x) + 0.5 \phi (s-x)}{(s-x)^T \Psi (s-x)}
         sx = desc - Q;
+        psis.fill(0);
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
             pairwise_[k]->apply(tmp, sx);
             psis += tmp;
@@ -260,31 +256,18 @@ MatrixXf DenseCRF::qp_inference(bool assume_convex) const {
 
         double num =  2 * Q.cwiseProduct(psis).sum() + unary.cwiseProduct(sx).sum();
         double denom = 2* sx.cwiseProduct(psis).sum();
-        std::cout << "Polynom parameters: " << num << '\t' << denom << '\n';
         double optimal_step_size = - num / denom;
-        std::cout << "Optimal step size: " << optimal_step_size  << '\n';
-
         if (optimal_step_size > 1) {
             optimal_step_size = 1;
         }
 
         // Take a step
-        new_Q = Q + optimal_step_size * sx;
+        Q += optimal_step_size * sx;
         if(not assume_convex){
-            energy = compute_LR_QP_value(new_Q, diag_dom);
+            energy = compute_LR_QP_value(Q, diag_dom);
         } else{
-            energy = compute_energy(new_Q);
+            energy = compute_energy(Q);
         }
-        if (not valid_probability(new_Q)) {
-            std::cout << "Invalid probability" << '\n';
-        }
-        std::cout << "Diminution: " << old_energy - energy  << '\n';
-        if (energy > old_energy) {
-            std::cout << "This shouldn't happen, fix this shit" << '\n';
-            std::cout << compute_energy(Q) << '\n';
-            std::cout << compute_energy(new_Q) << '\n';
-        }
-        Q = new_Q;
     }
     return Q;
 }
