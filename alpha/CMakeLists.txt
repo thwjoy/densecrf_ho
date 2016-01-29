@@ -15,6 +15,8 @@ add_library(eigen_utils eigen_utils.cpp)
 add_library(newton_cccp newton_cccp.cpp)
 target_link_libraries(newton_cccp eigen_utils)
 
+add_library(qp qp.cpp)
+
 add_library(brute_force brute_force.cpp)
 
 add_library(color_to_label color_to_label.cpp)

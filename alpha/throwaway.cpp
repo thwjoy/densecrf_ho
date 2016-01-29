@@ -39,7 +39,7 @@ void initialize_crf_parameters(){
 
     int M = 21;
 
-    unsigned char * img = load_image("/home/rudy/datasets/MSRC/Images_by_partition/test/1_27_s.bmp", size);
+    unsigned char * img = load_image("/data/MSRC/Images_by_partition/test/1_27_s.bmp", size);
 
     DenseCRF2D crf(size.height, size.width, M);
     // Add simple pairwise potts terms
@@ -108,7 +108,7 @@ void matrix_eigenvalues(){
 }
 
 void test_label_matrix_loading(){
-    std::string  path_to_labels = "/home/rudy/datasets/MSRC/GT_by_partition/val/4_11_s_GT.bmp";
+    std::string  path_to_labels = "/data/MSRC/GT_by_partition/val/4_11_s_GT.bmp";
     label_matrix lbl = load_label_matrix(path_to_labels);
 }
 

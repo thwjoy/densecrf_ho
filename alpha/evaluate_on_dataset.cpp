@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
 {
     if (argc<6) {
         std::cout << "evaluate split path_to_dataset path_to_results" << '\n';
-        std::cout << "Example: ./evaluate Train /home/rudy/datasets/MSRC/ ./train/ learned_parameters.csv -10:-3:-1:2:10:mf:grad" << '\n';
+        std::cout << "Example: ./evaluate Train /data/MSRC/ ./train/ learned_parameters.csv -10:-3:-1:2:10:mf:grad" << '\n';
         return 1;
     }
 

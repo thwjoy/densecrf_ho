@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 {
     if (argc<3) {
         std::cout << "learn_pairwise split path_to_dataset" << '\n';
-        std::cout << "Example: ./learn_pairwise Train /home/rudy/datasets/MSRC/" << '\n';
+        std::cout << "Example: ./learn_pairwise Train /data/MSRC/" << '\n';
         return 1;
     }
 

@@ -17,7 +17,7 @@ void save_confusion_matrix(const std::vector<int>& confMat, const std::string& f
 
 int main(int argc, char *argv[])
 {
-    std::string path_to_dataset = "/home/rudy/datasets/MSRC/";
+    std::string path_to_dataset = "/data/MSRC/";
     std::string dataset_split = "Validation";
 
     std::vector<std::string> test_images = get_all_split_files(path_to_dataset, dataset_split);
