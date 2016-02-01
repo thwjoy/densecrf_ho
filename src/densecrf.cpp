@@ -202,7 +202,7 @@ MatrixXf DenseCRF::qp_inference() const {
     // Initialize state to the unaries
     // Warning: We don't get exactly the same optimum depending on the initialisation
     // expAndNormalize(Q, -unary);
-    Q.fill(1/M_);
+    Q.fill(1/ (float) M_);
 
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
@@ -282,7 +282,7 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
     // Initialize state to the unaries
     // Warning: We don't get exactly the same optimum depending on the initialisation
     // expAndNormalize(Q, -unary);
-    Q.fill(1/M_);
+    Q.fill(1/ (float) M_);
 
     // Compute the value of the energy
     double old_energy = std::numeric_limits<double>::max();
