@@ -325,10 +325,10 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
             num += Q.cwiseProduct(psis).sum();
             num += 2 * lambda_eig * desc.cwiseProduct(Q_old - Q).sum();
 
-            double denom = desc.cwiseProduct(psis);
+            double denom = desc.cwiseProduct(psis).sum();
             denom -= lambda_eig *  desc.cwiseProduct(desc).sum(); // squared
 
-            double optimal_step_size = - num/ denom;
+            double optimal_step_size = - num/ (2 *denom);
             if (optimal_step_size > 1) {
                 optimal_step_size = 1;
             }
