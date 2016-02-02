@@ -264,7 +264,7 @@ MatrixXf DenseCRF::qp_inference() const {
 
 MatrixXf DenseCRF::qp_cccp_inference() const {
     MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
-        desc(M_, N_), sx(M_, N_), psis(M_, N_);
+        desc(M_, N_), sx(M_, N_), psis(M_, N_), psix(M_,N_);
     // Compute the smallest eigenvalues, that we need to make bigger
     // than 0, to ensure that the problem is convex.
     float lambda_eig = 0;
@@ -295,17 +295,22 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 
         Q_old = Q;
         double old_convex_energy = std::numeric_limits<double>::max();
+        double convex_energy = energy - lambda_eig * Q.cwiseProduct(2 *Q_old - Q).sum();
 
-        while ( (old_convex_energy - energy) > 1) {
-            old_convex_energy = energy;
+        while ( (old_convex_energy - convex_energy) > 1) {
+            old_convex_energy = convex_energy;
 
             // Compute gradient of the convex problem
             grad = unary;
+            psix.fill(0);
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
                 pairwise_[k]->apply( tmp, Q);
-                grad += 2 *tmp;
+                psix += tmp;
             }
-            grad += 2 * lambda_eig * (Q_old - Q);
+
+            grad = unary +
+                2 * psix +
+                2 * lambda_eig * (Q - Q_old);
 
             // Get a Descent direction by minimising < \nabla E, s >
             descent_direction(desc, grad);
@@ -315,26 +320,45 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
             // (s-x)^T (x_old - x)}{2 (s-x) \psi (s-x) - \lambda
             // (s-x)^2}
             sx = desc - Q;
+
             psis.fill(0);
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
                 pairwise_[k]->apply(tmp, sx);
                 psis += tmp;
             }
 
-            double num = unary.cwiseProduct(sx).sum();
-            num += Q.cwiseProduct(psis).sum();
-            num += 2 * lambda_eig * desc.cwiseProduct(Q_old - Q).sum();
+            double num = unary.cwiseProduct(sx).sum() +
+                2 * Q.cwiseProduct(psis).sum() +
+                2 * lambda_eig * desc.cwiseProduct(Q - Q_old).sum();
 
-            double denom = desc.cwiseProduct(psis).sum();
-            denom -= lambda_eig *  desc.cwiseProduct(desc).sum(); // squared
+            double denom = desc.cwiseProduct(psis).sum() +
+                lambda_eig *  desc.cwiseProduct(desc).sum(); // squared
+
+            double cst = unary.cwiseProduct(Q).sum() +
+                Q.cwiseProduct(psix).sum() +
+                (- 2 * lambda_eig * Q.cwiseProduct(Q_old)).sum() +
+                lambda_eig * Q.cwiseProduct(Q).sum();
 
             double optimal_step_size = - num/ (2 *denom);
+
             if (optimal_step_size > 1) {
                 optimal_step_size = 1;
             }
 
             Q += optimal_step_size * sx;
+
+            convex_energy = pow(optimal_step_size, 2) * denom + optimal_step_size * num + cst;
+            // TODO: There seems to be a difference in the way of computing the value of the energy.
+            // Figure this shit out.
+
             energy = compute_energy(Q);
+            //old_convex_energy = energy;// - lambda_eig * Q.cwiseProduct(2 *Q_old - Q).sum();
+
+
+            if (not valid_probability(Q)) {
+                std::cout << "Invalid probability" << '\n';
+            }
+
         }
         // We are now at a minimum of the convexified problem, so we
         // will update the linearisation
