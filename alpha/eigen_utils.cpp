@@ -40,3 +40,11 @@ bool valid_probability(const MatrixXf & proba){
     }
     return true;
 }
+
+typeP dotProduct(const MatrixXf & M1, const MatrixXf & M2, MatrixP & temp){
+    // tmp is an already allocated and well dimensioned temporary
+    // matrix so that we don't need to allocate a new one. This may
+    // very well be premature optimisation.
+    temp = (M1.cast<typeP>()).cwiseProduct(M2.cast<typeP>());
+    return temp.sum();
+}

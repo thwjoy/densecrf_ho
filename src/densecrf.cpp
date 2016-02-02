@@ -264,7 +264,8 @@ MatrixXf DenseCRF::qp_inference() const {
 
 MatrixXf DenseCRF::qp_cccp_inference() const {
     MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
-        desc(M_, N_), sx(M_, N_), psis(M_, N_), psix(M_,N_);
+        desc(M_, N_), sx(M_, N_),  psis(M_, N_), psix(M_,N_);
+    MatrixP temp_dot(M_,N_);
     // Compute the smallest eigenvalues, that we need to make bigger
     // than 0, to ensure that the problem is convex.
     float lambda_eig = 0;
@@ -327,17 +328,17 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
                 psis += tmp;
             }
 
-            double num = unary.cwiseProduct(sx).sum() +
-                2 * Q.cwiseProduct(psis).sum() +
-                2 * lambda_eig * desc.cwiseProduct(Q - Q_old).sum();
+            double num = dotProduct(unary, sx, temp_dot) +
+                2 * dotProduct(Q, psis, temp_dot) +
+                2 * lambda_eig * dotProduct(desc, Q-Q_old, temp_dot);
 
-            double denom = desc.cwiseProduct(psis).sum() +
-                lambda_eig *  desc.cwiseProduct(desc).sum(); // squared
+            double denom = dotProduct(desc, psis, temp_dot) +
+                lambda_eig * dotProduct(desc, desc, temp_dot); // squared
 
-            double cst = unary.cwiseProduct(Q).sum() +
-                Q.cwiseProduct(psix).sum() +
-                (- 2 * lambda_eig * Q.cwiseProduct(Q_old)).sum() +
-                lambda_eig * Q.cwiseProduct(Q).sum();
+            double cst = dotProduct(unary, Q, temp_dot) +
+                dotProduct(Q, psix, temp_dot) +
+                (-2 * lambda_eig) * dotProduct(Q, Q_old, temp_dot) +
+                lambda_eig * dotProduct(Q, Q, temp_dot);
 
             double optimal_step_size = - num/ (2 *denom);
 
