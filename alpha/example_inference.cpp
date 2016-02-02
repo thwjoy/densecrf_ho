@@ -20,6 +20,8 @@ int main(int argc, char* argv[]) {
     // unaries_baseline(path_to_unaries, path_to_unoutput);
     // minimize_mean_field(path_to_image, path_to_unaries,  path_to_mf_output, path_to_parameters);
     // minimize_cccp_mean_field(path_to_image, path_to_unaries, path_to_cccp_output, path_to_parameters);
-    // minimize_LR_QP(path_to_image, path_to_unaries, path_to_qplroutput, path_to_parameters);
+    std::cout << "Lafferty QP"  << '\n';
+    minimize_LR_QP(path_to_image, path_to_unaries, path_to_qplroutput, path_to_parameters);
+    std::cout << "CCCP QP" << '\n';
     minimize_QP_cccp(path_to_image, path_to_unaries, path_to_qpcccp_output, path_to_parameters);
 }
