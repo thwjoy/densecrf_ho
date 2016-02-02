@@ -286,22 +286,19 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
     Q.fill(1/ (float) M_);
 
     // Compute the value of the energy
-    double old_energy = std::numeric_limits<double>::max();
-    double energy;
-    energy = compute_energy(Q);
+    double old_energy;
+    double energy = compute_energy(Q);
 
-    while ( (old_energy -energy) > 1e-3) {
+    do {
         // New value of the linearization point.
         old_energy = energy;
-
         Q_old = Q;
-        double old_convex_energy = std::numeric_limits<double>::max();
-        double convex_energy = energy + lambda_eig * Q.cwiseProduct(2 *Q_old - Q).sum();
 
-        while ( (old_convex_energy - convex_energy) > 1) {
-            std::cout << (old_convex_energy - convex_energy) << '\n';
+        double convex_energy = energy + lambda_eig * dotProduct(Q, 2*Q_old - Q, temp_dot);
+        double old_convex_energy;
+
+        do {
             old_convex_energy = convex_energy;
-
             // Compute gradient of the convex problem
             grad = unary;
             psix.fill(0);
@@ -364,11 +361,15 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
             if (not valid_probability(Q)) {
                 std::cout << "Invalid probability" << '\n';
             }
+            std::cout << (old_convex_energy - convex_energy) << '\n';
+        } while ( (old_convex_energy - convex_energy) > 100);
+        // We are now (almost) at a minimum of the convexified problem, so we
+        // stop solving the convex problem and get a new convex approximation.
 
-        }
-        // We are now at a minimum of the convexified problem, so we
-        // will update the linearisation
-    }
+        // Compute our current value of the energy;
+        energy = compute_energy(Q);
+    } while ( (old_energy -energy) > 1e-3);
+
     return Q;
 }
 
