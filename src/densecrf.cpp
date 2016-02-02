@@ -298,7 +298,6 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
         do {
             old_convex_energy = convex_energy;
             // Compute gradient of the convex problem
-            grad = unary;
             psix.fill(0);
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
                 pairwise_[k]->apply( tmp, Q);
