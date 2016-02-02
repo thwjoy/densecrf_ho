@@ -18,8 +18,10 @@ int main(int argc, char* argv[]) {
 
     // minimize_dense_alpha_divergence(path_to_image, path_to_unaries, path_to_alpha_output, path_to_parameters, 5);n
     // unaries_baseline(path_to_unaries, path_to_unoutput);
-    // minimize_mean_field(path_to_image, path_to_unaries,  path_to_mf_output, path_to_parameters);
-    // minimize_cccp_mean_field(path_to_image, path_to_unaries, path_to_cccp_output, path_to_parameters);
+    std::cout << "Meanfield" << '\n';
+    minimize_mean_field(path_to_image, path_to_unaries,  path_to_mf_output, path_to_parameters);
+    std::cout << "CCCP Meanfield" << '\n';
+    minimize_cccp_mean_field(path_to_image, path_to_unaries, path_to_cccp_output, path_to_parameters);
     std::cout << "Lafferty QP"  << '\n';
     minimize_LR_QP(path_to_image, path_to_unaries, path_to_qplroutput, path_to_parameters);
     std::cout << "CCCP QP" << '\n';

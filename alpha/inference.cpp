@@ -51,6 +51,7 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.inference();
+    std::cout << crf.compute_energy(Q) << '\n';
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     // std::cout << "Time taken: " << timing << '\n';
@@ -81,6 +82,7 @@ void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.qp_inference();
+    std::cout << crf.compute_energy(Q) << '\n';
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     // std::cout << "Time taken: " << timing << '\n';
@@ -110,6 +112,7 @@ void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.qp_cccp_inference();
+    std::cout << crf.compute_energy(Q) << '\n';
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     // std::cout << "Time taken: " << timing << '\n';
@@ -142,6 +145,7 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.cccp_inference();
+    std::cout << crf.compute_energy(Q) << '\n';
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     // std::cout << "Time taken: " << timing << '\n';

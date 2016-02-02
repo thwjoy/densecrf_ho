@@ -184,8 +184,7 @@ MatrixXf DenseCRF::inference () const {
 		old_Q = Q;
 		count++;
 	}
-	std::cout << "Nb of needed iterations: " << count << '\n';
-	return Q;
+    return Q;
 }
 
 MatrixXf DenseCRF::qp_inference() const {
@@ -257,7 +256,6 @@ MatrixXf DenseCRF::qp_inference() const {
         Q += optimal_step_size * sx;
         energy = compute_LR_QP_value(Q, diag_dom);
     }
-    std::cout << compute_energy(Q) << '\n';
     // TODO: Should we do a better rounding than this one?
     return Q;
 }
@@ -366,7 +364,6 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
         // Compute our current value of the energy;
         energy = compute_energy(Q);
     } while ( (old_energy -energy) > 1);
-    std::cout << compute_energy(Q) << '\n';
     return Q;
 }
 
@@ -424,7 +421,6 @@ MatrixXf DenseCRF::cccp_inference() const {
         old_Q = Q;
         count++;
     }
-    std::cout << "Nb of needed iterations: " << count << '\n';
     return Q;
 }
 
