@@ -296,9 +296,10 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 
         Q_old = Q;
         double old_convex_energy = std::numeric_limits<double>::max();
-        double convex_energy = energy - lambda_eig * Q.cwiseProduct(2 *Q_old - Q).sum();
+        double convex_energy = energy + lambda_eig * Q.cwiseProduct(2 *Q_old - Q).sum();
 
         while ( (old_convex_energy - convex_energy) > 1) {
+            std::cout << (old_convex_energy - convex_energy) << '\n';
             old_convex_energy = convex_energy;
 
             // Compute gradient of the convex problem
@@ -311,13 +312,13 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 
             grad = unary +
                 2 * psix +
-                2 * lambda_eig * (Q - Q_old);
+                2 * lambda_eig * (Q_old - Q);
 
             // Get a Descent direction by minimising < \nabla E, s >
             descent_direction(desc, grad);
 
             // Solve for the best step size of the convex problem. It
-            // is - frac{\phi (s-x) + 2 x^T \psi (s-x) + 2 \lambda
+            // is - frac{\phi^T(s-x) + 2 x^T \psi (s-x) + 2 \lambda
             // (s-x)^T (x_old - x)}{2 (s-x) \psi (s-x) - \lambda
             // (s-x)^2}
             sx = desc - Q;
@@ -330,15 +331,17 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 
             double num = dotProduct(unary, sx, temp_dot) +
                 2 * dotProduct(Q, psis, temp_dot) +
-                2 * lambda_eig * dotProduct(desc, Q-Q_old, temp_dot);
+                2 * lambda_eig * dotProduct(sx, Q_old-Q, temp_dot);
+            // double alt_num = dotProduct(sx, grad, temp_dot); // This is the same computation, done differently
+            assert(num<0); // This is negative if desc is really the good minimizer
 
             double denom = dotProduct(desc, psis, temp_dot) +
-                lambda_eig * dotProduct(desc, desc, temp_dot); // squared
+                (-lambda_eig) * dotProduct(desc, desc, temp_dot); // squared
+            assert(denom>0); // This is positive if we did our decomposition correctly
 
             double cst = dotProduct(unary, Q, temp_dot) +
                 dotProduct(Q, psix, temp_dot) +
-                (-2 * lambda_eig) * dotProduct(Q, Q_old, temp_dot) +
-                lambda_eig * dotProduct(Q, Q, temp_dot);
+                lambda_eig * dotProduct(Q, 2 * Q_old - Q, temp_dot);
 
             double optimal_step_size = - num/ (2 *denom);
 
@@ -346,15 +349,17 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
                 optimal_step_size = 1;
             }
 
+            // std::cout << "Step size: " << optimal_step_size << '\n';
+
             Q += optimal_step_size * sx;
 
+            // std::cout << "Coefficients: "<< denom << '\t' << num << '\t' << cst << '\n';
             convex_energy = pow(optimal_step_size, 2) * denom + optimal_step_size * num + cst;
-            // TODO: There seems to be a difference in the way of computing the value of the energy.
-            // Figure this shit out.
 
-            energy = compute_energy(Q);
-            //old_convex_energy = energy;// - lambda_eig * Q.cwiseProduct(2 *Q_old - Q).sum();
-
+            // energy = compute_energy(Q);
+            // old_convex_energy = energy + lambda_eig * dotProduct(Q, 2*Q_old -Q, temp_dot);
+            // std::cout << old_convex_energy  << '\n';
+            // std::cout << convex_energy << '\n';
 
             if (not valid_probability(Q)) {
                 std::cout << "Invalid probability" << '\n';
@@ -590,36 +595,36 @@ double DenseCRF::compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_d
     double energy = 0;
     // Add the unary term
     MatrixXf unary = unary_->get();
-    energy += unary.cwiseProduct(Q).sum();
-    energy -= diag_dom.cwiseProduct(Q).sum();
+    MatrixP dot_tmp;
+
+    energy += dotProduct(unary, Q, dot_tmp);
+    energy -= dotProduct(diag_dom, Q, dot_tmp);
 
     // Add all pairwise terms
     MatrixXf tmp;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, Q );
-        energy += Q.cwiseProduct(tmp).sum();
+        energy += dotProduct(Q, tmp, dot_tmp);
     }
-    energy += Q.cwiseProduct(diag_dom.cwiseProduct(Q)).sum();
+    energy += dotProduct(Q, diag_dom.cwiseProduct(Q), dot_tmp);
     return energy;
 }
 
 
 double DenseCRF::compute_energy(const MatrixXf & Q) const {
     double energy = 0;
+    MatrixP dot_tmp;
     // Add the unary term
     if( unary_ ) {
         MatrixXf unary = unary_->get();
-        for( int i=0; i<Q.cols(); i++ )
-            for( int l=0; l<Q.rows(); l++ )
-                energy += unary(l,i)*Q(l,i);
+        energy += dotProduct(unary, Q, dot_tmp);
     }
     // Add all pairwise terms
     MatrixXf tmp;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, Q );
-        energy += (Q.array()*tmp.array()).sum();
+        energy += dotProduct(Q, tmp, dot_tmp);
     }
-
     return energy;
 }
 
