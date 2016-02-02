@@ -358,18 +358,15 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
             // std::cout << old_convex_energy  << '\n';
             // std::cout << convex_energy << '\n';
 
-            if (not valid_probability(Q)) {
-                std::cout << "Invalid probability" << '\n';
-            }
-            std::cout << (old_convex_energy - convex_energy) << '\n';
+            assert(valid_probability(Q));
         } while ( (old_convex_energy - convex_energy) > 100);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
 
         // Compute our current value of the energy;
         energy = compute_energy(Q);
-    } while ( (old_energy -energy) > 1e-3);
-
+    } while ( (old_energy -energy) > 1);
+    std::cout << compute_energy(Q) << '\n';
     return Q;
 }
 
