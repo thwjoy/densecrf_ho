@@ -60,10 +60,6 @@ bool file_exist(std::string file_path);
 void make_dir(std::string dir_path);
 void split_string(const std::string &s, const char delim, std::vector<std::string> &elems);
 
-std::vector<std::string> get_all_split_files(const std::string & path_to_dataset, const std::string & dataset_split);
-std::string get_image_path(const std::string & path_to_dataset, const std::string & image_name);
-std::string get_unaries_path(const std::string & path_to_dataset, const std::string & image_name);
-std::string get_ground_truth_path(const std::string & path_to_dataset, const std::string & image_name);
 std::string get_output_path(const std::string & path_to_results_folder, const std::string & image_name);
 
 unsigned char* load_image(const std::string& path_to_image, img_size size);
