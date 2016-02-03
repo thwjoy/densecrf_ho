@@ -21,13 +21,13 @@ protected:
     float l2_norm_ = 0;
 
     std::vector<std::string> all_images_;
-    std::string path_to_dataset_;
+    Dataset ds_;
 
 public:
-    DenseCRFEnergy(std::vector<std::string> all_images, std::string path_to_dataset, int NIT,
+    DenseCRFEnergy(std::vector<std::string> all_images, std::string dataset_name, int NIT,
                    bool train_pairwise=true, bool train_kernel=true):nb_iter(NIT),
                                                                      train_pairwise_(train_pairwise),train_kernel_(train_kernel),
-                                                                     l2_norm_(0.0f), all_images_(all_images), path_to_dataset_(path_to_dataset){
+                                                                     l2_norm_(0.0f), all_images_(all_images), ds_(get_dataset_by_name(dataset_name)){
     }
 
     void setParametersValue(VectorXf parameters){
@@ -111,9 +111,9 @@ public:
         for(int i=0; i< all_images_.size(); ++i){
             std::string image_name = all_images_[i];
             std::cout << image_name << '\n';
-            std::string unaries_path = get_unaries_path(path_to_dataset_, image_name);
-            std::string image_path = get_image_path(path_to_dataset_, image_name);
-            std::string gt_path = get_ground_truth_path(path_to_dataset_, image_name);
+            std::string unaries_path = ds_.get_unaries_path(image_name);
+            std::string image_path = ds_.get_image_path(image_name);
+            std::string gt_path = ds_.get_ground_truth_path(image_name);
 
             VectorXf img_gradient = VectorXf(dx.size());
             double img_loss = single_image_gradient(image_path, unaries_path, gt_path, x, img_gradient);
@@ -142,18 +142,20 @@ public:
 int main(int argc, char *argv[])
 {
     if (argc<3) {
-        std::cout << "learn_pairwise split path_to_dataset" << '\n';
-        std::cout << "Example: ./learn_pairwise Train /data/MSRC/" << '\n';
+        std::cout << "learn_pairwise split dataset_name" << '\n';
+        std::cout << "Example: ./learn_pairwise Train MSRC" << '\n';
         return 1;
     }
 
 
     std::string dataset_split = argv[1];
-    std::string path_to_dataset = argv[2];
+    std::string dataset_name = argv[2];
 
+
+    Dataset ds = get_dataset_by_name(dataset_name);
     std::string init_parameters = "parameters.csv";
     std::string learned_parameters = "learned_parameters.csv";
-    std::vector<std::string> split_images = get_all_split_files(path_to_dataset, dataset_split);
+    std::vector<std::string> split_images = ds.get_all_split_files(dataset_split);
 
     // initialize parameters
     VectorXf parameters;
@@ -164,7 +166,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    DenseCRFEnergy to_optimize(split_images, path_to_dataset, 5);
+    DenseCRFEnergy to_optimize(split_images, dataset_name, 5);
     to_optimize.setParametersValue(parameters);
 
     int nb_restart = 2;

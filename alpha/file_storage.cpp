@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sys/stat.h>
 
+
 // Directory and file stuff
 void make_dir(std::string dir_name){
     struct stat resdir_stat;
@@ -35,21 +36,6 @@ void split_string(const std::string &s, const char delim, std::vector<std::strin
     }
 }
 
-std::vector<std::string> get_all_split_files(const std::string & path_to_dataset, const std::string & split)
-{
-    std::string path_to_split = path_to_dataset + "split/" + split+ ".txt";
-
-    std::vector<std::string> split_images;
-    std::string next_img_name;
-    std::ifstream file(path_to_split.c_str());
-
-    while(getline(file, next_img_name)){
-        split_images.push_back(rtrim(next_img_name));
-    }
-
-    return split_images;
-}
-
 std::string stringreplace(std::string s,
                           std::string toReplace,
                           std::string replaceWith)
@@ -62,29 +48,75 @@ std::string stringreplace(std::string s,
 }
 
 
-std::string  get_unaries_path(const std::string & path_to_dataset, const std::string & image_name){
-    std::string unaries_path = path_to_dataset + "texton_unaries/";
-    unaries_path = unaries_path + image_name;
-    unaries_path = stringreplace(unaries_path, ".bmp", ".c_unary");
+Dataset::Dataset(std::string path_to_images,
+                 std::string path_to_unaries,
+                 std::string path_to_ground_truths,
+                 std::string path_to_root,
+                 std::string image_format,
+                 std::string ground_truth_format): path_to_images(path_to_images),
+                                                   path_to_unaries(path_to_unaries),
+                                                   path_to_ground_truths(path_to_ground_truths),
+                                                   path_to_root(path_to_root),
+                                                   image_format(image_format),
+                                                   ground_truth_format(ground_truth_format){}
+
+std::string Dataset::get_unaries_path(const std::string & image_name){
+    std::string unaries_path = path_to_unaries + image_name;
+    unaries_path = unaries_path + ".c_unary";
     return unaries_path;
 }
 
-std::string  get_image_path(const std::string & path_to_dataset, const std::string & image_name){
-    std::string image_path = path_to_dataset +"MSRC_ObjCategImageDatabase_v2/Images/";
-    image_path = image_path + image_name;
+std::string Dataset::get_image_path(const std::string & image_name){
+    std::string image_path = path_to_images + image_name;
+    image_path = image_path + image_format;
     return image_path;
 }
 
-std::string  get_ground_truth_path(const std::string & path_to_dataset, const std::string & image_name){
-    std::string ground_truth_path = path_to_dataset +"MSRC_ObjCategImageDatabase_v2/GroundTruth/";
-    ground_truth_path = ground_truth_path + image_name;
-    ground_truth_path = stringreplace(ground_truth_path, ".bmp", "_GT.bmp");
-    return ground_truth_path;
+std::string Dataset::get_ground_truth_path(const std::string & image_name){
+    std::string gt_path = path_to_ground_truths + image_name;
+    gt_path = gt_path + ground_truth_format;
+    return gt_path;
+}
+
+std::vector<std::string> Dataset::get_all_split_files(const std::string & split)
+{
+    std::string path_to_split = path_to_root + "split/" + split+ ".txt";
+
+    std::vector<std::string> split_images;
+    std::string next_img_name;
+    std::ifstream file(path_to_split.c_str());
+
+
+    while(getline(file, next_img_name)){
+        next_img_name = rtrim(next_img_name);
+        next_img_name = stringreplace(next_img_name, ".bmp", ""); // Cleanup the name in MSRC
+        split_images.push_back(next_img_name);
+    }
+    return split_images;
+}
+
+Dataset get_dataset_by_name(const std::string & dataset_name){
+    if (dataset_name == "MSRC") {
+        return Dataset("/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
+                       "/data/MSRC/texton_unaries/",
+                       "/data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
+                       "/data/MSRC/",
+                       ".bmp",
+                       "_GT.bmp");
+    }
+    else if (dataset_name == "Pascal2010") {
+        return Dataset("/data/PascalVOC2010/JPEGImages/",
+                       "/data/PascalVOC2010/unaries/",
+                       "/data/PascalVOC2010/SegmentationClass/",
+                       "/data/PascalVOC2010/",
+                       ".jpg",
+                       ".png");
+    }
+    // Add some possible other datasets
 }
 
 std::string get_output_path(const std::string & path_to_results_folder, const std::string & image_name){
-    std::string output_path = path_to_results_folder + image_name;
-    output_path = stringreplace(output_path, ".bmp", "_res.bmp");
+    std::string output_path = path_to_results_folder + image_name + ".png";
     return output_path;
 }
 

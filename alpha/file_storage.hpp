@@ -39,6 +39,23 @@ const unsigned char legend[22*3] = {
     0,0,0
 };
 
+class Dataset {
+protected:
+    std::string path_to_images, path_to_unaries, path_to_ground_truths, path_to_root;
+    std::string image_format, ground_truth_format;
+public:
+    Dataset(std::string path_to_images, std::string path_to_unaries,
+            std::string path_to_ground_truths, std::string path_to_root,
+            std::string image_format, std::string ground_truth_format);
+    std::string get_unaries_path(const std::string & image_name);
+    std::string get_ground_truth_path(const std::string & image_name);
+    std::string get_image_path(const std::string & image_name);
+    std::vector<std::string> get_all_split_files(const std::string & split);
+};
+
+
+Dataset get_dataset_by_name(const std::string & dataset_name);
+
 bool file_exist(std::string file_path);
 void make_dir(std::string dir_path);
 void split_string(const std::string &s, const char delim, std::vector<std::string> &elems);

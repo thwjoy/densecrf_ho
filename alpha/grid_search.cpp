@@ -17,10 +17,10 @@ void save_confusion_matrix(const std::vector<int>& confMat, const std::string& f
 
 int main(int argc, char *argv[])
 {
-    std::string path_to_dataset = "/data/MSRC/";
+    Dataset ds = get_dataset_by_name("MSRC");
     std::string dataset_split = "Validation";
 
-    std::vector<std::string> test_images = get_all_split_files(path_to_dataset, dataset_split);
+    std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
 
     for (float w1 =1; w1< 11; w1+=0.5) {
         for (float sigma_alpha = 30; sigma_alpha<80; sigma_alpha+=5) {
@@ -32,9 +32,9 @@ int main(int argc, char *argv[])
 #pragma omp parallel for
                 for(int i=0; i< test_images.size(); ++i){
                     std::string image_name = test_images[i];
-                    std::string image_path = get_image_path(path_to_dataset, image_name);
-                    std::string unaries_path = get_unaries_path(path_to_dataset, image_name);
-                    std::string gt_path = get_ground_truth_path(path_to_dataset, image_name);
+                    std::string image_path = ds.get_image_path(image_name);
+                    std::string unaries_path = ds.get_unaries_path(image_name);
+                    std::string gt_path = ds.get_ground_truth_path(image_name);
 
                     label_matrix gt = load_label_matrix(gt_path);
                     label_matrix img_res = minimize_mean_field(image_path, unaries_path, w1, sigma_alpha, sigma_beta);
