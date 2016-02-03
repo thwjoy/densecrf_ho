@@ -1,8 +1,9 @@
-#include "densecrf.h"
 #include <Eigen/Core>
-#include "file_storage.hpp"
 #include <Eigen/Eigenvalues>
 #include <iostream>
+#include "densecrf.h"
+#include "file_storage.hpp"
+#include "inference.hpp"
 #include "newton_cccp.hpp"
 
 void test_writing(){
@@ -71,8 +72,6 @@ void initialize_crf_parameters(){
     }
 
     save_matrix("parameters.csv", params);
-
-
 }
 
 
@@ -113,9 +112,26 @@ void test_label_matrix_loading(){
 }
 
 
+void test_pascal_loading(){
+    Dataset ds = get_dataset_by_name("Pascal2010");
+    std::vector<std::string> all_images = ds.get_all_split_files("Train");
+    std::string output_directory = "/data/tests/";
+
+    std::string image_name = all_images[0];
+
+    std::string path_to_image = ds.get_image_path(image_name);
+    std::string path_to_unaries = ds.get_unaries_path(image_name);
+    std::string path_to_output = get_output_path(output_directory, image_name);
+    std::string path_to_parameters = "/data/densecrf/alpha/learned_parameters.csv";
+
+    minimize_mean_field(path_to_image, path_to_unaries,
+                        path_to_output, path_to_parameters);
+
+}
+
 
 int main(int argc, char *argv[])
 {
-    test_label_matrix_loading();
+    test_pascal_loading();
     return 0;
 }

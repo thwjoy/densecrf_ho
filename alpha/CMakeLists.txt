@@ -32,7 +32,7 @@ target_link_libraries(inference densecrf brute_force file_storage eigen_utils ne
 
 # Executables
 add_executable(run throwaway.cpp)
-target_link_libraries(run file_storage densecrf newton_cccp)
+target_link_libraries(run file_storage densecrf newton_cccp inference)
 
 add_executable(example_inference  example_inference.cpp)
 target_link_libraries(example_inference inference file_storage)
