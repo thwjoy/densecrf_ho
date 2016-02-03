@@ -53,18 +53,19 @@ void do_inference(Dataset dataset, std::string path_to_results,
     std::string image_path = dataset.get_image_path(image_name);
     std::string unaries_path = dataset.get_unaries_path(image_name);
     std::string output_path = get_output_path(path_to_results, image_name);
+    std::string dataset_name = dataset.name;
 
     if(not file_exist(output_path)){
         std::cout << output_path << '\n';
         if (to_minimize == "mf") {
-            minimize_mean_field(image_path, unaries_path, output_path, path_to_parameters);
+            minimize_mean_field(image_path, unaries_path, output_path, path_to_parameters, dataset_name);
         } else if(to_minimize == "grad"){
-            gradually_minimize_mean_field(image_path, unaries_path, output_path, path_to_parameters);
+            gradually_minimize_mean_field(image_path, unaries_path, output_path, path_to_parameters, dataset_name);
         } else if(to_minimize == "unaries") {
-            unaries_baseline(unaries_path, output_path);
+            unaries_baseline(unaries_path, output_path, dataset_name);
         } else{
             float alpha = stof(to_minimize);
-            minimize_dense_alpha_divergence(image_path, unaries_path, output_path, path_to_parameters, alpha);
+            minimize_dense_alpha_divergence(image_path, unaries_path, output_path, path_to_parameters, alpha, dataset_name);
         }
     }
 }

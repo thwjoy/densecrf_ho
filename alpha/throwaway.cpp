@@ -113,19 +113,22 @@ void test_label_matrix_loading(){
 
 
 void test_pascal_loading(){
-    Dataset ds = get_dataset_by_name("Pascal2010");
+    std::string dataset_name = "MSRC";
+    Dataset ds = get_dataset_by_name(dataset_name);
     std::vector<std::string> all_images = ds.get_all_split_files("Train");
     std::string output_directory = "/data/tests/";
 
-    std::string image_name = all_images[0];
+    std::string image_name = all_images[1];
 
     std::string path_to_image = ds.get_image_path(image_name);
     std::string path_to_unaries = ds.get_unaries_path(image_name);
     std::string path_to_output = get_output_path(output_directory, image_name);
     std::string path_to_parameters = "/data/densecrf/alpha/learned_parameters.csv";
 
-    minimize_mean_field(path_to_image, path_to_unaries,
-                        path_to_output, path_to_parameters);
+    // minimize_mean_field(path_to_image, path_to_unaries,
+    //                     path_to_output, path_to_parameters);
+
+    unaries_baseline(path_to_unaries, path_to_output, dataset_name);
 
 }
 

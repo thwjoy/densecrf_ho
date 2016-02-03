@@ -12,7 +12,7 @@ struct img_size {
     int height;
 };
 
-const unsigned char legend[22*3] = {
+const unsigned char MSRC_legend[22*3] = {
     128,0,0,
     0,128,0,
     128,128,0,
@@ -39,14 +39,48 @@ const unsigned char legend[22*3] = {
     0,0,0
 };
 
+
+const unsigned char Pascal_legend[28*3] = {
+    0,0,0,
+    128,0,0,
+    0,128,0,
+    128,128,0,
+    0,0,128,
+    128,0,128,
+    0,128,128,
+    128,128,128,
+    64,0,0,
+    192,0,0,
+    64,128,0,
+    192,128,0,
+    64,0,128,
+    192,0,128,
+    64,128,128,
+    192,128,128,
+    0,64,0,
+    128,64,0,
+    0,192,0,
+    128,192,0,
+    0,64,128,
+    128,64,128,
+    0,192,128,
+    128,192,128,
+    64,64,0,
+    192,64,0,
+    64,192,0,
+    192,192,0
+};
+
 class Dataset {
 protected:
     std::string path_to_images, path_to_unaries, path_to_ground_truths, path_to_root;
     std::string image_format, ground_truth_format;
 public:
+    std::string name;
     Dataset(std::string path_to_images, std::string path_to_unaries,
             std::string path_to_ground_truths, std::string path_to_root,
-            std::string image_format, std::string ground_truth_format);
+            std::string image_format, std::string ground_truth_format,
+            std::string name);
     std::string get_unaries_path(const std::string & image_name);
     std::string get_ground_truth_path(const std::string & image_name);
     std::string get_image_path(const std::string & image_name);
@@ -65,7 +99,8 @@ std::string get_output_path(const std::string & path_to_results_folder, const st
 unsigned char* load_image(const std::string& path_to_image, img_size size);
 Matrix<short,Dynamic,1> load_labeling(const std::string & path_to_labels, img_size& size);
 MatrixXf load_unary(const std::string & path_to_unary, img_size& size);
-void save_map(const MatrixXf & estimates, const img_size &  size, const std::string &  path_to_output);
+void save_map(const MatrixXf & estimates, const img_size &  size,
+              const std::string & path_to_output, const std::string & dataset_name);
 
 label_matrix load_label_matrix(const std::string & path_to_labels);
 label_matrix get_label_matrix(const MatrixXf & estimates, const img_size & size);

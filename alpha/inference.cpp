@@ -8,7 +8,8 @@
 using namespace Eigen;
 
 void minimize_dense_alpha_divergence(std::string path_to_image, std::string path_to_unaries,
-                                     std::string path_to_output, std::string path_to_parameters, float alpha) {
+                                     std::string path_to_output, std::string path_to_parameters, float alpha,
+                                     std::string dataset_name) {
     img_size size;
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
@@ -27,17 +28,20 @@ void minimize_dense_alpha_divergence(std::string path_to_image, std::string path
 
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    save_map(Q, size, path_to_output);
+    save_map(Q, size, path_to_output, dataset_name);
 
 }
 
 void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
-                         std::string path_to_output, std::string path_to_parameters) {
+                         std::string path_to_output, std::string path_to_parameters,
+                         std::string dataset_name) {
     img_size size;
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
     unsigned char * img = load_image(path_to_image, size);
     VectorXf pairwise_parameters = load_matrix(path_to_parameters);
+
+    std::cout << unaries.rows() << '\t' << unaries.cols() << '\n';
 
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
@@ -59,11 +63,12 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     // std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    save_map(Q, size, path_to_output);
+    save_map(Q, size, path_to_output, dataset_name);
 }
 
 void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
-                    std::string path_to_output, std::string path_to_parameters) {
+                    std::string path_to_output, std::string path_to_parameters,
+                    std::string dataset_name) {
     img_size size;
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
@@ -89,11 +94,12 @@ void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
     // std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    save_map(Q, size, path_to_output);
+    save_map(Q, size, path_to_output, dataset_name);
 }
 
 void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
-                      std::string path_to_output, std::string path_to_parameters) {
+                      std::string path_to_output, std::string path_to_parameters,
+                      std::string dataset_name) {
     img_size size;
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
@@ -119,13 +125,14 @@ void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
     // std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    save_map(Q, size, path_to_output);
+    save_map(Q, size, path_to_output, dataset_name);
 }
 
 
 
 void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_unaries,
-                              std::string path_to_output, std::string path_to_parameters) {
+                              std::string path_to_output, std::string path_to_parameters,
+                              std::string dataset_name) {
     img_size size;
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
@@ -153,13 +160,14 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
     // std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    save_map(Q, size, path_to_output);
+    save_map(Q, size, path_to_output, dataset_name);
 }
 
 
 
 void gradually_minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
-                                   std::string path_to_output, std::string path_to_parameters) {
+                                   std::string path_to_output, std::string path_to_parameters,
+                                   std::string dataset_name) {
     img_size size;
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
@@ -178,15 +186,15 @@ void gradually_minimize_mean_field(std::string path_to_image, std::string path_t
 
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    save_map(Q, size, path_to_output);
+    save_map(Q, size, path_to_output, dataset_name);
 }
 
-void unaries_baseline(std::string path_to_unaries, std::string path_to_output){
+void unaries_baseline(std::string path_to_unaries, std::string path_to_output, std::string dataset_name){
     img_size size;
     MatrixXf unaries = load_unary(path_to_unaries, size);
     MatrixXf Q(unaries.rows(), unaries.cols());
     expAndNormalize(Q, -unaries);
-    save_map(Q, size, path_to_output);
+    save_map(Q, size, path_to_output, dataset_name);
 }
 
 

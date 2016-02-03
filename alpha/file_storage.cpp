@@ -53,12 +53,14 @@ Dataset::Dataset(std::string path_to_images,
                  std::string path_to_ground_truths,
                  std::string path_to_root,
                  std::string image_format,
-                 std::string ground_truth_format): path_to_images(path_to_images),
-                                                   path_to_unaries(path_to_unaries),
-                                                   path_to_ground_truths(path_to_ground_truths),
-                                                   path_to_root(path_to_root),
-                                                   image_format(image_format),
-                                                   ground_truth_format(ground_truth_format){}
+                 std::string ground_truth_format,
+                 std::string name): path_to_images(path_to_images),
+                                    path_to_unaries(path_to_unaries),
+                                    path_to_ground_truths(path_to_ground_truths),
+                                    path_to_root(path_to_root),
+                                    image_format(image_format),
+                                    ground_truth_format(ground_truth_format),
+                                    name(name){}
 
 std::string Dataset::get_unaries_path(const std::string & image_name){
     std::string unaries_path = path_to_unaries + image_name;
@@ -102,7 +104,8 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "/data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
                        "/data/MSRC/",
                        ".bmp",
-                       "_GT.bmp");
+                       "_GT.bmp",
+                       "MSRC");
     }
     else if (dataset_name == "Pascal2010") {
         return Dataset("/data/PascalVOC2010/JPEGImages/",
@@ -110,7 +113,8 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "/data/PascalVOC2010/SegmentationClass/",
                        "/data/PascalVOC2010/",
                        ".jpg",
-                       ".png");
+                       ".png",
+                       "Pascal2010");
     }
     // Add some possible other datasets
 }
@@ -204,7 +208,7 @@ label_matrix load_label_matrix(const std::string & path_to_labels){
     return labels_from_lblimg(img, color_to_label);
 }
 
-void save_map(const MatrixXf & estimates, const img_size & size, const std::string & path_to_output) {
+void save_map(const MatrixXf & estimates, const img_size & size, const std::string & path_to_output, const std::string & dataset_name) {
     std::vector<short> labeling(estimates.cols());
 
     // MAP estimation
@@ -212,6 +216,12 @@ void save_map(const MatrixXf & estimates, const img_size & size, const std::stri
         int lbl;
         estimates.col(i).maxCoeff( &lbl);
         labeling[i] = lbl;
+    }
+    const unsigned char*  legend;
+    if (dataset_name == "MSRC") {
+        legend = MSRC_legend;
+    } else {
+        legend = Pascal_legend;
     }
 
     // Make the image
