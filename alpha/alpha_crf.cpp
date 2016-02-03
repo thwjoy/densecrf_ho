@@ -208,7 +208,7 @@ void AlphaCRF::cccpiter_for_proxy_marginals(MatrixXf & approx_Q, MatrixXf & tmp1
     MatrixXf Cste = proxy_unary;
     Cste += MatrixXf::Ones(approx_Q.rows(), approx_Q.cols());
     for (int i=0; i < pairwise_.size(); i++) {
-        lambda_eig += pick_lambda_eig(pairwise_[i]->compatibility_matrix(M_));
+        lambda_eig += pick_lambda_eig_to_concave(pairwise_[i]->compatibility_matrix(M_));
         pairwise_[i]->apply(tmp1, Q_old);
         Cste += tmp1;
     }

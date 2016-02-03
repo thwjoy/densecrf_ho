@@ -184,8 +184,7 @@ MatrixXf DenseCRF::inference () const {
 		old_Q = Q;
 		count++;
 	}
-	std::cout << "Nb of needed iterations: " << count << '\n';
-	return Q;
+    return Q;
 }
 
 MatrixXf DenseCRF::qp_inference() const {
@@ -194,13 +193,15 @@ MatrixXf DenseCRF::qp_inference() const {
 	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
         desc(M_,N_), psis(M_,N_), sx(M_,N_);
 
-    // Get initial estimates
+    // Get parameters
     unary.fill(0);
     if(unary_){
         unary = unary_->get();
     }
     // Initialize state to the unaries
-    expAndNormalize(Q, -unary);
+    // Warning: We don't get exactly the same optimum depending on the initialisation
+    // expAndNormalize(Q, -unary);
+    Q.fill(1/ (float) M_);
 
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
@@ -255,29 +256,113 @@ MatrixXf DenseCRF::qp_inference() const {
         Q += optimal_step_size * sx;
         energy = compute_LR_QP_value(Q, diag_dom);
     }
-    std::cout << compute_energy(Q) << '\n';
+    // TODO: Should we do a better rounding than this one?
     return Q;
 }
 
 MatrixXf DenseCRF::qp_cccp_inference() const {
-    MatrixXf Q(M_, N_);
-    // Compute the largest eigenvalues necessary to make sure that the problem is convex.
+    MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
+        desc(M_, N_), sx(M_, N_),  psis(M_, N_), psix(M_,N_);
+    MatrixP temp_dot(M_,N_);
+    // Compute the smallest eigenvalues, that we need to make bigger
+    // than 0, to ensure that the problem is convex.
+    float lambda_eig = 0;
+    for (int i=0; i < pairwise_.size(); i++) {
+        lambda_eig += pick_lambda_eig_to_convex(pairwise_[i]->compatibility_matrix(M_));
+    }
 
-    // TODO: Write down on paper the updates rules for cccp, should just be
-    // a simpler version than the ones for KL-divergence minimisation
-
+    // Get parameters
+    unary.fill(0);
+    if(unary_){
+        unary = unary_->get();
+    }
 
     // Get initial estimates
+    // Initialize state to the unaries
+    // Warning: We don't get exactly the same optimum depending on the initialisation
+    // expAndNormalize(Q, -unary);
+    Q.fill(1/ (float) M_);
 
-    // CCCP loop start, while energy is decreasing
+    // Compute the value of the energy
+    double old_energy;
+    double energy = compute_energy(Q);
 
-    // Compute the linearisation of the concave part
+    do {
+        // New value of the linearization point.
+        old_energy = energy;
+        Q_old = Q;
 
-    // Solve the convex minimisation problem, using conditional gradient descent
-    // This should be really easy to reuse some of the functions in the relaxed qp.
+        double convex_energy = energy + lambda_eig * dotProduct(Q, 2*Q_old - Q, temp_dot);
+        double old_convex_energy;
 
-    // CCCP loop end
+        do {
+            old_convex_energy = convex_energy;
+            // Compute gradient of the convex problem
+            psix.fill(0);
+            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+                pairwise_[k]->apply( tmp, Q);
+                psix += tmp;
+            }
 
+            grad = unary +
+                2 * psix +
+                2 * lambda_eig * (Q_old - Q);
+
+            // Get a Descent direction by minimising < \nabla E, s >
+            descent_direction(desc, grad);
+
+            // Solve for the best step size of the convex problem. It
+            // is - frac{\phi^T(s-x) + 2 x^T \psi (s-x) + 2 \lambda
+            // (s-x)^T (x_old - x)}{2 (s-x) \psi (s-x) - \lambda
+            // (s-x)^2}
+            sx = desc - Q;
+
+            psis.fill(0);
+            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+                pairwise_[k]->apply(tmp, sx);
+                psis += tmp;
+            }
+
+            double num = dotProduct(unary, sx, temp_dot) +
+                2 * dotProduct(Q, psis, temp_dot) +
+                2 * lambda_eig * dotProduct(sx, Q_old-Q, temp_dot);
+            // double alt_num = dotProduct(sx, grad, temp_dot); // This is the same computation, done differently
+            assert(num<0); // This is negative if desc is really the good minimizer
+
+            double denom = dotProduct(desc, psis, temp_dot) +
+                (-lambda_eig) * dotProduct(desc, desc, temp_dot); // squared
+            assert(denom>0); // This is positive if we did our decomposition correctly
+
+            double cst = dotProduct(unary, Q, temp_dot) +
+                dotProduct(Q, psix, temp_dot) +
+                lambda_eig * dotProduct(Q, 2 * Q_old - Q, temp_dot);
+
+            double optimal_step_size = - num/ (2 *denom);
+
+            if (optimal_step_size > 1) {
+                optimal_step_size = 1;
+            }
+
+            // std::cout << "Step size: " << optimal_step_size << '\n';
+
+            Q += optimal_step_size * sx;
+
+            // std::cout << "Coefficients: "<< denom << '\t' << num << '\t' << cst << '\n';
+            convex_energy = pow(optimal_step_size, 2) * denom + optimal_step_size * num + cst;
+
+            // energy = compute_energy(Q);
+            // old_convex_energy = energy + lambda_eig * dotProduct(Q, 2*Q_old -Q, temp_dot);
+            // std::cout << old_convex_energy  << '\n';
+            // std::cout << convex_energy << '\n';
+
+            assert(valid_probability(Q));
+        } while ( (old_convex_energy - convex_energy) > 100);
+        // We are now (almost) at a minimum of the convexified problem, so we
+        // stop solving the convex problem and get a new convex approximation.
+
+        // Compute our current value of the energy;
+        energy = compute_energy(Q);
+    } while ( (old_energy -energy) > 1);
     return Q;
 }
 
@@ -293,7 +378,7 @@ MatrixXf DenseCRF::cccp_inference() const {
     // Compute the largest eigenvalues
     float lambda_eig = 0;
     for (int i=0; i<pairwise_.size(); i++) {
-        lambda_eig += pick_lambda_eig(pairwise_[i]->compatibility_matrix(M_));
+        lambda_eig += pick_lambda_eig_to_concave(pairwise_[i]->compatibility_matrix(M_));
     }
     expAndNormalize(Q, -unary);
 
@@ -335,7 +420,6 @@ MatrixXf DenseCRF::cccp_inference() const {
         old_Q = Q;
         count++;
     }
-    std::cout << "Nb of needed iterations: " << count << '\n';
     return Q;
 }
 
@@ -504,36 +588,36 @@ double DenseCRF::compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_d
     double energy = 0;
     // Add the unary term
     MatrixXf unary = unary_->get();
-    energy += unary.cwiseProduct(Q).sum();
-    energy -= diag_dom.cwiseProduct(Q).sum();
+    MatrixP dot_tmp;
+
+    energy += dotProduct(unary, Q, dot_tmp);
+    energy -= dotProduct(diag_dom, Q, dot_tmp);
 
     // Add all pairwise terms
     MatrixXf tmp;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, Q );
-        energy += Q.cwiseProduct(tmp).sum();
+        energy += dotProduct(Q, tmp, dot_tmp);
     }
-    energy += Q.cwiseProduct(diag_dom.cwiseProduct(Q)).sum();
+    energy += dotProduct(Q, diag_dom.cwiseProduct(Q), dot_tmp);
     return energy;
 }
 
 
 double DenseCRF::compute_energy(const MatrixXf & Q) const {
     double energy = 0;
+    MatrixP dot_tmp;
     // Add the unary term
     if( unary_ ) {
         MatrixXf unary = unary_->get();
-        for( int i=0; i<Q.cols(); i++ )
-            for( int l=0; l<Q.rows(); l++ )
-                energy += unary(l,i)*Q(l,i);
+        energy += dotProduct(unary, Q, dot_tmp);
     }
     // Add all pairwise terms
     MatrixXf tmp;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, Q );
-        energy += (Q.array()*tmp.array()).sum();
+        energy += dotProduct(Q, tmp, dot_tmp);
     }
-
     return energy;
 }
 
