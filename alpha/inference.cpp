@@ -1,9 +1,11 @@
-#include "inference.hpp"
-#include "alpha_crf.hpp"
-#include "color_to_label.hpp"
 #include <ctime>
+#include <fstream>
 #include <iostream>
 #include <string>
+
+#include "alpha_crf.hpp"
+#include "color_to_label.hpp"
+#include "inference.hpp"
 
 using namespace Eigen;
 
@@ -15,6 +17,14 @@ Potts_weight_set::Potts_weight_set(float spatial_std, float spatial_potts_weight
                                                              bilat_color_std(bilat_color_std),
                                                              bilat_potts_weight(bilat_potts_weight){}
 
+void write_down_perf(double timing, double final_energy, std::string path_to_output){
+    std::string txt_output = path_to_output;
+    txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
+
+    std::ofstream txt_file(txt_output.c_str());
+    txt_file << timing << '\t' << final_energy << std::endl;
+    txt_file.close();
+}
 
 void minimize_dense_alpha_divergence(std::string path_to_image, std::string path_to_unaries,
                                      Potts_weight_set parameters, std::string path_to_output, float alpha,
@@ -24,18 +34,23 @@ void minimize_dense_alpha_divergence(std::string path_to_image, std::string path
     MatrixXf unaries = load_unary(path_to_unaries, size);
     unsigned char * img = load_image(path_to_image, size);
 
-// Load a crf
+    // Load a crf
     AlphaCRF crf(size.width, size.height, unaries.rows(), alpha);
 
 
-    int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
                             new PottsCompatibility(parameters.spatial_potts_weight));
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
+    clock_t start, end;
+    start = clock();
     MatrixXf Q = crf.inference();
+    end = clock();
+    double timing = (double(end-start)/CLOCKS_PER_SEC);
+    double final_energy = crf.compute_energy(Q);
+    write_down_perf(timing, final_energy, path_to_output);
 
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
@@ -54,7 +69,6 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
 
-    int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
                             new PottsCompatibility(parameters.spatial_potts_weight));
@@ -66,9 +80,11 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.inference();
-    std::cout << crf.compute_energy(Q) << '\n';
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
+    double final_energy = crf.compute_energy(Q);
+    write_down_perf(timing, final_energy, path_to_output);
+
     // std::cout << "Time taken: " << timing << '\n';
     // std::cout << "KL divergence: " << crf.klDivergence(Q) << '\n';
     // std::cout << "Done with inference"<< '\n';
@@ -88,7 +104,6 @@ void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
 
-    int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
                             new PottsCompatibility(parameters.spatial_potts_weight));
@@ -100,9 +115,11 @@ void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.qp_inference();
-    std::cout << crf.compute_energy(Q) << '\n';
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
+    double final_energy = crf.compute_energy(Q);
+    write_down_perf(timing, final_energy, path_to_output);
+
     // std::cout << "Time taken: " << timing << '\n';
     // std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
@@ -121,7 +138,6 @@ void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
 
-    int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
                             new PottsCompatibility(parameters.spatial_potts_weight));
@@ -133,9 +149,11 @@ void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.qp_cccp_inference();
-    std::cout << crf.compute_energy(Q) << '\n';
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
+    double final_energy = crf.compute_energy(Q);
+    write_down_perf(timing, final_energy, path_to_output);
+
     // std::cout << "Time taken: " << timing << '\n';
     // std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
@@ -156,7 +174,6 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
 
-    int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
                             new PottsCompatibility(parameters.spatial_potts_weight));
@@ -169,9 +186,12 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.cccp_inference();
-    std::cout << crf.compute_energy(Q) << '\n';
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
+    double final_energy = crf.compute_energy(Q);
+    write_down_perf(timing, final_energy, path_to_output);
+
+
     // std::cout << "Time taken: " << timing << '\n';
     // std::cout << "KL divergence: " << crf.klDivergence(Q) << '\n';
     // std::cout << "Done with inference"<< '\n';
@@ -193,17 +213,21 @@ void gradually_minimize_mean_field(std::string path_to_image, std::string path_t
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
 
-    int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
                             new PottsCompatibility(parameters.spatial_potts_weight));
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
-
+    clock_t start, end;
+    start = clock();
     MatrixXf Q = crf.grad_inference();
+    end = clock();
+    double timing = (double(end-start)/CLOCKS_PER_SEC);
+    double final_energy = crf.compute_energy(Q);
+    write_down_perf(timing, final_energy, path_to_output);
 
-    // Perform the MAP estimation on the fully factorized dipstribution
+    // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
 }
@@ -227,7 +251,6 @@ label_matrix minimize_mean_field(std::string path_to_image, std::string path_to_
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
 
-    int M = unaries.rows();
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
                             new PottsCompatibility(parameters.spatial_potts_weight));
