@@ -51,8 +51,6 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     MatrixXf unaries = load_unary(path_to_unaries, size);
     unsigned char * img = load_image(path_to_image, size);
 
-    std::cout << unaries.rows() << '\t' << unaries.cols() << '\n';
-
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
 
