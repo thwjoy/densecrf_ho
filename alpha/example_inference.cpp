@@ -15,16 +15,17 @@ int main(int argc, char* argv[]) {
 
     std::string path_to_parameters = "/data/densecrf/alpha/learned_parameters.csv";
 
-
+    Potts_weight_set params(3, 3, 50, 15, 5);
 
     // minimize_dense_alpha_divergence(path_to_image, path_to_unaries, path_to_alpha_output, path_to_parameters, 5);n
-    // unaries_baseline(path_to_unaries, path_to_unoutput);
+    std::cout << "Unaries" << '\n';
+    unaries_baseline(path_to_unaries, path_to_unoutput, dataset_name);
     std::cout << "Meanfield" << '\n';
-    minimize_mean_field(path_to_image, path_to_unaries,  path_to_mf_output, path_to_parameters, dataset_name);
+    minimize_mean_field(path_to_image, path_to_unaries, params, path_to_mf_output, dataset_name);
     std::cout << "CCCP Meanfield" << '\n';
-    minimize_cccp_mean_field(path_to_image, path_to_unaries, path_to_cccp_output, path_to_parameters, dataset_name);
+    minimize_cccp_mean_field(path_to_image, path_to_unaries, params, path_to_cccp_output, dataset_name);
     std::cout << "Lafferty QP"  << '\n';
-    minimize_LR_QP(path_to_image, path_to_unaries, path_to_qplroutput, path_to_parameters, dataset_name);
+    minimize_LR_QP(path_to_image, path_to_unaries, params, path_to_qplroutput, dataset_name);
     std::cout << "CCCP QP" << '\n';
-    minimize_QP_cccp(path_to_image, path_to_unaries, path_to_qpcccp_output, path_to_parameters, dataset_name);
+    minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
 }

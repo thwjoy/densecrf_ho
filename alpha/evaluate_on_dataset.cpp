@@ -47,7 +47,7 @@ void save_vector(const std::vector<T>& vector, const std::string& filename)
 //////////////////////////////
 
 void do_inference(Dataset dataset, std::string path_to_results,
-                  std::string image_name, std::string path_to_parameters, std::string to_minimize)
+                  std::string image_name, std::string to_minimize)
 {
 
     std::string image_path = dataset.get_image_path(image_name);
@@ -55,17 +55,19 @@ void do_inference(Dataset dataset, std::string path_to_results,
     std::string output_path = get_output_path(path_to_results, image_name);
     std::string dataset_name = dataset.name;
 
+    Potts_weight_set params(3, 3, 50, 15, 5);
+
     if(not file_exist(output_path)){
         std::cout << output_path << '\n';
         if (to_minimize == "mf") {
-            minimize_mean_field(image_path, unaries_path, output_path, path_to_parameters, dataset_name);
+            minimize_mean_field(image_path, unaries_path, params, output_path, dataset_name);
         } else if(to_minimize == "grad"){
-            gradually_minimize_mean_field(image_path, unaries_path, output_path, path_to_parameters, dataset_name);
+            gradually_minimize_mean_field(image_path, unaries_path, params, output_path, dataset_name);
         } else if(to_minimize == "unaries") {
             unaries_baseline(unaries_path, output_path, dataset_name);
         } else{
             float alpha = stof(to_minimize);
-            minimize_dense_alpha_divergence(image_path, unaries_path, output_path, path_to_parameters, alpha, dataset_name);
+            minimize_dense_alpha_divergence(image_path, unaries_path, params, output_path, alpha, dataset_name);
         }
     }
 }
@@ -89,8 +91,7 @@ void evaluate_segmentation_files(Dataset dataset, std::string path_to_results, s
 }
 
 double compute_pixel_accuracy(std::string dataset_split, std::string dataset_name,
-                              std::string path_to_generated, std::string path_to_parameters,
-                              std::string to_minimize){
+                              std::string path_to_generated, std::string to_minimize){
 
     Dataset ds = get_dataset_by_name(dataset_name);
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
@@ -98,7 +99,7 @@ double compute_pixel_accuracy(std::string dataset_split, std::string dataset_nam
     // Inference
 #pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
-        do_inference(ds, path_to_generated, test_images[i], path_to_parameters, to_minimize);
+        do_inference(ds, path_to_generated, test_images[i], to_minimize);
     }
 
 // Confusion evaluation
@@ -131,15 +132,14 @@ int main(int argc, char *argv[])
 {
     if (argc<6) {
         std::cout << "evaluate split dataset results" << '\n';
-        std::cout << "Example: ./evaluate Train MSRC /data/MSRC/results/train/ learned_parameters.csv -10:-3:-1:2:10:mf:grad" << '\n';
+        std::cout << "Example: ./evaluate Train MSRC /data/MSRC/results/train/ -10:-3:-1:2:10:mf:grad" << '\n';
         return 1;
     }
 
     std::string dataset_split = argv[1];
     std::string dataset_name  = argv[2];
     std::string path_to_results = argv[3];
-    std::string path_to_parameters = argv[4];
-    std::string all_optims = argv[5];
+    std::string all_optims = argv[4];
 
     std::vector<std::string> optims_to_do;
     split_string(all_optims, ':', optims_to_do);
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
         std::string path_to_generated = path_to_results + *optim_s + '/';
         make_dir(path_to_generated);
 
-        double accuracy = compute_pixel_accuracy(dataset_split, dataset_name, path_to_generated, path_to_parameters, *optim_s);
+        double accuracy = compute_pixel_accuracy(dataset_split, dataset_name, path_to_generated, *optim_s);
         std::cout <<*optim_s << '\t' << accuracy << '\n';
     }
 }

@@ -37,7 +37,8 @@ int main(int argc, char *argv[])
                     std::string gt_path = ds.get_ground_truth_path(image_name);
 
                     label_matrix gt = load_label_matrix(gt_path);
-                    label_matrix img_res = minimize_mean_field(image_path, unaries_path, w1, sigma_alpha, sigma_beta);
+                    Potts_weight_set params(3, 3, sigma_alpha, sigma_beta, w1);
+                    label_matrix img_res = minimize_mean_field(image_path, unaries_path, params);
 
                     gts[i] = gt;
                     res[i] = img_res;
