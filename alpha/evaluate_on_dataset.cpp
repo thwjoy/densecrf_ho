@@ -61,11 +61,18 @@ void do_inference(Dataset dataset, std::string path_to_results,
         std::cout << output_path << '\n';
         if (to_minimize == "mf") {
             minimize_mean_field(image_path, unaries_path, params, output_path, dataset_name);
-        } else if(to_minimize == "grad"){
+        } else if(to_minimize == "grad") {
             gradually_minimize_mean_field(image_path, unaries_path, params, output_path, dataset_name);
         } else if(to_minimize == "unaries") {
             unaries_baseline(unaries_path, output_path, dataset_name);
-        } else{
+        } else if(to_minimize == "lrqp") {
+            minimize_LR_QP(image_path, unaries_path, params, output_path, dataset_name);
+        } else if(to_minimize == "qpccp") {
+            minimize_QP_cccp(image_path, unaries_path, params, output_path, dataset_name);
+        } else if(to_minimize == "cccpmf") {
+            minimize_cccp_mean_field(image_path, unaries_path, params, output_path, dataset_name);
+        }
+        else{
             float alpha = stof(to_minimize);
             minimize_dense_alpha_divergence(image_path, unaries_path, params, output_path, alpha, dataset_name);
         }
