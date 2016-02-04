@@ -138,7 +138,7 @@ double compute_pixel_accuracy(std::string dataset_split, std::string dataset_nam
 int main(int argc, char *argv[])
 {
     if (argc<5) {
-        std::cout << "evaluate split dataset results" << '\n';
+        std::cout << "evaluate split dataset results tasks" << '\n';
         std::cout << "Example: ./evaluate Train MSRC /data/MSRC/results/train/ -10:-3:-1:2:10:mf:grad" << '\n';
         return 1;
     }
