@@ -109,7 +109,6 @@ double compute_pixel_accuracy(std::string dataset_split, std::string dataset_nam
     std::vector<int> totalConfMat(NUMLABELS * NUMLABELS, 0);
     std::vector<int> conf_mat(NUMLABELS * NUMLABELS, 0);
     std::vector<double> meanIous;
-#pragma omp parallel for
     for(int i=0; i < test_images.size(); ++i) {
         std::string image_name = test_images[i];
         std::fill(conf_mat.begin(), conf_mat.end(), 0);
