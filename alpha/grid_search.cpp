@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
                     std::string unaries_path = ds.get_unaries_path(image_name);
                     std::string gt_path = ds.get_ground_truth_path(image_name);
 
-                    label_matrix gt = load_label_matrix(gt_path);
+                    label_matrix gt = load_label_matrix(gt_path, ds.name);
                     Potts_weight_set params(3, 3, sigma_alpha, sigma_beta, w1);
                     label_matrix img_res = minimize_mean_field(image_path, unaries_path, params);
 

@@ -108,7 +108,7 @@ void matrix_eigenvalues(){
 
 void test_label_matrix_loading(){
     std::string  path_to_labels = "/data/MSRC/GT_by_partition/val/4_11_s_GT.bmp";
-    label_matrix lbl = load_label_matrix(path_to_labels);
+    label_matrix lbl = load_label_matrix(path_to_labels, "MSRC");
 }
 
 

@@ -10,12 +10,6 @@
 
 #define NUMLABELS 22
 
-/////////////////
-// Color Index //
-/////////////////
-labelindex color_to_label = init_color_to_label_map();
-
-
 ////////////////////////////////////////////////////////
 // Save the results for analysis of the Segmentation  //
 ////////////////////////////////////////////////////////
@@ -90,6 +84,8 @@ void evaluate_segmentation_files(Dataset dataset, std::string path_to_results, s
 
     cv::Mat gtImg = cv::imread(output_path);
     cv::Mat crfImg = cv::imread(gt_path);
+
+    labelindex color_to_label = get_color_to_label_map_from_dataset(dataset.name);
 
     label_matrix gt_labels = labels_from_lblimg(gtImg, color_to_label);
     label_matrix crf_labels = labels_from_lblimg(crfImg, color_to_label);

@@ -97,12 +97,13 @@ void split_string(const std::string &s, const char delim, std::vector<std::strin
 std::string get_output_path(const std::string & path_to_results_folder, const std::string & image_name);
 
 unsigned char* load_image(const std::string& path_to_image, img_size size);
-Matrix<short,Dynamic,1> load_labeling(const std::string & path_to_labels, img_size& size);
+Matrix<short,Dynamic,1> load_labeling(const std::string & path_to_labels, const std::string & dataset_name,
+                                      img_size& size);
 MatrixXf load_unary(const std::string & path_to_unary, img_size& size);
 void save_map(const MatrixXf & estimates, const img_size &  size,
               const std::string & path_to_output, const std::string & dataset_name);
 
-label_matrix load_label_matrix(const std::string & path_to_labels);
+label_matrix load_label_matrix(const std::string & path_to_labels, const std::string & dataset_name);
 label_matrix get_label_matrix(const MatrixXf & estimates, const img_size & size);
 
 

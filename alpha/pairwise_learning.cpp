@@ -51,7 +51,7 @@ public:
 
         unsigned char * img = load_image(path_to_image, size);
 
-        VectorXs labeling = load_labeling(path_to_label, size);
+        VectorXs labeling = load_labeling(path_to_label, ds_.name, size);
 
         // Setup the CRF model
         DenseCRF2D crf(size.width, size.height, unaries.rows());

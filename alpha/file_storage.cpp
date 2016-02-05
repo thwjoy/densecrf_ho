@@ -170,7 +170,8 @@ MatrixXf load_unary( const std::string & path_to_unary, img_size& size) {
     return unaries;
 }
 
-Matrix<short,Dynamic,1> load_labeling(const std::string & path_to_labels, img_size& size){
+Matrix<short,Dynamic,1> load_labeling(const std::string & path_to_labels, const std::string & dataset_name,
+                                      img_size& size){
     Matrix<short,Dynamic,1> labeling(size.width * size.height);
 
     cv::Mat img = cv::imread(path_to_labels);
@@ -178,7 +179,7 @@ Matrix<short,Dynamic,1> load_labeling(const std::string & path_to_labels, img_si
         std::cout << "Dimension doesn't correspond to labeling" << std::endl;
     }
 
-    labelindex lbl_idx = init_color_to_label_map();
+    labelindex lbl_idx = get_color_to_label_map_from_dataset(dataset_name);
 
     for (int j=0; j < size.height; j++) {
         for (int i=0; i < size.width; i++) {
@@ -202,9 +203,9 @@ label_matrix get_label_matrix(const MatrixXf & estimates, const img_size & size)
     return res;
 }
 
-label_matrix load_label_matrix(const std::string & path_to_labels){
+label_matrix load_label_matrix(const std::string & path_to_labels, const std::string & dataset_name){
     cv::Mat img = cv::imread(path_to_labels);
-    labelindex color_to_label = init_color_to_label_map();
+    labelindex color_to_label = get_color_to_label_map_from_dataset(dataset_name);
     return labels_from_lblimg(img, color_to_label);
 }
 
