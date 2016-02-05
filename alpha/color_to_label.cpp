@@ -54,7 +54,8 @@ labelindex  get_color_to_label_map_from_dataset(const std::string & dataset_name
         color_to_label[cv::Vec3b(128,192,0)]= 19;
         color_to_label[cv::Vec3b(0,64,128)]= 20;
 
-        color_to_label[cv::Vec3b(255,255,255)] = 21;
+        color_to_label[cv::Vec3b(224, 224, 192)] = 21;
+        // color_to_label[cv::Vec3b(255,255,255)] = 21;
         // color_to_label[cv::Vec3b(128,64,128)]= 21;
         // color_to_label[cv::Vec3b(0,192,128)]= 1;
         // color_to_label[cv::Vec3b(128,192,128)]= 1;
