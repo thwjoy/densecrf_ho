@@ -67,7 +67,7 @@ void do_inference(Dataset dataset, std::string path_to_results,
             unaries_baseline(unaries_path, output_path, dataset_name);
         } else if(to_minimize == "lrqp") {
             minimize_LR_QP(image_path, unaries_path, params, output_path, dataset_name);
-        } else if(to_minimize == "qpccp") {
+        } else if(to_minimize == "qpcccp") {
             minimize_QP_cccp(image_path, unaries_path, params, output_path, dataset_name);
         } else if(to_minimize == "cccpmf") {
             minimize_cccp_mean_field(image_path, unaries_path, params, output_path, dataset_name);
