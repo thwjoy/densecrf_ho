@@ -247,9 +247,15 @@ MatrixXf DenseCRF::qp_inference() const {
         psis += diag_dom.cwiseProduct(sx);
         double num =  2 * Q.cwiseProduct(psis).sum() + unary.cwiseProduct(sx).sum();
         double denom = 2* sx.cwiseProduct(psis).sum();
+
         double optimal_step_size = - num / denom;
         if (optimal_step_size > 1) {
             optimal_step_size = 1;
+        }
+        if (denom == 0) {
+            // This means that the conditional gradient is the same
+            // than the current step and we have converged.
+            optimal_step_size = 0;
         }
 
         // Take a step
