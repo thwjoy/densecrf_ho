@@ -65,6 +65,8 @@ void do_inference(Dataset dataset, std::string path_to_results,
             minimize_QP_cccp(image_path, unaries_path, params, output_path, dataset_name);
         } else if(to_minimize == "cccpmf") {
             minimize_cccp_mean_field(image_path, unaries_path, params, output_path, dataset_name);
+        } else if (to_minimize == "mfiter") {
+            minimize_mean_field_fixed_iter(image_path, unaries_path, params, output_path, dataset_name, 5);
         }
         else{
             float alpha = stof(to_minimize);

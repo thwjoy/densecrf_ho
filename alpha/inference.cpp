@@ -92,6 +92,42 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     save_map(Q, size, path_to_output, dataset_name);
 }
 
+void minimize_mean_field_fixed_iter(std::string path_to_image, std::string path_to_unaries,
+                                    Potts_weight_set parameters, std::string path_to_output,
+                                    std::string dataset_name, int num_iter) {
+    img_size size;
+    // Load the unaries potentials for our image.
+    MatrixXf unaries = load_unary(path_to_unaries, size);
+    unsigned char * img = load_image(path_to_image, size);
+
+    // Load a crf
+    DenseCRF2D crf(size.width, size.height, unaries.rows());
+
+    crf.setUnaryEnergy(unaries);
+    crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
+                            new PottsCompatibility(parameters.spatial_potts_weight));
+    crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
+                             parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
+                             img, new PottsCompatibility(parameters.bilat_potts_weight));
+    crf.compute_kl_divergence();
+    clock_t start, end;
+    start = clock();
+    MatrixXf Q = crf.inference(num_iter);
+    end = clock();
+    double timing = (double(end-start)/CLOCKS_PER_SEC);
+    double final_energy = crf.compute_energy(Q);
+    write_down_perf(timing, final_energy, path_to_output);
+
+    // std::cout << "Time taken: " << timing << '\n';
+    // std::cout << "KL divergence: " << crf.klDivergence(Q) << '\n';
+    // std::cout << "Done with inference"<< '\n';
+    // Perform the MAP estimation on the fully factorized distribution
+    // and write the results to an image file with a dumb color code
+    save_map(Q, size, path_to_output, dataset_name);
+}
+
+
+
 void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
                     Potts_weight_set parameters, std::string path_to_output,
                     std::string dataset_name) {

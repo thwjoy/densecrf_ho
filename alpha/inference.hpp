@@ -8,6 +8,11 @@ public:
                      float bilat_spatial_std, float bilat_color_std, float bilat_potts_weight);
 };
 
+
+void minimize_mean_field_fixed_iter(std::string path_to_image, std::string path_to_unaries,
+                                    Potts_weight_set parameters, std::string path_to_output,
+                                    std::string dataset_name, int num_iter);
+
 void minimize_dense_alpha_divergence(std::string path_to_image, std::string path_to_unaries,
                                      Potts_weight_set parameters, std::string path_to_output,
                                      float alpha, std::string dataset_name);
