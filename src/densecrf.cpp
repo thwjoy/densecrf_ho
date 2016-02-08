@@ -192,6 +192,7 @@ MatrixXf DenseCRF::qp_inference() const {
     // shouldn't happen
 	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
         desc(M_,N_), psis(M_,N_), sx(M_,N_);
+    MatrixP temp_dot(M_,N_);
 
     // Get parameters
     unary.fill(0);
@@ -214,6 +215,13 @@ MatrixXf DenseCRF::qp_inference() const {
         pairwise_[k]->apply( tmp, full_ones);
         diag_dom += tmp;
     }
+    diag_dom += 0.0001 * MatrixXf::Ones(M_, N_);
+    // This is a caution to make sure that the matrix is well
+    // diagonally dominant and therefore convex. Otherwise, due to
+    // floating point errors, we can have issues.
+    // This is triggered easily when we initialise with the uniform distribution,
+    // then the results of the matrix multiplication is exactly the sum along the columns.
+
     // Update the proxy_unaries
     unary = unary - diag_dom;
 
@@ -235,9 +243,8 @@ MatrixXf DenseCRF::qp_inference() const {
 
         // Get a Descent direction by minimising < \nabla E, s >
         descent_direction(desc, grad);
-
         // Solve for the best step size. The best step size is
-        // - \frac{x^T \Psi (s-x) + 0.5 \phi (s-x)}{(s-x)^T \Psi (s-x)}
+        // - \frac{\theta'^T(s-x) + 2 x^T \psi (s-x)}{ 2 * (s-x)^T \psi (s-x) }
         sx = desc - Q;
         psis.fill(0);
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -245,10 +252,12 @@ MatrixXf DenseCRF::qp_inference() const {
             psis += tmp;
         }
         psis += diag_dom.cwiseProduct(sx);
-        double num =  2 * Q.cwiseProduct(psis).sum() + unary.cwiseProduct(sx).sum();
-        double denom = 2* sx.cwiseProduct(psis).sum();
+        double num =  2 * dotProduct(Q, psis, temp_dot) + dotProduct(unary, sx, temp_dot);
+        // Num should be negative, otherwise our choice of s was necessarily wrong.
+        double denom = dotProduct(sx, psis, temp_dot);
+        // Denom should be positive, otherwise our choice of psi was not convex enough.
 
-        double optimal_step_size = - num / denom;
+        double optimal_step_size = - num / 2 * denom;
         if (optimal_step_size > 1) {
             optimal_step_size = 1;
         }
@@ -262,7 +271,6 @@ MatrixXf DenseCRF::qp_inference() const {
         Q += optimal_step_size * sx;
         energy = compute_LR_QP_value(Q, diag_dom);
     }
-    // TODO: Should we do a better rounding than this one?
     return Q;
 }
 
