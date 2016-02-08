@@ -21,7 +21,6 @@ int main(int argc, char* argv[]) {
     std::string path_to_qplroutput = "/data/densecrf/res-lrqp.bmp";
     std::string path_to_qpcccp_output = "/data/densecrf/res-cccp-qp.bmp";
     // the image that we are using is from the validation set.
-    std::string path_to_parameters = "/data/densecrf/alpha/learned_parameters.csv";
 
     Potts_weight_set params(3, 3, 50, 15, 5);
 

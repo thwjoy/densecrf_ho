@@ -75,8 +75,7 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
-    //crf.compute_kl_divergence();
-
+    crf.compute_kl_divergence();
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.inference();
@@ -181,7 +180,7 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
 
-    //crf.compute_kl_divergence();
+    crf.compute_kl_divergence();
 
     clock_t start, end;
     start = clock();
