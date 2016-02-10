@@ -492,7 +492,10 @@ double DenseCRF::assignment_energy( const VectorXs & l) const {
     VectorXf unary = unaryEnergy(l);
     VectorXf pairwise = pairwiseEnergy(l);
 
-    VectorXf total_energy = unary + pairwise;
+    // Due to the weird way that the pairwise Energy is computed, this
+    // is how we get results that correspond to what would be given by
+    // binarizing the estimates, and using the compute_energy function.
+    VectorXf total_energy = unary -2* pairwise;
 
     assert( total_energy.rows() == N_);
     double ass_energy = 0;
@@ -526,7 +529,8 @@ VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
             r += pairwiseEnergy( l, i );
         return r;
     }
-
+    // This adds a negative term to the pairwise energy
+    // and divide by two, I don't really know why.
     MatrixXf Q( M_, N_ );
     // Build the current belief [binary assignment]
     for( int i=0; i<N_; i++ )
@@ -540,6 +544,7 @@ VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
             r[i] = 0;
     return r;
 }
+
 MatrixXf DenseCRF::startInference() const{
     MatrixXf Q( M_, N_ );
     Q.fill(0);

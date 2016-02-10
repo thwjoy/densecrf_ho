@@ -20,6 +20,7 @@ int main(int argc, char* argv[]) {
     std::string path_to_unoutput = "/data/densecrf/res-un.bmp";
     std::string path_to_qplroutput = "/data/densecrf/res-lrqp.bmp";
     std::string path_to_qpcccp_output = "/data/densecrf/res-cccp-qp.bmp";
+    std::string path_to_fixed_iter_output = "/data/densecrf/res-fixediter-mf.bmp";
     // the image that we are using is from the validation set.
 
     Potts_weight_set params(3, 3, 50, 15, 5);
@@ -35,4 +36,6 @@ int main(int argc, char* argv[]) {
     minimize_LR_QP(path_to_image, path_to_unaries, params, path_to_qplroutput, dataset_name);
     std::cout << "CCCP QP" << '\n';
     minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
+    std::cout << "Fixed Iter Meanfield"  << '\n';
+    minimize_mean_field_fixed_iter(path_to_image, path_to_unaries, params, path_to_fixed_iter_output, dataset_name, 5);
 }
