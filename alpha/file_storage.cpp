@@ -109,7 +109,7 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
     }
     else if (dataset_name == "Pascal2010") {
         return Dataset("/data/PascalVOC2010/JPEGImages/",
-                       "/data/PascalVOC2010/unaries/",
+                       "/data/PascalVOC2010/logit_unaries/",
                        "/data/PascalVOC2010/SegmentationClass/",
                        "/data/PascalVOC2010/",
                        ".jpg",
