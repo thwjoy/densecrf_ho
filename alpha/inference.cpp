@@ -17,12 +17,12 @@ Potts_weight_set::Potts_weight_set(float spatial_std, float spatial_potts_weight
                                                              bilat_color_std(bilat_color_std),
                                                              bilat_potts_weight(bilat_potts_weight){}
 
-void write_down_perf(double timing, double final_energy, std::string path_to_output){
+void write_down_perf(double timing, double final_energy, double rounded_energy, std::string path_to_output){
     std::string txt_output = path_to_output;
     txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
 
     std::ofstream txt_file(txt_output.c_str());
-    txt_file << timing << '\t' << final_energy << std::endl;
+    txt_file << timing << '\t' << final_energy << '\t' << rounded_energy << std::endl;
     txt_file.close();
 }
 
@@ -50,8 +50,8 @@ void minimize_dense_alpha_divergence(std::string path_to_image, std::string path
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
-    write_down_perf(timing, final_energy, path_to_output);
-
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
@@ -82,7 +82,8 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
-    write_down_perf(timing, final_energy, path_to_output);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
 
     // std::cout << "Time taken: " << timing << '\n';
     // std::cout << "KL divergence: " << crf.klDivergence(Q) << '\n';
@@ -116,7 +117,8 @@ void minimize_mean_field_fixed_iter(std::string path_to_image, std::string path_
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
-    write_down_perf(timing, final_energy, path_to_output);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
 
     // std::cout << "Time taken: " << timing << '\n';
     // std::cout << "KL divergence: " << crf.klDivergence(Q) << '\n';
@@ -153,7 +155,8 @@ void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
-    write_down_perf(timing, final_energy, path_to_output);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
 
     // std::cout << "Time taken: " << timing << '\n';
     // std::cout << "Done with inference"<< '\n';
@@ -187,7 +190,8 @@ void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
-    write_down_perf(timing, final_energy, path_to_output);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
 
     // std::cout << "Time taken: " << timing << '\n';
     // std::cout << "Done with inference"<< '\n';
@@ -224,7 +228,8 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
-    write_down_perf(timing, final_energy, path_to_output);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
 
 
     // std::cout << "Time taken: " << timing << '\n';
@@ -260,7 +265,8 @@ void gradually_minimize_mean_field(std::string path_to_image, std::string path_t
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
-    write_down_perf(timing, final_energy, path_to_output);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
 
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
