@@ -188,9 +188,7 @@ MatrixXf DenseCRF::inference () const {
 }
 
 MatrixXf DenseCRF::qp_inference() const {
-    // Todo: We don't get always decreasing value, which is weird and
-    // shouldn't happen
-	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
+    MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
         desc(M_,N_), psis(M_,N_), sx(M_,N_);
     MatrixP temp_dot(M_,N_);
 
@@ -309,6 +307,8 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
         double convex_energy = energy + lambda_eig * dotProduct(Q, 2*Q_old - Q, temp_dot);
         double old_convex_energy;
 
+
+        int convex_rounds = 0;
         do {
             old_convex_energy = convex_energy;
             // Compute gradient of the convex problem
@@ -370,13 +370,14 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
             // std::cout << convex_energy << '\n';
 
             assert(valid_probability(Q));
-        } while ( (old_convex_energy - convex_energy) > 100);
+            convex_rounds++;
+        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<10);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
 
         // Compute our current value of the energy;
         energy = compute_energy(Q);
-    } while ( (old_energy -energy) > 1);
+    } while ( (old_energy -energy) > 100);
     return Q;
 }
 
