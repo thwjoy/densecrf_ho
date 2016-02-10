@@ -113,7 +113,7 @@ void test_label_matrix_loading(){
 
 
 void test_pascal_loading(){
-    std::string dataset_name = "MSRC";
+    std::string dataset_name = "Pascal2010";
     Dataset ds = get_dataset_by_name(dataset_name);
     std::vector<std::string> all_images = ds.get_all_split_files("Train");
     std::string output_directory = "/data/tests/";
@@ -128,6 +128,13 @@ void test_pascal_loading(){
     // minimize_mean_field(path_to_image, path_to_unaries,
     //                     path_to_output, path_to_parameters);
 
+
+    img_size size;
+    MatrixXf un = load_unary(path_to_unaries, size);
+
+
+    std::cout << un.rows() << '\n';
+    std::cout << un.cols() << '\n';
     unaries_baseline(path_to_unaries, path_to_output, dataset_name);
 
 }
