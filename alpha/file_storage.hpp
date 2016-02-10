@@ -40,7 +40,7 @@ const unsigned char MSRC_legend[22*3] = {
 };
 
 
-const unsigned char Pascal_legend[28*3] = {
+const unsigned char Pascal_legend[21*3] = {
     0,0,0,
     128,0,0,
     0,128,0,
@@ -62,13 +62,6 @@ const unsigned char Pascal_legend[28*3] = {
     0,192,0,
     128,192,0,
     0,64,128,
-    128,64,128,
-    0,192,128,
-    128,192,128,
-    64,64,0,
-    192,64,0,
-    64,192,0,
-    192,192,0
 };
 
 class Dataset {
