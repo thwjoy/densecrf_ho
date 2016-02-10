@@ -96,7 +96,8 @@ void evaluate_segmentation_files(Dataset dataset, std::string path_to_results, s
 }
 
 double compute_pixel_accuracy(std::string dataset_split, std::string dataset_name,
-                              std::string path_to_generated, std::string to_minimize){
+                              std::string path_to_generated, std::string to_minimize,
+                              bool evaluate_pixel_accuracy){
 
     Dataset ds = get_dataset_by_name(dataset_name);
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
@@ -107,36 +108,40 @@ double compute_pixel_accuracy(std::string dataset_split, std::string dataset_nam
         do_inference(ds, path_to_generated, test_images[i], to_minimize);
     }
 
-// Confusion evaluation
-    std::vector<int> totalConfMat(NUMLABELS * NUMLABELS, 0);
-    std::vector<int> conf_mat(NUMLABELS * NUMLABELS, 0);
-    std::vector<double> meanIous;
-    for(int i=0; i < test_images.size(); ++i) {
-        std::string image_name = test_images[i];
-        std::fill(conf_mat.begin(), conf_mat.end(), 0);
-        evaluate_segmentation_files(ds, path_to_generated, image_name, conf_mat);
 
-        for(int j = 0; j < NUMLABELS * NUMLABELS; ++j)
-        {
-            totalConfMat[j] += conf_mat[j];
+    if(evaluate_pixel_accuracy){
+        // Confusion evaluation
+        std::vector<int> totalConfMat(NUMLABELS * NUMLABELS, 0);
+        std::vector<int> conf_mat(NUMLABELS * NUMLABELS, 0);
+        std::vector<double> meanIous;
+        for(int i=0; i < test_images.size(); ++i) {
+            std::string image_name = test_images[i];
+            std::fill(conf_mat.begin(), conf_mat.end(), 0);
+            evaluate_segmentation_files(ds, path_to_generated, image_name, conf_mat);
+
+            for(int j = 0; j < NUMLABELS * NUMLABELS; ++j)
+            {
+                totalConfMat[j] += conf_mat[j];
+            }
+
+            meanIous.push_back( compute_mean_iou(conf_mat, NUMLABELS));
+
         }
 
-        meanIous.push_back( compute_mean_iou(conf_mat, NUMLABELS));
+        save_confusion_matrix(totalConfMat, path_to_generated + "conf_mat.csv", NUMLABELS);
+        save_vector(meanIous, path_to_generated + "mean_iou_per_image.csv");
 
+        return pixwise_acc_from_confmat(totalConfMat, NUMLABELS);
+    } else {
+        return 0;
     }
-
-    save_confusion_matrix(totalConfMat, path_to_generated + "conf_mat.csv", NUMLABELS);
-    save_vector(meanIous, path_to_generated + "mean_iou_per_image.csv");
-
-    return pixwise_acc_from_confmat(totalConfMat, NUMLABELS);
-    
 }
 
 int main(int argc, char *argv[])
 {
-    if (argc<5) {
-        std::cout << "evaluate split dataset results tasks" << '\n';
-        std::cout << "Example: ./evaluate Train MSRC /data/MSRC/results/train/ -10:-3:-1:2:10:mf:grad" << '\n';
+    if (argc<6) {
+        std::cout << "./evaluate split dataset results tasks compute_accuracy" << '\n';
+        std::cout << "Example: ./evaluate Train MSRC /data/MSRC/results/train/ -10:-3:-1:2:10:mf:grad true" << '\n';
         return 1;
     }
 
@@ -144,6 +149,7 @@ int main(int argc, char *argv[])
     std::string dataset_name  = argv[2];
     std::string path_to_results = argv[3];
     std::string all_optims = argv[4];
+    bool evaluate_pixel_accuracy = (argv[5] == "true");
 
     std::vector<std::string> optims_to_do;
     split_string(all_optims, ':', optims_to_do);
@@ -155,7 +161,7 @@ int main(int argc, char *argv[])
         std::string path_to_generated = path_to_results + *optim_s + '/';
         make_dir(path_to_generated);
 
-        double accuracy = compute_pixel_accuracy(dataset_split, dataset_name, path_to_generated, *optim_s);
+        double accuracy = compute_pixel_accuracy(dataset_split, dataset_name, path_to_generated, *optim_s, evaluate_pixel_accuracy);
         std::cout <<*optim_s << '\t' << accuracy << '\n';
     }
 }
