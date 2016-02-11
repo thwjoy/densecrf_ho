@@ -139,9 +139,60 @@ void test_pascal_loading(){
 
 }
 
+void check_pairwise_energies(){
+    std::string dataset_name = "Pascal2010";
+    Dataset ds = get_dataset_by_name(dataset_name);
+    std::vector<std::string> all_images = ds.get_all_split_files("Train");
+    std::string output_directory = "/data/tests/";
+
+    std::string image_name = all_images[1];
+
+    std::string path_to_image = ds.get_image_path(image_name);
+    std::string path_to_unaries = ds.get_unaries_path(image_name);
+    std::string path_to_output = get_output_path(output_directory, image_name);
+    std::string path_to_parameters = "/data/densecrf/alpha/learned_parameters.csv";
+
+    img_size size;
+    MatrixXf un = load_unary(path_to_unaries, size);
+    un = 0* un;
+    unsigned char * img = load_image(path_to_image, size);
+
+    // Load a crf
+    DenseCRF2D crf(size.width, size.height, un.rows());
+    Potts_weight_set parameters(3, 3, 50, 15, 5);
+    crf.setUnaryEnergy(un);
+    crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
+                            new PottsCompatibility(parameters.spatial_potts_weight));
+    crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
+                             parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
+                             img, new PottsCompatibility(parameters.bilat_potts_weight));
+
+
+
+    //  Use a labeling that is uniform.
+    MatrixXf Q_un = MatrixXf::Zero(un.rows(), size.width * size.height);
+    for (int i = 0; i < Q_un.cols(); i++) {
+        Q_un(0, i) = 1;
+    }
+    // Use a labeling that is not uniform.
+    MatrixXf Q_rd = MatrixXf::Zero(un.rows(), size.width * size.height);
+    for (int i =0; i < Q_rd.cols(); i++) {
+        Q_rd( i % Q_rd.rows(), i) = 1;
+    }
+    std::cout << "Our way: " << '\n';
+    std::cout << "Uniform labeling energy: "<< crf.compute_energy(Q_un) << '\n'; // -1.47465e+06
+    std::cout << "Heterogeneous labeling energy: " << crf.compute_energy(Q_rd)<< '\n'; // -70977.7
+
+    std::cout << "Old way: " << '\n';
+    std::cout << "Uniform labeling pairwise energy: " << crf.pairwiseEnergy(crf.currentMap(Q_un)).sum() << '\n';
+    std::cout << "Heterogeneous labeling pairwise energy: " << crf.pairwiseEnergy(crf.currentMap(Q_rd)).sum() << '\n';
+
+}
+
+
 
 int main(int argc, char *argv[])
 {
-    test_pascal_loading();
+    check_pairwise_energies();
     return 0;
 }
