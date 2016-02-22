@@ -123,6 +123,10 @@ public:
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const {
 		filter( out, Q, false );
 	}
+	virtual void apply_nodiag( MatrixXf & out, const MatrixXf & Q ) const {
+		filter( out, Q, false );
+		out = out - Q;
+	}
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const {
 		filter( out, Q, true );
 	}
@@ -179,6 +183,12 @@ void PairwisePotential::apply(MatrixXf & out, const MatrixXf & Q) const {
 	
 	// Apply the compatibility
 	compatibility_->apply( out, out );
+}
+void PairwisePotential::apply_nodiag(MatrixXf & out, const MatrixXf & Q) const {
+	kernel_->apply_nodiag(out, Q);
+
+	// Apply the compatibility
+	compatibility_->apply(out, out);
 }
 void PairwisePotential::applyTranspose(MatrixXf & out, const MatrixXf & Q) const {
 	kernel_->applyTranspose( out, Q );

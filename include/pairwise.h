@@ -45,6 +45,7 @@ class Kernel {
 public:
 	virtual ~Kernel();
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const = 0;
+	virtual void apply_nodiag( MatrixXf & out, const MatrixXf & Q) const = 0;
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const = 0;
 	virtual VectorXf parameters() const = 0;
 	virtual void setParameters( const VectorXf & p ) = 0;
@@ -62,6 +63,7 @@ public:
 	virtual ~PairwisePotential();
 	PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype=CONST_KERNEL, NormalizationType ntype=NORMALIZE_SYMMETRIC);
 	void apply(MatrixXf & out, const MatrixXf & Q) const;
+	void apply_nodiag(MatrixXf & out, const MatrixXf & Q) const;
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
 	
 	// Get the parameters
