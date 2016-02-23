@@ -48,3 +48,6 @@ target_link_libraries(learn_pairwise inference file_storage optimization)
 
 add_executable(grid_search grid_search.cpp)
 target_link_libraries(grid_search inference evaluation file_storage)
+
+add_executable(cv-script cv-script.cpp)
+target_link_libraries(cv-script densecrf file_storage)
