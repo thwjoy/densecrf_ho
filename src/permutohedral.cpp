@@ -526,6 +526,59 @@ void Permutohedral::seqCompute ( float* out, const float* in, int value_size, bo
 	delete[] values;
 	delete[] new_values;
 }
+void Permutohedral::seqCompute_lower_left ( float* out, int value_size, int middle_low, int middle_high ) const
+{
+	// Shift all values by 1 such that -1 -> 0 (used for blurring)
+	float * values = new float[ (M_+2)*value_size ];
+	float * new_values = new float[ (M_+2)*value_size ];
+	
+	for( int i=0; i<(M_+2)*value_size; i++ )
+		values[i] = new_values[i] = 0;
+	
+	// Splatting
+	for( int i=0;  i<middle_low; i++ ){
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j]+1;
+			float w = barycentric_[i*(d_+1)+j];
+			for( int k=0; k<value_size; k++ )
+				values[ o*value_size+k ] += w * 1;
+		}
+	}
+
+	// Blurring
+	for( int j=0; j<=d_ && j>=0; j++ ){
+		for( int i=0; i<M_; i++ ){
+			float * old_val = values + (i+1)*value_size;
+			float * new_val = new_values + (i+1)*value_size;
+			
+			int n1 = blur_neighbors_[j*M_+i].n1+1;
+			int n2 = blur_neighbors_[j*M_+i].n2+1;
+			float * n1_val = values + n1*value_size;
+			float * n2_val = values + n2*value_size;
+			for( int k=0; k<value_size; k++ )
+				new_val[k] = old_val[k]+0.5*(n1_val[k] + n2_val[k]);
+		}
+		std::swap( values, new_values );
+	}
+	// Alpha is a magic scaling constant (write Andrew if you really wanna understand this)
+	float alpha = 1.0f / (1+powf(2, -d_));
+	
+	// Slicing
+	for( int i=middle_high; i<N_; i++ ){
+		for( int k=0; k<value_size; k++ )
+			out[i*value_size+k] = 0;
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j]+1;
+			float w = barycentric_[i*(d_+1)+j];
+			for( int k=0; k<value_size; k++ )
+				out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
+		}
+	}
+	
+	
+	delete[] values;
+	delete[] new_values;
+}
 #ifdef SSE_PERMUTOHEDRAL
 void Permutohedral::sseCompute ( float* out, const float* in, int value_size, bool reverse ) const
 {
@@ -594,6 +647,11 @@ void Permutohedral::sseCompute ( float* out, const float* in, int value_size, bo
 	seqCompute( out, in, value_size, reverse );
 }
 #endif
+void Permutohedral::compute_lower_left ( MatrixXf & out, int middle_low, int middle_high ) const
+{
+	// Here anly one label at a time so always seq
+	seqCompute_lower_left(out.data(), out.rows(), middle_low, middle_high);
+}
 void Permutohedral::compute ( MatrixXf & out, const MatrixXf & in, bool reverse ) const
 {
 	if( out.cols() != in.cols() || out.rows() != in.rows() )

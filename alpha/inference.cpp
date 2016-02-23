@@ -156,6 +156,40 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
     save_map(Q, size, path_to_output);
 }
 
+void minimize_LP(std::string path_to_image, std::string path_to_unaries,
+                 std::string path_to_output, std::string path_to_parameters) {
+    img_size size = {50, 50};
+    // Load the unaries potentials for our image.
+    MatrixXf unaries = load_unary(path_to_unaries, size);
+    unsigned char * img = load_image(path_to_image, size);
+    VectorXf pairwise_parameters = load_matrix(path_to_parameters);
+    int M = unaries.rows();
+
+    // Load a crf
+    DenseCRF2D crf(size.width, size.height, unaries.rows());
+
+    crf.setUnaryEnergy(unaries);
+    crf.addPairwiseGaussian(3,3, new PottsCompatibility(3), DIAG_KERNEL, NO_NORMALIZATION);
+    //crf.addPairwiseBilateral(50,50,15,15,15, img, new PottsCompatibility(5), DIAG_KERNEL, NO_NORMALIZATION);
+
+    clock_t start, end;
+    start = clock();
+    std::cout<<"Using qp_cccp as init"<<std::endl;
+    MatrixXf Q(M, size.height*size.width);
+    //Q = crf.qp_cccp_inference();
+    Q.fill(1/M);
+    std::cout<<"Doing the actual lp"<<std::endl;
+    Q = crf.lp_inference(Q);
+    std::cout << crf.compute_energy(Q) << '\n';
+    end = clock();
+    double timing = (double(end-start)/CLOCKS_PER_SEC);
+    std::cout << "Time taken: " << timing << '\n';
+    // std::cout << "KL divergence: " << crf.klDivergence(Q) << '\n';
+    // std::cout << "Done with inference"<< '\n';
+    // Perform the MAP estimation on the fully factorized distribution
+    // and write the results to an image file with a dumb color code
+    save_map(Q, size, path_to_output);
+}
 
 
 void gradually_minimize_mean_field(std::string path_to_image, std::string path_to_unaries,

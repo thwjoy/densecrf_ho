@@ -48,3 +48,42 @@ typeP dotProduct(const MatrixXf & M1, const MatrixXf & M2, MatrixP & temp){
     temp = (M1.cast<typeP>()).cwiseProduct(M2.cast<typeP>());
     return temp.sum();
 }
+
+void sortRows(const MatrixXf & M, MatrixXi & ind) {
+    int nbrRows = M.rows();
+    int nbrCols = M.cols();
+    // Initialize the indices matrix
+    for(int i=0; i<ind.cols(); ++i) {
+        ind.col(i).fill(i);
+    }
+
+    // we need indices for the row to be contiguous in memory
+    ind.transposeInPlace();
+
+    for(int i=0; i<nbrRows; ++i) {
+        std::sort(ind.data()+i*nbrCols,
+                  ind.data()+(i+1)*nbrCols,
+                  [&M, i](int a, int b){return M(i, a)>M(i, b);});
+    }
+
+    ind.transposeInPlace();
+}
+
+void sortCols(const MatrixXf & M, MatrixXi & ind) {
+    // Sort each row of M independantly and store indices in ind
+    int nbrRows = M.rows();
+    int nbrCols = M.cols();
+    for(int i=0; i<ind.rows(); ++i) {
+        ind.row(i).fill(i);
+    }
+
+    // indices for the cols are already contiguous in memory
+    for(int i=0; i<nbrCols; ++i) {
+        std::sort(ind.data()+i*nbrRows,
+                  ind.data()+(i+1)*nbrRows,
+                  [&M, i](int a, int b){
+                    return M(a, i)>M(b, i);
+                  });
+    }
+
+}

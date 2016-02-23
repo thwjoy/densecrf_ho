@@ -46,10 +46,13 @@ public:
 	virtual ~Kernel();
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const = 0;
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const = 0;
+    virtual void apply_lower_left( MatrixXf & out, int middle_low, int middle_high) const = 0;
 	virtual VectorXf parameters() const = 0;
 	virtual void setParameters( const VectorXf & p ) = 0;
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const = 0;
 	virtual MatrixXf features() const = 0;
+    virtual KernelType ktype() const = 0;
+    virtual NormalizationType ntype() const = 0;
 };
 
 class PairwisePotential{
@@ -61,8 +64,10 @@ protected:
 public:
 	virtual ~PairwisePotential();
 	PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype=CONST_KERNEL, NormalizationType ntype=NORMALIZE_SYMMETRIC);
-	void apply(MatrixXf & out, const MatrixXf & Q) const;
+    void apply(MatrixXf & out, const MatrixXf & Q) const;
+	void apply_lower(MatrixXf & out, const MatrixXi & ind) const;
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
+    void apply_lower_sorted(MatrixXf & out) const;
 	
 	// Get the parameters
 	virtual VectorXf parameters() const;

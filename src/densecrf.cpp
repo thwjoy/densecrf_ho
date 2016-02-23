@@ -366,6 +366,102 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
     return Q;
 }
 
+MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
+    MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
+            tmp2(M_, N_), grad(M_, N_);
+    MatrixXi ind(M_, N_);
+    VectorXi K(N_);
+    VectorXd sum(N_);
+
+    ones.fill(1);
+
+    int i,j;
+
+    // Get parameters
+    unary.fill(0);
+    if(unary_){
+        unary = unary_->get();
+    }
+
+    Q = init;
+
+    // Compute the value of the energy
+    double old_energy;
+    double energy = compute_energy(Q);
+    std::cout << "0: " << energy << "\n";
+
+    // precompute the constant part of the gradient
+    base_grad = unary;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        // Add the full sum
+        pairwise_[k]->apply(tmp, ones);
+        base_grad += ones;
+
+        // Remove the diagonal terms
+        base_grad = base_grad.array() - (-1*pairwise_[k]->parameters()(0));
+    }
+
+    int it=0;
+    do {
+        ++it;
+        old_energy = energy;
+        
+        // Grad start with constant part
+        grad = base_grad;
+
+        // Add changing part
+        sortRows(Q, ind);
+
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply_lower(tmp, ind);
+            tmp2.fill(0);
+            for(i=0; i<tmp.cols(); ++i) {
+                for(j=0; j<tmp.rows(); ++j) {
+                    int in = ind(j, i);
+                    tmp2(j, i) = tmp(j, in);
+                }
+            }
+            grad -= 2*tmp2;
+        }
+
+        // Sub-gradient descent step
+        float lr = 1.0/(10+it);
+        Q -= lr*grad;
+
+        // Project solution
+        sortCols(Q, ind);
+        for(int i=0; i<N_; ++i) {
+            sum(i) = Q.col(i).sum()-1;
+            K(i) = -1;
+        }
+        for(int i=0; i<N_; ++i) {
+            for(int k=M_; k>0; --k) {
+                double uk = Q(ind(k-1, i), i);
+                if(sum(i)/k < uk) {
+                    K(i) = k;
+                    break;
+                }
+                sum(i) -= uk;
+            }
+        }
+        tmp.fill(0);
+        for(int i=0; i<N_; ++i) {
+            for(int k=0; k<M_; ++k) {
+                tmp(k, i) = std::max(Q(k, i) - sum(i)/K(i), (double)0);
+            }
+        }
+        Q = tmp;
+
+        assert(valid_probability(Q));
+        energy = compute_energy(Q);
+        std::cout << it << ": " << energy << "\n";
+    } while(fabs(old_energy -energy) > 1e-5);
+    std::cout <<"final: " << energy << "\n";
+
+    return Q;
+}
+
+
 
 MatrixXf DenseCRF::cccp_inference() const {
     MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);

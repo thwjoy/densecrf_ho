@@ -85,6 +85,8 @@ public:
 	MatrixXf qp_inference() const;
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
 	MatrixXf qp_cccp_inference() const;
+    // Run the energy minimisation on the LP
+    MatrixXf lp_inference(MatrixXf & init) const;
 
 	// Run the inference with gradually lower lambda values.
 	MatrixXf grad_inference() const;
