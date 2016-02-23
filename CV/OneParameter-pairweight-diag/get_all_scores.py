@@ -4,7 +4,7 @@ import os
 
 def evaluate_segmentation(pairwise_weight):
     eng = matlab.engine.start_matlab()
-    path_to_results = "/data/CV/OneParameter-pairweight/" + \
+    path_to_results = "/data/CV/OneParameter-pairweight-diag/" + \
         str(pairwise_weight) + "/mf25"
     ret = eng.voc_test(path_to_results)
 
@@ -14,7 +14,7 @@ def evaluate_segmentation(pairwise_weight):
     return - ret
 
 
-top_directory = "/data/CV/OneParameter-pairweight/"
+top_directory = "/data/CV/OneParameter-pairweight-diag/"
 all_pairwise_weight = os.listdir(top_directory)
 
 all_results = []

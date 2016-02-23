@@ -18,7 +18,7 @@ def generate_segmentation(pairwise_weight):
 
 def evaluate_segmentation(pairwise_weight):
     eng = matlab.engine.start_matlab()
-    path_to_results = "/data/CV/OneParameter-pairweight-diag/" + str(pairwise_weight) + "/mf5"
+    path_to_results = "/data/CV/OneParameter-pairweight-diag/" + str(pairwise_weight) + "/mf25"
     ret = eng.voc_test(path_to_results)
 
     # This returns the value of the average accuracy. Spearmint
