@@ -1,3 +1,4 @@
+#include <fstream>
 #include <vector>
 #include <string>
 #include "file_storage.hpp"
@@ -32,6 +33,11 @@ void image_inference(Dataset dataset, std::string path_to_results,
             double final_energy = crf.compute_energy(Q);
             double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
+            std::string txt_output = output_path;
+            txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
+            std::ofstream txt_file(txt_output.c_str());
+            txt_file << 0 << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+            txt_file.close();
         }
     }
 
@@ -45,6 +51,11 @@ void image_inference(Dataset dataset, std::string path_to_results,
             double final_energy = crf.compute_energy(Q);
             double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
+            std::string txt_output = output_path;
+            txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
+            std::ofstream txt_file(txt_output.c_str());
+            txt_file << 0 << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+            txt_file.close();
         }
     }
     // Run Meanfield for 25 iterations
@@ -57,6 +68,11 @@ void image_inference(Dataset dataset, std::string path_to_results,
             double final_energy = crf.compute_energy(Q);
             double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
+            std::string txt_output = output_path;
+            txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
+            std::ofstream txt_file(txt_output.c_str());
+            txt_file << 0 << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+            txt_file.close();
         }
     }
 }
