@@ -137,7 +137,7 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 	for( int it=0; it<n_iterations; it++ ) {
 		tmp1 = -unary;
 		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply_nodiag( tmp2, Q );
+			pairwise_[k]->apply( tmp2, Q );
 			tmp1 -= tmp2;
 		}
 		expAndNormalize( Q, tmp1 );
@@ -166,7 +166,7 @@ MatrixXf DenseCRF::inference () const {
 		old_kl = kl;
 		tmp1 = -unary;
 		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply_nodiag( tmp2, Q );
+			pairwise_[k]->apply( tmp2, Q );
 			tmp1 -= tmp2;
 		}
 		expAndNormalize( Q, tmp1 );
@@ -210,7 +210,7 @@ MatrixXf DenseCRF::qp_inference() const {
     // product with the matrix full of -1.
     MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, full_ones); // This is actually a full one.
+        pairwise_[k]->apply( tmp, full_ones);
         diag_dom += tmp;
     }
     diag_dom += 0.0001 * MatrixXf::Ones(M_, N_);
@@ -234,7 +234,7 @@ MatrixXf DenseCRF::qp_inference() const {
         // Compute the gradient at the current estimates.
         grad = unary;
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply_nodiag( tmp, Q);
+            pairwise_[k]->apply( tmp, Q);
             grad += 2 *tmp;
         }
         grad += 2 * diag_dom.cwiseProduct(Q);
@@ -246,7 +246,7 @@ MatrixXf DenseCRF::qp_inference() const {
         sx = desc - Q;
         psis.fill(0);
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply_nodiag(tmp, sx);
+            pairwise_[k]->apply(tmp, sx);
             psis += tmp;
         }
         psis += diag_dom.cwiseProduct(sx);
@@ -280,7 +280,7 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
     // than 0, to ensure that the problem is convex.
     MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, full_ones); // This is actually a full one.
+        pairwise_[k]->apply( tmp, full_ones);
         diag_dom += tmp;
     }
     diag_dom += 0.0001 * MatrixXf::Ones(M_, N_);
@@ -316,7 +316,7 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
             // Compute gradient of the convex problem
             psix.fill(0);
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-                pairwise_[k]->apply_nodiag( tmp, Q);
+                pairwise_[k]->apply( tmp, Q);
                 psix += tmp;
             }
 
@@ -334,7 +334,7 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 
             psis.fill(0);
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-                pairwise_[k]->apply_nodiag(tmp, sx);
+                pairwise_[k]->apply(tmp, sx);
                 psis += tmp;
             }
 
@@ -409,7 +409,7 @@ MatrixXf DenseCRF::cccp_inference() const {
         MatrixXf Cste = unary;
         Cste += MatrixXf::Ones(Q.rows(), Q.cols());
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply_nodiag( tmp2, old_Q);
+            pairwise_[k]->apply( tmp2, old_Q);
             Cste += tmp2;
         }
 
@@ -459,7 +459,7 @@ MatrixXf DenseCRF::grad_inference() const {
         while(keep_inferring) {
             tmp1 = -unary;
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-                pairwise_[k]->apply_nodiag( tmp2, Q );
+                pairwise_[k]->apply( tmp2, Q );
                 tmp1 -= tmp2;
             }
             tmp1 = (1/lambda) * tmp1;
@@ -536,11 +536,10 @@ VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
     for( int i=0; i<N_; i++ )
         for( int j=0; j<M_; j++ )
             Q(j,i) = (l[i] == j);
-    MatrixXf new_Q = Q;
-    pairwise_[ term ]->apply_nodiag( new_Q, Q );
+    pairwise_[ term ]->apply( Q, Q );
     for( int i=0; i<N_; i++ )
         if ( 0 <= l[i] && l[i] < M_ )
-            r[i] =-0.5*new_Q(l[i],i );
+            r[i] =-0.5*Q(l[i],i );
         else
             r[i] = 0;
     return r;
@@ -563,7 +562,7 @@ void DenseCRF::stepInference( MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2 ) c
 	
     // Add up all pairwise potentials
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply_nodiag( tmp2, Q );
+        pairwise_[k]->apply( tmp2, Q );
         tmp1 -= tmp2;
     }
 	
@@ -599,7 +598,7 @@ double DenseCRF::klDivergence( const MatrixXf & Q ) const {
     // Add all pairwise terms
     MatrixXf tmp;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply_nodiag( tmp, Q );
+        pairwise_[k]->apply( tmp, Q );
         kl += (Q.array()*tmp.array()).sum();
     }
     return kl;
@@ -617,7 +616,7 @@ double DenseCRF::compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_d
     // Add all pairwise terms
     MatrixXf tmp;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply_nodiag( tmp, Q );
+        pairwise_[k]->apply( tmp, Q );
         energy += dotProduct(Q, tmp, dot_tmp);
     }
     energy += dotProduct(Q, diag_dom.cwiseProduct(Q), dot_tmp);
@@ -636,7 +635,7 @@ double DenseCRF::compute_energy(const MatrixXf & Q) const {
     // Add all pairwise terms
     MatrixXf tmp;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply_nodiag( tmp, Q );
+        pairwise_[k]->apply( tmp, Q );
         energy += dotProduct(Q, tmp, dot_tmp);
     }
     return energy;
@@ -654,7 +653,7 @@ double DenseCRF::gradient( int n_iterations, const ObjectiveFunction & objective
     for( int it=0; it<n_iterations; it++ ) {
         tmp1 = -unary;
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply_nodiag( tmp2, Q[it] );
+            pairwise_[k]->apply( tmp2, Q[it] );
             tmp1 -= tmp2;
         }
         expAndNormalize( Q[it+1], tmp1 );
