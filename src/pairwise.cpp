@@ -229,45 +229,54 @@ void PairwisePotential::apply_lower(MatrixXf & out, const MatrixXi & ind) const 
 void PairwisePotential::apply_lower_sorted(MatrixXf & out) const {
 	MatrixXf const & features = kernel_->features();
 	int size = out.cols();
-	int middle_low, middle_high;
 
 	if(size <= 1) {
 		// Only a=b term remaining
 		return;
-	} else if(size%2==0) {
-		middle_low = size/2;
-		middle_high = size/2;
-	} else if(size%2==1) {
-		middle_low = floor(size/2.0);
-		middle_high = floor(size/2.0) + 1;
+	} else if(size<=-10000000) {
+		for(int c=0; c<out.cols(); ++c) {
+            for(int b=0; b<c; ++b) {
+                VectorXf featDiff = (features.col(c) - features.col(b));
+                out(0, c) += exp(-featDiff.squaredNorm())/0.6;
+            }
+        }
+	} else {
+		int middle_low, middle_high;
+		if(size%2==0) {
+			middle_low = size/2;
+			middle_high = size/2;
+		} else if(size%2==1) {
+			middle_low = floor(size/2.0);
+			middle_high = floor(size/2.0) + 1;
+		}
+
+		// Compute the lower left part
+		kernel_->apply_lower_left(out, middle_low, middle_high);
+
+		// Compute the upper left
+		PairwisePotential upper_pairwise(
+			features.leftCols(middle_high),
+			new PottsCompatibility(compatibility_->parameters()(0)),
+			kernel_->ktype(),
+			kernel_->ntype()
+		);
+		MatrixXf upper_out(1,middle_high);
+		upper_out.fill(0);
+		upper_pairwise.apply_lower_sorted(upper_out);
+		out.leftCols(middle_high) += upper_out;
+
+		// Compute the lower right
+		PairwisePotential lower_pairwise(
+			features.rightCols(middle_high),
+			new PottsCompatibility(compatibility_->parameters()(0)),
+			kernel_->ktype(),
+			kernel_->ntype()
+		);
+		MatrixXf lower_out(1,middle_high);
+		lower_out.fill(0);
+		lower_pairwise.apply_lower_sorted(lower_out);
+		out.rightCols(middle_high) += lower_out;
 	}
-
-	// Compute the lower left part
-	kernel_->apply_lower_left(out, middle_low, middle_high);
-
-	// Compute the upper left
-	PairwisePotential upper_pairwise(
-		features.leftCols(middle_high),
-		new PottsCompatibility(compatibility_->parameters()(0)),
-		kernel_->ktype(),
-		kernel_->ntype()
-	);
-	MatrixXf upper_out(1,middle_high);
-	upper_out.fill(0);
-	upper_pairwise.apply_lower_sorted(upper_out);
-	out.leftCols(middle_high) += upper_out;
-
-	// Compute the lower right
-	PairwisePotential lower_pairwise(
-		features.rightCols(middle_high),
-		new PottsCompatibility(compatibility_->parameters()(0)),
-		kernel_->ktype(),
-		kernel_->ntype()
-	);
-	MatrixXf lower_out(1,middle_high);
-	lower_out.fill(0);
-	lower_pairwise.apply_lower_sorted(lower_out);
-	out.rightCols(middle_high) += lower_out;
 }
 VectorXf PairwisePotential::parameters() const {
 	return compatibility_->parameters();

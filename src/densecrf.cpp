@@ -384,6 +384,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     }
 
     Q = init;
+    Q = (MatrixXf::Random(M_, N_).array()+1)/2;
 
     // Compute the value of the energy
     double old_energy;
@@ -395,7 +396,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         // Add the full sum
         pairwise_[k]->apply(tmp, ones);
-        base_grad += ones;
+        base_grad += tmp;
 
         // Remove the diagonal terms
         base_grad = base_grad.array() - (-1*pairwise_[k]->parameters()(0));
@@ -417,12 +418,51 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
             tmp2.fill(0);
             for(i=0; i<tmp.cols(); ++i) {
                 for(j=0; j<tmp.rows(); ++j) {
-                    int in = ind(j, i);
-                    tmp2(j, i) = tmp(j, in);
+                    tmp2(j, ind(j, i)) = tmp(j, i);
                 }
             }
             grad -= 2*tmp2;
         }
+
+        /////////////////////////////////////////////////////////////////////////
+        MatrixXf real_grad(M_,N_);
+        real_grad = unary;
+        MatrixXf real_upper(M_,N_);
+        real_upper.fill(0);
+        MatrixXf real_lower(M_,N_);
+        real_lower.fill(0);
+
+        for(int label=0; label<M_; ++label) {
+            for(int c=0; c<N_; ++c) {
+                for(int b=0; b<N_; ++b) {
+                    float Kcb = 0;
+                    for(int k=0; k<pairwise_.size(); ++k) {
+                        MatrixXf const & features = pairwise_[k]->features();
+                        VectorXf featDiff = (features.col(c) - features.col(b));
+                        Kcb -= pairwise_[k]->parameters()(0) * exp(-featDiff.squaredNorm());
+                    }
+                    if(Q(label, b) > Q(label, c)) {
+                        real_lower(label, c) += Kcb;
+                    } else if(Q(label, b) < Q(label, c)){
+                        real_upper(label, c) += Kcb;
+                    }
+                }
+            }
+        }
+        real_grad += real_upper - real_lower;
+
+        // Compare label 0 only
+        VectorXf clone_grad = grad.row(0);
+        std::cout<<"1 norm"<<std::endl;
+        std::cout<<clone_grad.norm()<<std::endl;
+        VectorXf clone_real_grad = real_grad.row(0);
+        std::cout<<"2 norm"<<std::endl;
+        std::cout<<clone_real_grad.norm()<<std::endl;
+        clone_grad /= clone_grad.norm();
+        clone_real_grad /= clone_real_grad.norm();
+        std::cout<<"Dot product 1 2"<<std::endl;
+        std::cout<<clone_grad.dot(clone_real_grad.transpose())<<std::endl;
+        /////////////////////////////////////////////////////////////////////////
 
         // Sub-gradient descent step
         float lr = 1.0/(10+it);

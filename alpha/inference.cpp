@@ -158,7 +158,7 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
 
 void minimize_LP(std::string path_to_image, std::string path_to_unaries,
                  std::string path_to_output, std::string path_to_parameters) {
-    img_size size = {50, 50};
+    img_size size = {20, 20};
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
     unsigned char * img = load_image(path_to_image, size);
@@ -169,11 +169,12 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     DenseCRF2D crf(size.width, size.height, unaries.rows());
 
     crf.setUnaryEnergy(unaries);
-    crf.addPairwiseGaussian(3,3, new PottsCompatibility(3), DIAG_KERNEL, NO_NORMALIZATION);
+    crf.addPairwiseGaussian(5,5, new PottsCompatibility(3), DIAG_KERNEL, NO_NORMALIZATION);
     //crf.addPairwiseBilateral(50,50,15,15,15, img, new PottsCompatibility(5), DIAG_KERNEL, NO_NORMALIZATION);
 
     clock_t start, end;
     start = clock();
+    srand(start);
     std::cout<<"Using qp_cccp as init"<<std::endl;
     MatrixXf Q(M, size.height*size.width);
     //Q = crf.qp_cccp_inference();
