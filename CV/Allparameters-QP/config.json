@@ -1,0 +1,39 @@
+{
+    "language"        : "PYTHON",
+    "main-file"       : "experiment-allparam-qp.py",
+    "experiment-name" : "All-parameters",
+    "likelihood"      : "NOISELESS",
+    "variables" : {
+        "spc_std" : {
+            "type" : "INT",
+            "size" : 1,
+            "min"  : 1,
+            "max"  : 100
+        },
+        "spc_potts" : {
+            "type" : "FLOAT",
+            "size" : 1,
+            "min"  : 0,
+            "max"  : 100
+        },
+        "bil_spcstd" : {
+            "type" : "INT",
+            "size" : 1,
+            "min"  : 1,
+            "max"  : 100
+        },
+        "bil_colstd" : {
+            "type" : "INT",
+            "size" : 1,
+            "min"  : 1,
+            "max"  : 100
+        },
+        "bil_potts" : {
+            "type" : "FLOAT",
+            "size" : 1,
+            "min"  : 0,
+            "max"  : 100
+        }
+    }
+}
+
