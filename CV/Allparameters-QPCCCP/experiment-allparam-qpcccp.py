@@ -4,7 +4,8 @@ import os
 
 def generate_segmentation(spc_std, spc_potts,
                           bil_spcstd, bil_colstd, bil_potts):
-    path_to_executable = '/data/Experiments/Allparameters-QPCCCP/cv-script'
+    path_to_executable = os.path.dirname(
+        os.path.realpath(__file__)) + '/cv-script'
     split = "Validation"
     dataset = "Pascal2010"
 
