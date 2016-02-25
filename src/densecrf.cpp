@@ -384,7 +384,6 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     }
 
     Q = init;
-    Q = (MatrixXf::Random(M_, N_).array()+1)/2;
 
     // Compute the value of the energy
     double old_energy;

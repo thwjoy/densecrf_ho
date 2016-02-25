@@ -233,11 +233,13 @@ void PairwisePotential::apply_lower_sorted(MatrixXf & out) const {
 	if(size <= 1) {
 		// Only a=b term remaining
 		return;
-	} else if(size<=-10000000) {
+	} else if(size<=10) {
+		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
+		double alpha = 1.0 / 0.6;
 		for(int c=0; c<out.cols(); ++c) {
             for(int b=0; b<c; ++b) {
                 VectorXf featDiff = (features.col(c) - features.col(b));
-                out(0, c) += exp(-featDiff.squaredNorm())/0.6;
+                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
             }
         }
 	} else {
@@ -304,6 +306,9 @@ VectorXf PairwisePotential::kernelGradient( const MatrixXf & b, const MatrixXf &
 }
 MatrixXf PairwisePotential::features() const {
 	return kernel_->features();
+}
+KernelType PairwisePotential::ktype() const {
+	return kernel_->ktype();
 }
 MatrixXf PairwisePotential::compatibility_matrix(int nb_labels) const {
 	return compatibility_->matrixForm(nb_labels);

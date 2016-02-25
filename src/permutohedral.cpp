@@ -508,7 +508,7 @@ void Permutohedral::seqCompute ( float* out, const float* in, int value_size, bo
 		std::swap( values, new_values );
 	}
 	// Alpha is a magic scaling constant (write Andrew if you really wanna understand this)
-	float alpha = 1.0f / (1+powf(2, -d_));
+	float alpha = 1.0f / (1+powf(2, -d_)); // 0.8 in 2D / 0.97 in 5D
 	
 	// Slicing
 	for( int i=0; i<N_; i++ ){
