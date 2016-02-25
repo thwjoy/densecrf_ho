@@ -228,8 +228,8 @@ MatrixXf DenseCRF::qp_inference() const {
     double energy;
 
     energy = compute_LR_QP_value(Q, diag_dom);
-
-    while( (old_energy - energy) > 1e-3){
+    int num_iter=0;
+    while( (old_energy - energy) > 100){
         old_energy = energy;
         // Compute the gradient at the current estimates.
         grad = unary;
@@ -255,7 +255,7 @@ MatrixXf DenseCRF::qp_inference() const {
         double denom = dotProduct(sx, psis, temp_dot);
         // Denom should be positive, otherwise our choice of psi was not convex enough.
 
-        double optimal_step_size = - num / 2 * denom;
+        double optimal_step_size = - num / (2 * denom);
         if (optimal_step_size > 1) {
             optimal_step_size = 1;
         }
@@ -294,8 +294,8 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
     // Get initial estimates
     // Initialize state to the unaries
     // Warning: We don't get exactly the same optimum depending on the initialisation
-    // expAndNormalize(Q, -unary);
-    Q.fill(1/ (float) M_);
+    expAndNormalize(Q, -unary);
+    // Q.fill(1/ (float) M_);
 
     // Compute the value of the energy
     double old_energy;
@@ -371,7 +371,7 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 
             assert(valid_probability(Q));
             convex_rounds++;
-        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<10);
+        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<3);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
 

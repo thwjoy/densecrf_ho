@@ -1,7 +1,7 @@
 {
     "language"        : "PYTHON",
     "main-file"       : "experiment-allparam-qpcccp.py",
-    "experiment-name" : "All-parameters",
+    "experiment-name" : "All-parameters-QPCCCP",
     "likelihood"      : "NOISELESS",
     "variables" : {
         "spc_std" : {
