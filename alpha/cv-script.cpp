@@ -25,10 +25,10 @@ void image_inference(Dataset dataset, std::string path_to_results,
                              img, new PottsCompatibility(bil_potts));
     MatrixXf Q;
     {
-        std::string path_to_subexp_results = path_to_results + "/lrqp/";
+        std::string path_to_subexp_results = path_to_results + "/qpcccp/";
         std::string output_path = get_output_path(path_to_subexp_results, image_name);
         if (not file_exist(output_path)) {
-            Q = crf.qp_inference();
+            Q = crf.qp_cccp_inference();
             make_dir(path_to_subexp_results);
             double final_energy = crf.compute_energy(Q);
             double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
@@ -44,37 +44,37 @@ void image_inference(Dataset dataset, std::string path_to_results,
 
 int main(int argc, char *argv[])
 {
-    if (argc<4) {
-        std::cout << "./generate split dataset results params" << '\n';
-        std::cout << "Example: ./generate Train MSRC /data/MSRC/results/train/ 3" << '\n';
-        return 1;
-    }
+        if (argc<4) {
+            std::cout << "./generate split dataset results params" << '\n';
+            std::cout << "Example: ./generate Train MSRC /data/MSRC/results/train/ 3" << '\n';
+            return 1;
+        }
 
-    std::string dataset_split = argv[1];
-    std::string dataset_name  = argv[2];
-    std::string path_to_results = argv[3];
+        std::string dataset_split = argv[1];
+        std::string dataset_name  = argv[2];
+        std::string path_to_results = argv[3];
 
-    std::string param1 = argv[4];
-    float spc_std = std::stof(param1);
-    std::string param2 = argv[5];
-    float spc_potts = std::stof(param2);
-    std::string param3 = argv[6];
-    float bil_spcstd = std::stof(param3);
-    std::string param4 = argv[7];
-    float bil_colstd = std::stof(param4);
-    std::string param5 = argv[8];
-    float bil_potts = std::stof(param5);
+        std::string param1 = argv[4];
+        float spc_std = std::stof(param1);
+        std::string param2 = argv[5];
+        float spc_potts = std::stof(param2);
+        std::string param3 = argv[6];
+        float bil_spcstd = std::stof(param3);
+        std::string param4 = argv[7];
+        float bil_colstd = std::stof(param4);
+        std::string param5 = argv[8];
+        float bil_potts = std::stof(param5);
 
-    make_dir(path_to_results);
+        make_dir(path_to_results);
 
-    Dataset ds = get_dataset_by_name(dataset_name);
-    std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-    omp_set_num_threads(8);
+        Dataset ds = get_dataset_by_name(dataset_name);
+        std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
+        omp_set_num_threads(8);
 #pragma omp parallel for
-    for(int i=0; i< test_images.size(); ++i){
-        image_inference(ds, path_to_results, test_images[i], spc_std, spc_potts,
-                        bil_spcstd, bil_colstd, bil_potts);
+        for(int i=0; i< test_images.size(); ++i){
+            image_inference(ds, path_to_results, test_images[i], spc_std, spc_potts,
+                            bil_spcstd, bil_colstd, bil_potts);
+        }
+
+
     }
-
-
-}

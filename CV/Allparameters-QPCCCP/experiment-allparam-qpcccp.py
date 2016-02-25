@@ -4,14 +4,14 @@ import os
 
 def generate_segmentation(spc_std, spc_potts,
                           bil_spcstd, bil_colstd, bil_potts):
-    path_to_executable = '/data/Experiments/experiment-allparam-qp/cv-script'
+    path_to_executable = '/data/Experiments/Allparameters-QPCCCP/cv-script'
     split = "Validation"
     dataset = "Pascal2010"
 
     exp_path = '/'.join(map(str, [spc_std, spc_potts, bil_spcstd,
                                   bil_colstd, bil_potts]))
 
-    results_path = "/data/CV/Allparams-qp/" + exp_path + "/"
+    results_path = "/data/CV/Allparams-qpcccp/" + exp_path + "/"
     try:
         os.makedirs(results_path)
     except OSError:
@@ -29,7 +29,7 @@ def evaluate_segmentation(spc_std, spc_potts,
     eng = matlab.engine.start_matlab()
     exp_path = '/'.join(map(str, [spc_std, spc_potts, bil_spcstd,
                                   bil_colstd, bil_potts]))
-    path_to_results = "/data/CV/Allparams-qp/" + exp_path + "/lrqp"
+    path_to_results = "/data/CV/Allparams-qpcccp/" + exp_path + "/qpcccp"
     ret = eng.voc_test(path_to_results)
 
     # This returns the value of the average accuracy. Spearmint
