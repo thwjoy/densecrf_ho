@@ -168,19 +168,20 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
     crf.setUnaryEnergy(unaries);
-    crf.addPairwiseGaussian(5,5, new PottsCompatibility(3), DIAG_KERNEL, NO_NORMALIZATION);
-    //crf.addPairwiseBilateral(50,50,15,15,15, img, new PottsCompatibility(5), DIAG_KERNEL, NO_NORMALIZATION);
+    crf.addPairwiseGaussian(5,5, new PottsCompatibility(3));
+    crf.addPairwiseBilateral(50,50,15,15,15, img, new PottsCompatibility(5));
 
     clock_t start, end;
     start = clock();
     srand(start);
     std::cout<<"Using qp_cccp as init"<<std::endl;
     MatrixXf Q(M, size.height*size.width);
-    //Q = crf.qp_cccp_inference();
-    Q = (MatrixXf::Random(M, size.height*size.width).array()+1)/2;
+    Q = crf.qp_cccp_inference();
+    save_map(Q, size, "/data/densecrf/res-cccp-qp.bmp");
+    /*Q = (MatrixXf::Random(M, size.height*size.width).array()+1)/2;
     for(int c=0; c<Q.cols(); ++c) {
         Q.col(c)/=Q.col(c).sum();
-    }
+    }/**/
     //Q.fill(1/M);
     std::cout<<"Doing the actual lp"<<std::endl;
     Q = crf.lp_inference(Q);

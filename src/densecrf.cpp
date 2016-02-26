@@ -362,7 +362,7 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 
         // Compute our current value of the energy;
         energy = compute_energy(Q);
-    } while ( (old_energy -energy) > 1);
+    } while ( (old_energy -energy) > 100);
     return Q;
 }
 
@@ -401,7 +401,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     // Compute the value of the energy
     double old_energy;
     assert(valid_probability(Q));
-    double energy = compute_energy(Q);
+    double energy = compute_energy_LP(Q);
     std::cout << "0: " << energy << "\n";
 
     // precompute the constant part of the gradient
@@ -438,7 +438,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         }
 
         // Sub-gradient descent step
-        float lr = 1.0/(100+it);
+        float lr = 1.0/(10000+it);
         Q -= lr*grad;
 
         // Project solution
@@ -466,9 +466,9 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-        energy = compute_energy(Q);
+        energy = compute_energy_LP(Q);
         std::cout << it << ": " << energy << "\n";
-    } while(fabs(old_energy -energy) > 1e-5);
+    } while(it<5);//fabs(old_energy -energy) > 1e-5);
     std::cout <<"final: " << energy << "\n";
 
 
@@ -729,6 +729,32 @@ double DenseCRF::compute_energy(const MatrixXf & Q) const {
         pairwise_[k]->apply( tmp, Q );
         energy += dotProduct(Q, tmp, dot_tmp);
     }
+    return energy;
+}
+
+double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
+    double energy = 0;
+    MatrixP dot_tmp;
+    MatrixXi ind(M_, N_);
+    // Add the unary term
+    if( unary_ ) {
+        MatrixXf unary = unary_->get();
+        energy += dotProduct(unary, Q, dot_tmp);
+    }
+    // Add all pairwise terms
+    sortRows(Q, ind);
+    MatrixXf tmp;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        // Full
+        pairwise_[k]->apply( tmp, Q );
+        energy -= dotProduct(Q, tmp, dot_tmp);
+        // Diag
+        energy += (Q*pairwise_[k]->parameters()(0)).sum();
+        // Lower
+        pairwise_[k]->apply_lower(tmp, Q, ind);
+        energy += 2*dotProduct(Q, tmp, dot_tmp);
+    }
+
     return energy;
 }
 

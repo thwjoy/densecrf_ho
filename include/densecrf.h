@@ -119,8 +119,11 @@ public: /* Debugging functions */
 	// Compute the KL-divergence of a set of marginals
 	double klDivergence( const MatrixXf & Q ) const;
 
-	// Compute the energy associated with a relaxation
-	double compute_energy( const MatrixXf & Q) const;
+    // Compute the energy associated with the QP relaxation
+    double compute_energy( const MatrixXf & Q) const;
+
+    // Compute the energy associated with the LP relaxation
+    double compute_energy_LP( const MatrixXf & Q) const;
 
 	// Compute the value of a Lafferty-Ravikumar QP
 	double compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const;

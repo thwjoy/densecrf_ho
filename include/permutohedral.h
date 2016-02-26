@@ -53,13 +53,15 @@ protected:
 	int N_, M_, d_;
 	void sseCompute ( float* out, const float* in, int value_size, bool reverse=false ) const;
     void seqCompute ( float* out, const float* in, int value_size, bool reverse=false ) const;
-	void seqCompute_lower_left ( float* out, int value_size, int middle_low, int middle_high ) const;
+    void seqCompute_lower_left ( float* out, int value_size, int middle_low, int middle_high ) const;
+	void seqCompute_lower_left ( float* out, const float* in, int value_size, int middle_low, int middle_high ) const;
 public:
 	Permutohedral();
 	void init ( const MatrixXf & features );
 	MatrixXf compute ( const MatrixXf & v, bool reverse=false ) const;
     void compute ( MatrixXf & out, const MatrixXf & in, bool reverse=false ) const;
-	void compute_lower_left ( MatrixXf & out, int middle_low, int middle_high ) const;
+    void compute_lower_left ( MatrixXf & out, int middle_low, int middle_high ) const;
+	void compute_lower_left ( MatrixXf & out, const MatrixXf & in, int middle_low, int middle_high ) const;
 	// Compute the gradient of a^T K b
 	void gradient ( float* df, const float * a, const float* b, int value_size ) const;
 };
