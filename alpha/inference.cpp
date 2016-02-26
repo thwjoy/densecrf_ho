@@ -76,9 +76,10 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     crf.compute_kl_divergence();
+    MatrixXf init = crf.unary_init();
     clock_t start, end;
     start = clock();
-    MatrixXf Q = crf.inference();
+    MatrixXf Q = crf.inference(init);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
@@ -111,9 +112,10 @@ void minimize_mean_field_fixed_iter(std::string path_to_image, std::string path_
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     crf.compute_kl_divergence();
+    MatrixXf init = crf.unary_init();
     clock_t start, end;
     start = clock();
-    MatrixXf Q = crf.inference(num_iter);
+    MatrixXf Q = crf.inference(init, num_iter);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
@@ -148,10 +150,10 @@ void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     //crf.compute_kl_divergence();
-
+    MatrixXf init = crf.unary_init();
     clock_t start, end;
     start = clock();
-    MatrixXf Q = crf.qp_inference();
+    MatrixXf Q = crf.qp_inference(init);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
@@ -183,10 +185,10 @@ void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     //crf.compute_kl_divergence();
-
+    MatrixXf init = crf.unary_init();
     clock_t start, end;
     start = clock();
-    MatrixXf Q = crf.qp_cccp_inference();
+    MatrixXf Q = crf.qp_cccp_inference(init);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
@@ -221,10 +223,10 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
 
     crf.compute_kl_divergence();
-
+    MatrixXf init = crf.unary_init();
     clock_t start, end;
     start = clock();
-    MatrixXf Q = crf.cccp_inference();
+    MatrixXf Q = crf.cccp_inference(init);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
@@ -259,9 +261,10 @@ void gradually_minimize_mean_field(std::string path_to_image, std::string path_t
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
+    MatrixXf init = crf.unary_init();
     clock_t start, end;
     start = clock();
-    MatrixXf Q = crf.grad_inference();
+    MatrixXf Q = crf.grad_inference(init);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
@@ -298,8 +301,8 @@ label_matrix minimize_mean_field(std::string path_to_image, std::string path_to_
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
-
-    MatrixXf Q = crf.inference();
+    MatrixXf init = crf.unary_init();
+    MatrixXf Q = crf.inference(init);
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     return get_label_matrix(Q, size);

@@ -102,6 +102,12 @@ UnaryEnergy* DenseCRF::getUnaryEnergy() {
 ///////////////////////
 /////  Inference  /////
 ///////////////////////
+MatrixXf DenseCRF::unary_init() const {
+    MatrixXf Q;
+    expAndNormalize(Q, unary_->get());
+    return Q;
+}
+
 void normalize(MatrixXf & out, const MatrixXf & in){
 	out.resize(in.rows(), in.cols());
 	VectorXf norm_constants = in.colwise().sum();
@@ -126,13 +132,13 @@ void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q ) 
 	}
 }
 
-MatrixXf DenseCRF::inference ( int n_iterations ) const {
+MatrixXf DenseCRF::inference ( const MatrixXf & init, int n_iterations ) const {
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
 	unary.fill(0);
 	if( unary_ ){
 		unary = unary_->get();
 	}
-	expAndNormalize( Q, -unary );
+    Q = init;
 
 	for( int it=0; it<n_iterations; it++ ) {
 		tmp1 = -unary;
@@ -145,16 +151,17 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 	return Q;
 }
 
-MatrixXf DenseCRF::inference () const {
+MatrixXf DenseCRF::inference (const MatrixXf & init) const {
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_);
 	float old_kl, kl;
 	unary.fill(0);
 	if( unary_ ){
 		unary = unary_->get();
 	}
-	expAndNormalize( Q, -unary );
 
-	if (compute_kl) {
+    Q = init;
+
+    if (compute_kl) {
 		old_kl = 0;
 		kl = klDivergence(Q);
 	}
@@ -187,7 +194,7 @@ MatrixXf DenseCRF::inference () const {
     return Q;
 }
 
-MatrixXf DenseCRF::qp_inference() const {
+MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
     MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
         desc(M_,N_), psis(M_,N_), sx(M_,N_);
     MatrixP temp_dot(M_,N_);
@@ -200,7 +207,7 @@ MatrixXf DenseCRF::qp_inference() const {
     // Initialize state to the unaries
     // Warning: We don't get exactly the same optimum depending on the initialisation
     // expAndNormalize(Q, -unary);
-    Q.fill(1/ (float) M_);
+    Q = init;
 
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
@@ -272,7 +279,7 @@ MatrixXf DenseCRF::qp_inference() const {
     return Q;
 }
 
-MatrixXf DenseCRF::qp_cccp_inference() const {
+MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
         desc(M_, N_), sx(M_, N_),  psis(M_, N_), psix(M_,N_), diag_dom(M_,N_);
     MatrixP temp_dot(M_,N_);
@@ -294,7 +301,7 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
     // Get initial estimates
     // Initialize state to the unaries
     // Warning: We don't get exactly the same optimum depending on the initialisation
-    expAndNormalize(Q, -unary);
+    Q = init;
     // Q.fill(1/ (float) M_);
 
     // Compute the value of the energy
@@ -382,7 +389,7 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 }
 
 
-MatrixXf DenseCRF::cccp_inference() const {
+MatrixXf DenseCRF::cccp_inference(const MatrixXf & init) const {
     MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
     float old_kl, kl;
     unary.fill(0);
@@ -395,7 +402,7 @@ MatrixXf DenseCRF::cccp_inference() const {
     for (int i=0; i<pairwise_.size(); i++) {
         lambda_eig += pick_lambda_eig_to_concave(pairwise_[i]->compatibility_matrix(M_));
     }
-    expAndNormalize(Q, -unary);
+    Q = init;
 
     bool keep_inferring = true;
     if (compute_kl) {
@@ -439,13 +446,13 @@ MatrixXf DenseCRF::cccp_inference() const {
 }
 
 
-MatrixXf DenseCRF::grad_inference() const {
+MatrixXf DenseCRF::grad_inference(const MatrixXf & init) const {
     MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_), Q_prev_lambda(M_, N_);
     unary.fill(0);
     if( unary_ ) {
         unary = unary_->get();
     }
-    expAndNormalize( Q, -unary );
+    Q = init;
 
     bool keep_decreasing_lambda = true;
     float lambda = 1;
@@ -483,7 +490,7 @@ MatrixXf DenseCRF::grad_inference() const {
 
 VectorXs DenseCRF::map ( int n_iterations ) const {
     // Run inference
-    MatrixXf Q = inference( n_iterations );
+    MatrixXf Q = inference(unary_init(),  n_iterations );
     // Find the map
     return currentMap( Q );
 }

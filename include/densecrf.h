@@ -76,21 +76,23 @@ public:
 	void setUnaryEnergy( const MatrixXf & L, const MatrixXf & f );
 	UnaryEnergy* getUnaryEnergy();
 
+
+	MatrixXf unary_init() const;
 	// Run inference and return the probabilities
-	MatrixXf inference( int n_iterations ) const;
-	MatrixXf inference() const;
+	MatrixXf inference(const MatrixXf & init,  int n_iterations ) const;
+	MatrixXf inference(const MatrixXf & init) const;
 
 	// Run the energy minimisation on the QP
 	// First one is the Lafferty-Ravikumar version of the QP
-	MatrixXf qp_inference() const;
+	MatrixXf qp_inference(const MatrixXf & init) const;
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
-	MatrixXf qp_cccp_inference() const;
+	MatrixXf qp_cccp_inference(const MatrixXf & init) const;
 
 	// Run the inference with gradually lower lambda values.
-	MatrixXf grad_inference() const;
+	MatrixXf grad_inference(const MatrixXf & init) const;
 
 	// Run the inference with cccp optimization
-	MatrixXf cccp_inference() const;
+	MatrixXf cccp_inference(const MatrixXf & init) const;
 
 	// Run MAP inference and return the map for each pixel
 	VectorXs map( int n_iterations ) const;
