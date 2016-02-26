@@ -40,7 +40,7 @@ void newton_cccp(VectorXf & state, const VectorXf & cste, float lambda_eig){
         VectorXf new_state = state + step;
         float step_size = 1;
         while(true){
-            if(all_positive(new_state.head(M_))){
+            if(all_strict_positive(new_state.head(M_))){
                 break;
             } else {
                 step_size = step_size /2;

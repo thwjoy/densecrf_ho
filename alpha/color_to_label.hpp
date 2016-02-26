@@ -19,7 +19,8 @@ struct vec3bcomp{
 typedef std::vector<std::vector<int>> label_matrix;
 
 typedef std::map<cv::Vec3b, int, vec3bcomp> labelindex;
-labelindex  init_color_to_label_map();
+
+labelindex  get_color_to_label_map_from_dataset(const std::string & dataset_name);
 int lookup_label_index(labelindex color_to_label, cv::Vec3b gtVal);
 label_matrix labels_from_lblimg(cv::Mat lbl_img, labelindex color_to_label);
 
