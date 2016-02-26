@@ -302,16 +302,11 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
         unary = unary_->get();
     }
 
-    // Get initial estimates
-    // Initialize state to the unaries
-    // Warning: We don't get exactly the same optimum depending on the initialisation
     Q = init;
-    // Q.fill(1/ (float) M_);
-
     // Compute the value of the energy
     double old_energy;
     double energy = compute_energy(Q);
-
+    int convex_rounds = 0;
     do {
         // New value of the linearization point.
         old_energy = energy;
@@ -321,21 +316,16 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
         double old_convex_energy;
 
 
-        int convex_rounds = 0;
-        double optimal_step_size = 1;
+        double optimal_step_size = 0;
+
+        psis.fill(0);
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, Q);
+            psis += tmp;
+        }
+        grad = unary + 2 * psis + 2 * diag_dom.cwiseProduct(Q_old - Q);
         do {
             old_convex_energy = convex_energy;
-            // Compute gradient of the convex problem
-            psix.fill(0);
-            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-                pairwise_[k]->apply( tmp, Q);
-                psix += tmp;
-            }
-
-            grad = unary +
-                2 * psix +
-                2 * diag_dom.cwiseProduct(Q_old - Q);
-
             // Get a Descent direction by minimising < \nabla E, s >
             descent_direction(desc, grad);
 
@@ -369,26 +359,22 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
                 optimal_step_size = 1;
             }
 
-            // std::cout << "Step size: " << optimal_step_size << '\n';
-
             Q += optimal_step_size * sx;
+            // Compute gradient of the convex problem at the new position
+            grad += 2 * optimal_step_size * (psis-diag_dom.cwiseProduct(sx));
 
             // std::cout << "Coefficients: "<< denom << '\t' << num << '\t' << cst << '\n';
             convex_energy = pow(optimal_step_size, 2) * denom + optimal_step_size * num + cst;
 
             // energy = compute_energy(Q);
-            // old_convex_energy = energy + lambda_eig * dotProduct(Q, 2*Q_old -Q, temp_dot);
-            // std::cout << old_convex_energy  << '\n';
-            // std::cout << convex_energy << '\n';
-
-            assert(valid_probability(Q));
             convex_rounds++;
         } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<3 && optimal_step_size != 0);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
 
         // Compute our current value of the energy;
-        energy = compute_energy(Q);
+        // energy = compute_energy(Q);
+        energy = dotProduct(Q, 0.5 * (grad + unary) - diag_dom.cwiseProduct(Q_old - Q), temp_dot);
     } while ( (old_energy -energy) > 100);
     return Q;
 }
