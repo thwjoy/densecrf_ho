@@ -13,8 +13,8 @@
         "spc_potts" : {
             "type" : "FLOAT",
             "size" : 1,
-            "min"  : 0,
-            "max"  : 50
+            "min"  : 0.5,
+            "max"  : 100
         },
         "bil_spcstd" : {
             "type" : "INT",
@@ -31,8 +31,8 @@
         "bil_potts" : {
             "type" : "FLOAT",
             "size" : 1,
-            "min"  : 0,
-            "max"  : 50
+            "min"  : 0.5,
+            "max"  : 100
         }
     }
 }
