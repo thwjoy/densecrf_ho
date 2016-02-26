@@ -188,7 +188,8 @@ void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
     MatrixXf init = crf.unary_init();
     clock_t start, end;
     start = clock();
-    MatrixXf Q = crf.qp_cccp_inference(init);
+    MatrixXf Q = crf.qp_inference(init);
+    Q = crf.qp_cccp_inference(Q);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
