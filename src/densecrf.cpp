@@ -318,6 +318,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
 
 
         int convex_rounds = 0;
+        double optimal_step_size = 1;
         do {
             old_convex_energy = convex_energy;
             // Compute gradient of the convex problem
@@ -348,7 +349,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
             double num = dotProduct(unary, sx, temp_dot) +
                 2 * dotProduct(Q, psis, temp_dot) +
                 2 * dotProduct(sx, diag_dom.cwiseProduct(Q-Q_old), temp_dot);
-            assert(num<0); // This is negative if desc is really the good minimizer
+            assert(num<=0); // This is negative if desc is really the good minimizer
 
             double denom = dotProduct(desc, psis, temp_dot) +
                 dotProduct(desc, diag_dom.cwiseProduct(desc), temp_dot); // (s-x)d(s-x)
@@ -358,7 +359,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
                 dotProduct(Q, psix, temp_dot) +
                 dotProduct(Q-2*Q_old, diag_dom.cwiseProduct(Q), temp_dot);
 
-            double optimal_step_size = - num/ (2 *denom);
+            optimal_step_size = - num/ (2 *denom);
 
             if (optimal_step_size > 1) {
                 optimal_step_size = 1;
@@ -378,7 +379,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
 
             assert(valid_probability(Q));
             convex_rounds++;
-        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<3);
+        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<3 && optimal_step_size != 0);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
 
@@ -387,7 +388,6 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     } while ( (old_energy -energy) > 100);
     return Q;
 }
-
 
 MatrixXf DenseCRF::cccp_inference(const MatrixXf & init) const {
     MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
