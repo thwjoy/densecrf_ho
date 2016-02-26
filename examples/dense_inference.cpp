@@ -96,10 +96,11 @@ int main( int argc, char* argv[]){
 	// weight = 10
 	crf.addPairwiseBilateral( 80, 80, 13, 13, 13, im, new PottsCompatibility( 10 ) );
 
-	MatrixXf approx = crf.inference();
+	MatrixXf init = crf.unary_init();
+	MatrixXf approx = crf.inference(init);
 	VectorXs map = crf.currentMap(approx);
 
-	MatrixXf grad_approx = crf.grad_inference();
+	MatrixXf grad_approx = crf.grad_inference(init);
 	VectorXs grad_map = crf.currentMap(grad_approx);
 
 	// Store the result
