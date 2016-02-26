@@ -1,0 +1,21 @@
+{
+    "language"        : "PYTHON",
+    "main-file"       : "experiment-oneparam.py",
+    "experiment-name" : "OneParameter-pairweight-25",
+    "likelihood"      : "NOISELESS",
+    "variables" : {
+        "pairwise_weight" : {
+            "type" : "FLOAT",
+            "size" : 1,
+            "min"  : 0,
+            "max"  : 50
+        },
+        "dummy" : {
+            "type" : "FLOAT",
+            "size" : 1,
+            "min"  : 0,
+            "max"  : 50
+        }
+    }
+}
+

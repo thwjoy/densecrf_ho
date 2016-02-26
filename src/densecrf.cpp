@@ -102,6 +102,12 @@ UnaryEnergy* DenseCRF::getUnaryEnergy() {
 ///////////////////////
 /////  Inference  /////
 ///////////////////////
+MatrixXf DenseCRF::unary_init() const {
+    MatrixXf Q;
+    expAndNormalize(Q, unary_->get());
+    return Q;
+}
+
 void normalize(MatrixXf & out, const MatrixXf & in){
 	out.resize(in.rows(), in.cols());
 	VectorXf norm_constants = in.colwise().sum();
@@ -126,13 +132,13 @@ void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q ) 
 	}
 }
 
-MatrixXf DenseCRF::inference ( int n_iterations ) const {
+MatrixXf DenseCRF::inference ( const MatrixXf & init, int n_iterations ) const {
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
 	unary.fill(0);
 	if( unary_ ){
 		unary = unary_->get();
 	}
-	expAndNormalize( Q, -unary );
+    Q = init;
 
 	for( int it=0; it<n_iterations; it++ ) {
 		tmp1 = -unary;
@@ -145,16 +151,17 @@ MatrixXf DenseCRF::inference ( int n_iterations ) const {
 	return Q;
 }
 
-MatrixXf DenseCRF::inference () const {
+MatrixXf DenseCRF::inference (const MatrixXf & init) const {
 	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_);
 	float old_kl, kl;
 	unary.fill(0);
 	if( unary_ ){
 		unary = unary_->get();
 	}
-	expAndNormalize( Q, -unary );
 
-	if (compute_kl) {
+    Q = init;
+
+    if (compute_kl) {
 		old_kl = 0;
 		kl = klDivergence(Q);
 	}
@@ -187,11 +194,10 @@ MatrixXf DenseCRF::inference () const {
     return Q;
 }
 
-MatrixXf DenseCRF::qp_inference() const {
-    // Todo: We don't get always decreasing value, which is weird and
-    // shouldn't happen
-	MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
+MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
+    MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
         desc(M_,N_), psis(M_,N_), sx(M_,N_);
+    MatrixP temp_dot(M_,N_);
 
     // Get parameters
     unary.fill(0);
@@ -201,7 +207,7 @@ MatrixXf DenseCRF::qp_inference() const {
     // Initialize state to the unaries
     // Warning: We don't get exactly the same optimum depending on the initialisation
     // expAndNormalize(Q, -unary);
-    Q.fill(1/ (float) M_);
+    Q = init;
 
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
@@ -214,6 +220,13 @@ MatrixXf DenseCRF::qp_inference() const {
         pairwise_[k]->apply( tmp, full_ones);
         diag_dom += tmp;
     }
+    diag_dom += 0.0001 * MatrixXf::Ones(M_, N_);
+    // This is a caution to make sure that the matrix is well
+    // diagonally dominant and therefore convex. Otherwise, due to
+    // floating point errors, we can have issues.
+    // This is triggered easily when we initialise with the uniform distribution,
+    // then the results of the matrix multiplication is exactly the sum along the columns.
+
     // Update the proxy_unaries
     unary = unary - diag_dom;
 
@@ -222,8 +235,8 @@ MatrixXf DenseCRF::qp_inference() const {
     double energy;
 
     energy = compute_LR_QP_value(Q, diag_dom);
-
-    while( (old_energy - energy) > 1e-3){
+    int num_iter=0;
+    while( (old_energy - energy) > 100){
         old_energy = energy;
         // Compute the gradient at the current estimates.
         grad = unary;
@@ -235,9 +248,8 @@ MatrixXf DenseCRF::qp_inference() const {
 
         // Get a Descent direction by minimising < \nabla E, s >
         descent_direction(desc, grad);
-
         // Solve for the best step size. The best step size is
-        // - \frac{x^T \Psi (s-x) + 0.5 \phi (s-x)}{(s-x)^T \Psi (s-x)}
+        // - \frac{\theta'^T(s-x) + 2 x^T \psi (s-x)}{ 2 * (s-x)^T \psi (s-x) }
         sx = desc - Q;
         psis.fill(0);
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -245,31 +257,40 @@ MatrixXf DenseCRF::qp_inference() const {
             psis += tmp;
         }
         psis += diag_dom.cwiseProduct(sx);
-        double num =  2 * Q.cwiseProduct(psis).sum() + unary.cwiseProduct(sx).sum();
-        double denom = 2* sx.cwiseProduct(psis).sum();
-        double optimal_step_size = - num / denom;
+        double num =  2 * dotProduct(Q, psis, temp_dot) + dotProduct(unary, sx, temp_dot);
+        // Num should be negative, otherwise our choice of s was necessarily wrong.
+        double denom = dotProduct(sx, psis, temp_dot);
+        // Denom should be positive, otherwise our choice of psi was not convex enough.
+
+        double optimal_step_size = - num / (2 * denom);
         if (optimal_step_size > 1) {
             optimal_step_size = 1;
+        }
+        if (denom == 0) {
+            // This means that the conditional gradient is the same
+            // than the current step and we have converged.
+            optimal_step_size = 0;
         }
 
         // Take a step
         Q += optimal_step_size * sx;
         energy = compute_LR_QP_value(Q, diag_dom);
     }
-    // TODO: Should we do a better rounding than this one?
     return Q;
 }
 
-MatrixXf DenseCRF::qp_cccp_inference() const {
+MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
-        desc(M_, N_), sx(M_, N_),  psis(M_, N_), psix(M_,N_);
+        desc(M_, N_), sx(M_, N_),  psis(M_, N_), psix(M_,N_), diag_dom(M_,N_);
     MatrixP temp_dot(M_,N_);
     // Compute the smallest eigenvalues, that we need to make bigger
     // than 0, to ensure that the problem is convex.
-    float lambda_eig = 0;
-    for (int i=0; i < pairwise_.size(); i++) {
-        lambda_eig += pick_lambda_eig_to_convex(pairwise_[i]->compatibility_matrix(M_));
+    MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        pairwise_[k]->apply( tmp, full_ones);
+        diag_dom += tmp;
     }
+    diag_dom += 0.0001 * MatrixXf::Ones(M_, N_);
 
     // Get parameters
     unary.fill(0);
@@ -280,8 +301,8 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
     // Get initial estimates
     // Initialize state to the unaries
     // Warning: We don't get exactly the same optimum depending on the initialisation
-    // expAndNormalize(Q, -unary);
-    Q.fill(1/ (float) M_);
+    Q = init;
+    // Q.fill(1/ (float) M_);
 
     // Compute the value of the energy
     double old_energy;
@@ -292,9 +313,11 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
         old_energy = energy;
         Q_old = Q;
 
-        double convex_energy = energy + lambda_eig * dotProduct(Q, 2*Q_old - Q, temp_dot);
+        double convex_energy = energy + dotProduct(Q, diag_dom.cwiseProduct(2*Q_old - Q), temp_dot);
         double old_convex_energy;
 
+
+        int convex_rounds = 0;
         do {
             old_convex_energy = convex_energy;
             // Compute gradient of the convex problem
@@ -306,15 +329,14 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 
             grad = unary +
                 2 * psix +
-                2 * lambda_eig * (Q_old - Q);
+                2 * diag_dom.cwiseProduct(Q_old - Q);
 
             // Get a Descent direction by minimising < \nabla E, s >
             descent_direction(desc, grad);
 
             // Solve for the best step size of the convex problem. It
-            // is - frac{\phi^T(s-x) + 2 x^T \psi (s-x) + 2 \lambda
-            // (s-x)^T (x_old - x)}{2 (s-x) \psi (s-x) - \lambda
-            // (s-x)^2}
+            // is - frac{\phi^T(s-x) + 2 x^T \psi (s-x) + 2(x-x_old)^T
+            // d (s-x)}{2 (s-x) (\psi+d) (s-x)}
             sx = desc - Q;
 
             psis.fill(0);
@@ -325,17 +347,16 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
 
             double num = dotProduct(unary, sx, temp_dot) +
                 2 * dotProduct(Q, psis, temp_dot) +
-                2 * lambda_eig * dotProduct(sx, Q_old-Q, temp_dot);
-            // double alt_num = dotProduct(sx, grad, temp_dot); // This is the same computation, done differently
+                2 * dotProduct(sx, diag_dom.cwiseProduct(Q-Q_old), temp_dot);
             assert(num<0); // This is negative if desc is really the good minimizer
 
             double denom = dotProduct(desc, psis, temp_dot) +
-                (-lambda_eig) * dotProduct(desc, desc, temp_dot); // squared
+                dotProduct(desc, diag_dom.cwiseProduct(desc), temp_dot); // (s-x)d(s-x)
             assert(denom>0); // This is positive if we did our decomposition correctly
 
             double cst = dotProduct(unary, Q, temp_dot) +
                 dotProduct(Q, psix, temp_dot) +
-                lambda_eig * dotProduct(Q, 2 * Q_old - Q, temp_dot);
+                dotProduct(Q-2*Q_old, diag_dom.cwiseProduct(Q), temp_dot);
 
             double optimal_step_size = - num/ (2 *denom);
 
@@ -356,7 +377,8 @@ MatrixXf DenseCRF::qp_cccp_inference() const {
             // std::cout << convex_energy << '\n';
 
             assert(valid_probability(Q));
-        } while ( (old_convex_energy - convex_energy) > 100);
+            convex_rounds++;
+        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<3);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
 
@@ -478,7 +500,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
 
 
 
-MatrixXf DenseCRF::cccp_inference() const {
+MatrixXf DenseCRF::cccp_inference(const MatrixXf & init) const {
     MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
     float old_kl, kl;
     unary.fill(0);
@@ -491,7 +513,7 @@ MatrixXf DenseCRF::cccp_inference() const {
     for (int i=0; i<pairwise_.size(); i++) {
         lambda_eig += pick_lambda_eig_to_concave(pairwise_[i]->compatibility_matrix(M_));
     }
-    expAndNormalize(Q, -unary);
+    Q = init;
 
     bool keep_inferring = true;
     if (compute_kl) {
@@ -535,13 +557,13 @@ MatrixXf DenseCRF::cccp_inference() const {
 }
 
 
-MatrixXf DenseCRF::grad_inference() const {
+MatrixXf DenseCRF::grad_inference(const MatrixXf & init) const {
     MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_), Q_prev_lambda(M_, N_);
     unary.fill(0);
     if( unary_ ) {
         unary = unary_->get();
     }
-    expAndNormalize( Q, -unary );
+    Q = init;
 
     bool keep_decreasing_lambda = true;
     float lambda = 1;
@@ -579,7 +601,7 @@ MatrixXf DenseCRF::grad_inference() const {
 
 VectorXs DenseCRF::map ( int n_iterations ) const {
     // Run inference
-    MatrixXf Q = inference( n_iterations );
+    MatrixXf Q = inference(unary_init(),  n_iterations );
     // Find the map
     return currentMap( Q );
 }
@@ -588,7 +610,10 @@ double DenseCRF::assignment_energy( const VectorXs & l) const {
     VectorXf unary = unaryEnergy(l);
     VectorXf pairwise = pairwiseEnergy(l);
 
-    VectorXf total_energy = unary + pairwise;
+    // Due to the weird way that the pairwise Energy is computed, this
+    // is how we get results that correspond to what would be given by
+    // binarizing the estimates, and using the compute_energy function.
+    VectorXf total_energy = unary -2* pairwise;
 
     assert( total_energy.rows() == N_);
     double ass_energy = 0;
@@ -622,7 +647,8 @@ VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
             r += pairwiseEnergy( l, i );
         return r;
     }
-
+    // This adds a negative term to the pairwise energy
+    // and divide by two, I don't really know why.
     MatrixXf Q( M_, N_ );
     // Build the current belief [binary assignment]
     for( int i=0; i<N_; i++ )
@@ -636,6 +662,7 @@ VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
             r[i] = 0;
     return r;
 }
+
 MatrixXf DenseCRF::startInference() const{
     MatrixXf Q( M_, N_ );
     Q.fill(0);

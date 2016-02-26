@@ -5,6 +5,10 @@ import os
 
 
 def main():
+    if len(sys.argv) < 2:
+        print "Missing argument:"
+        print "accuracy.py /path/to/results/folder/"
+        return 1
     path_to_folder = sys.argv[1]
 
     with open(os.path.join(path_to_folder, 'conf_mat.csv'), 'rb') as csv_file:
@@ -42,4 +46,4 @@ def main():
     print "Global accuracy: " + str(sum(cls_accuracies) / len(cls_accuracies))
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
