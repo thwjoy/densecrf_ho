@@ -123,7 +123,7 @@ public: /* Debugging functions */
     double compute_energy( const MatrixXf & Q) const;
 
     // Compute the energy associated with the LP relaxation
-    double compute_energy_LP( const MatrixXf & Q) const;
+    double compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const;
 
 	// Compute the value of a Lafferty-Ravikumar QP
 	double compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const;

@@ -401,7 +401,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     // Compute the value of the energy
     double old_energy;
     assert(valid_probability(Q));
-    double energy = compute_energy_LP(Q);
+    double energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
     std::cout << "0: " << energy << "\n";
 
     // precompute the constant part of the gradient
@@ -466,7 +466,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-        energy = compute_energy_LP(Q);
+        energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
         std::cout << it << ": " << energy << "\n";
     } while(it<5);//fabs(old_energy -energy) > 1e-5);
     std::cout <<"final: " << energy << "\n";
@@ -732,7 +732,7 @@ double DenseCRF::compute_energy(const MatrixXf & Q) const {
     return energy;
 }
 
-double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
+double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const {
     double energy = 0;
     MatrixP dot_tmp;
     MatrixXi ind(M_, N_);
@@ -744,14 +744,14 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
     // Add all pairwise terms
     sortRows(Q, ind);
     MatrixXf tmp;
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+    for( unsigned int k=0; k<nb_pairwise; k++ ) {
         // Full
-        pairwise_[k]->apply( tmp, Q );
+        no_norm_pairwise[k]->apply( tmp, Q );
         energy -= dotProduct(Q, tmp, dot_tmp);
         // Diag
-        energy += (Q*pairwise_[k]->parameters()(0)).sum();
+        energy += (Q*no_norm_pairwise[k]->parameters()(0)).sum();
         // Lower
-        pairwise_[k]->apply_lower(tmp, Q, ind);
+        no_norm_pairwise[k]->apply_lower(tmp, Q, ind);
         energy += 2*dotProduct(Q, tmp, dot_tmp);
     }
 

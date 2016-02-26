@@ -158,7 +158,7 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
 
 void minimize_LP(std::string path_to_image, std::string path_to_unaries,
                  std::string path_to_output, std::string path_to_parameters) {
-    img_size size = {20, 20};
+    img_size size = {-1, -1};
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
     unsigned char * img = load_image(path_to_image, size);
