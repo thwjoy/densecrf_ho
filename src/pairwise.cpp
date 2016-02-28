@@ -279,6 +279,8 @@ void PairwisePotential::apply_lower_sorted(MatrixXf & out) const {
 	} else if(size<=10) {
 		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
 		double alpha = 1.0 / 0.6;
+		for(int c=0; c<out.cols(); ++c)
+			out(0, c) = 0;
 		for(int c=0; c<out.cols(); ++c) {
             for(int b=0; b<c; ++b) {
                 VectorXf featDiff = (features.col(c) - features.col(b));
@@ -333,6 +335,8 @@ void PairwisePotential::apply_lower_sorted(MatrixXf & out, const MatrixXf & Q) c
 	} else if(size<=10) {
 		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
 		double alpha = 1.0 / 0.6;
+		for(int c=0; c<out.cols(); ++c)
+			out(0, c) = 0;
 		for(int c=0; c<out.cols(); ++c) {
             for(int b=0; b<c; ++b) {
                 VectorXf featDiff = (features.col(c) - features.col(b));
@@ -361,7 +365,6 @@ void PairwisePotential::apply_lower_sorted(MatrixXf & out, const MatrixXf & Q) c
 		);
 		MatrixXf upper_out(1,middle_high);
 		MatrixXf upper_Q(1,middle_high);
-		upper_out.fill(0);
 		upper_Q = Q.leftCols(middle_high);
 		upper_pairwise.apply_lower_sorted(upper_out, upper_Q);
 		out.leftCols(middle_high) += upper_out;
@@ -375,7 +378,6 @@ void PairwisePotential::apply_lower_sorted(MatrixXf & out, const MatrixXf & Q) c
 		);
 		MatrixXf lower_out(1,middle_high);
 		MatrixXf lower_Q(1,middle_high);
-		lower_out.fill(0);
 		lower_Q = Q.rightCols(middle_high);
 		lower_pairwise.apply_lower_sorted(lower_out, lower_Q);
 		out.rightCols(middle_high) += lower_out;
@@ -410,6 +412,9 @@ MatrixXf PairwisePotential::features() const {
 }
 KernelType PairwisePotential::ktype() const {
 	return kernel_->ktype();
+}
+NormalizationType PairwisePotential::ntype() const {
+	return kernel_->ntype();
 }
 MatrixXf PairwisePotential::compatibility_matrix(int nb_labels) const {
 	return compatibility_->matrixForm(nb_labels);

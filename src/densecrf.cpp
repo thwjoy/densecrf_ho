@@ -426,6 +426,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     assert(valid_probability(Q));
     double energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
     std::cout << "0: " << energy << "\n";
+    //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
+    //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
 
     // precompute the constant part of the gradient
     base_grad = unary;
@@ -459,10 +461,50 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
             }
             grad -= 2*tmp2;
         }
+        /////////////////////////////////////////////////////////////////////////
+        /*MatrixXf real_grad(M_,N_);
+        real_grad = unary;
+        MatrixXf real_upper(M_,N_);
+        real_upper.fill(0);
+        MatrixXf real_lower(M_,N_);
+        real_lower.fill(0);
+
+        for(int label=0; label<M_; ++label) {
+            for(int c=0; c<N_; ++c) {
+                for(int b=0; b<N_; ++b) {
+                    float Kcb = 0;
+                    for(int k=0; k<pairwise_.size(); ++k) {
+                        MatrixXf const & features = pairwise_[k]->features();
+                        VectorXf featDiff = (features.col(c) - features.col(b));
+                        Kcb -= pairwise_[k]->parameters()(0) * exp(-featDiff.squaredNorm());
+                    }
+                    if(Q(label, c)<Q(label, b)) {
+                        real_lower(label, c) += Kcb;
+                    } else if(Q(label, c)>Q(label, b)) {
+                        real_upper(label, c) += Kcb;
+                    }
+                }
+            }
+        }
+        real_grad += real_upper - real_lower;
+
+        // Compare label 0 only
+        int to_compare = 9;
+        VectorXf clone_grad = grad.row(to_compare);
+        //std::cout<<"1 norm"<<std::endl;
+        //std::cout<<clone_grad.norm()<<std::endl;
+        VectorXf clone_real_grad = real_grad.row(to_compare);
+        //std::cout<<"2 norm"<<std::endl;
+        //std::cout<<clone_real_grad.norm()<<std::endl;
+        clone_grad /= clone_grad.norm();
+        clone_real_grad /= clone_real_grad.norm();
+        std::cout<<"Dot product 1 2"<<std::endl;
+        std::cout<<clone_grad.dot(clone_real_grad.transpose())<<std::endl;
+        /////////////////////////////////////////////////////////////////////////*/
 
         // Sub-gradient descent step
         float lr = 1.0/(10000+it);
-        Q -= lr*grad;
+        Q += lr*grad;
 
         // Project solution
         sortCols(Q, ind);
@@ -491,7 +533,9 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         assert(valid_probability(Q));
         energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
         std::cout << it << ": " << energy << "\n";
-    } while(it<5);//fabs(old_energy -energy) > 1e-5);
+        //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
+        //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
+    } while(it<1);//fabs(old_energy -energy) > 1e-5);
     std::cout <<"final: " << energy << "\n";
 
 
@@ -772,13 +816,13 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_no
     MatrixXf tmp;
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         // Full
-        no_norm_pairwise[k]->apply( tmp, Q );
-        energy -= dotProduct(Q, tmp, dot_tmp);
+        pairwise_[k]->apply( tmp, Q );
+        energy -= tmp.sum();
         // Diag
-        energy += (Q*no_norm_pairwise[k]->parameters()(0)).sum();
+        energy += Q.rows()*(Q*pairwise_[k]->parameters()(0)).sum();
         // Lower
-        no_norm_pairwise[k]->apply_lower(tmp, Q, ind);
-        energy += 2*dotProduct(Q, tmp, dot_tmp);
+        pairwise_[k]->apply_lower(tmp, Q, ind);
+        energy += 2*tmp.sum();
     }
 
     return energy;

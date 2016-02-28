@@ -77,6 +77,7 @@ public:
 	virtual VectorXf kernelParameters() const;
 	virtual MatrixXf features() const;
     virtual KernelType ktype() const;
+    virtual NormalizationType ntype() const;
 	virtual MatrixXf compatibility_matrix(int nb_labels) const;
 	virtual void setParameters( const VectorXf & v );
 	virtual void setKernelParameters( const VectorXf & v );
