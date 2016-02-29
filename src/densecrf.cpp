@@ -285,7 +285,7 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
 
 MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
-        desc(M_, N_), sx(M_, N_),  psis(M_, N_), psix(M_,N_), diag_dom(M_,N_);
+        desc(M_, N_), sx(M_, N_), psis(M_, N_), diag_dom(M_,N_);
     MatrixP temp_dot(M_,N_);
     // Compute the smallest eigenvalues, that we need to make bigger
     // than 0, to ensure that the problem is convex.
@@ -326,6 +326,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
         grad = unary + 2 * psis + 2 * diag_dom.cwiseProduct(Q_old - Q);
         do {
             old_convex_energy = convex_energy;
+
             // Get a Descent direction by minimising < \nabla E, s >
             descent_direction(desc, grad);
 
@@ -340,18 +341,14 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
                 psis += tmp;
             }
 
-            double num = dotProduct(unary, sx, temp_dot) +
-                2 * dotProduct(Q, psis, temp_dot) +
-                2 * dotProduct(sx, diag_dom.cwiseProduct(Q-Q_old), temp_dot);
+            double num = dotProduct(sx, unary + 2*diag_dom.cwiseProduct(Q-Q_old), temp_dot) +
+                2 * dotProduct(Q, psis, temp_dot);
             assert(num<=0); // This is negative if desc is really the good minimizer
 
-            double denom = dotProduct(desc, psis, temp_dot) +
-                dotProduct(desc, diag_dom.cwiseProduct(desc), temp_dot); // (s-x)d(s-x)
+            double denom = dotProduct(desc, psis + diag_dom.cwiseProduct(desc), temp_dot);
             assert(denom>0); // This is positive if we did our decomposition correctly
 
-            double cst = dotProduct(unary, Q, temp_dot) +
-                dotProduct(Q, psix, temp_dot) +
-                dotProduct(Q-2*Q_old, diag_dom.cwiseProduct(Q), temp_dot);
+            double cst = dotProduct(Q, 0.5 * (grad + unary) - diag_dom.cwiseProduct(Q_old),temp_dot);
 
             optimal_step_size = - num/ (2 *denom);
 
@@ -371,6 +368,10 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
         } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<3 && optimal_step_size != 0);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
+
+
+        //Check that the reduction in dotProduct actually corresponds to a decrease in runtime.
+
 
         // Compute our current value of the energy;
         // energy = compute_energy(Q);
