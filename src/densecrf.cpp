@@ -389,12 +389,17 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     return Q;
 }
 
+void add_noise(MatrixXf & Q, float var) {
+    Q += MatrixXf::Random(Q.rows(), Q.cols())*var;
+}
+
 MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
             tmp2(M_, N_), grad(M_, N_);
     MatrixXi ind(M_, N_);
     VectorXi K(N_);
     VectorXd sum(N_);
+    float noise_var = 0.00001;
 
     // Create copies of the original pairwise since we don't want normalization
     int nb_pairwise = pairwise_.size();
@@ -449,6 +454,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         grad = base_grad;
 
         // Add changing part
+        add_noise(Q, noise_var);
+        
         sortRows(Q, ind);
 
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
@@ -507,6 +514,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q += lr*grad;
 
         // Project solution
+        add_noise(Q, noise_var);
+
         sortCols(Q, ind);
         for(int i=0; i<N_; ++i) {
             sum(i) = Q.col(i).sum()-1;
@@ -535,7 +544,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         std::cout << it << ": " << energy << "\n";
         //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
         //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
-    } while(it<1);//fabs(old_energy -energy) > 1e-5);
+    } while(it<2);//fabs(old_energy -energy) > 1e-5);
     std::cout <<"final: " << energy << "\n";
 
 
