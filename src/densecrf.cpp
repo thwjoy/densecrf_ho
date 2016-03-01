@@ -532,6 +532,42 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     return Q;
 }
 
+
+MatrixXf DenseCRF::max_rounding(const MatrixXf &estimates) const {
+    MatrixXf rounded = MatrixXf::Zero(estimates.rows(), estimates.cols());
+    int argmax;
+    for (int col=0; col<estimates.cols(); col++) {
+        estimates.col(col).maxCoeff(&argmax);
+        rounded(argmax, col) = 1;
+    }
+    return rounded;
+}
+
+MatrixXf DenseCRF::interval_rounding(const MatrixXf &estimates) const {
+    MatrixXf rounded = MatrixXf::Zero(estimates.rows(), estimates.cols());
+
+    int assigned_labels = 0;
+    int to_assign = estimates.cols();
+
+    std::vector<bool> assigned(to_assign, false);
+    while (assigned_labels < to_assign) {
+        int label_index = rand() % estimates.rows();
+        float interval = (float) rand()/ RAND_MAX;
+
+        for (int col=0; col < to_assign; col++) {
+            if (not assigned[col]) { // check that we need to assign something
+                if (interval <= estimates(label_index, col)) { // check that this pixel should be assigned
+                    assigned[col] = true;
+                    assigned_labels++;
+                    rounded(label_index, col) = 1;
+                }
+            }
+        }
+    }
+    return rounded;
+}
+
+
 MatrixXf DenseCRF::cccp_inference(const MatrixXf & init) const {
     MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
     float old_kl, kl;
