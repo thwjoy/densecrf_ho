@@ -25,20 +25,24 @@ void image_inference(Dataset dataset, std::string path_to_results,
                              img, new PottsCompatibility(bil_potts));
     MatrixXf Q;
     {
-        std::string path_to_subexp_results = path_to_results + "/qpcccp/";
+        std::string path_to_subexp_results = path_to_results + "/mf5/";
         std::string output_path = get_output_path(path_to_subexp_results, image_name);
         if (not file_exist(output_path)) {
+            clock_t start, end;
+            double timing;
+            start = clock();
             Q = crf.unary_init();
-            Q = crf.qp_inference(Q);
-            Q = crf.qp_cccp_inference(Q);
+            Q = crf.inference(Q, 5);
+            end = clock();
             make_dir(path_to_subexp_results);
+            timing = (double(end-start)/CLOCKS_PER_SEC);
             double final_energy = crf.compute_energy(Q);
             double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
             std::string txt_output = output_path;
             txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
             std::ofstream txt_file(txt_output.c_str());
-            txt_file << 0 << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+            txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
             txt_file.close();
         }
     }
