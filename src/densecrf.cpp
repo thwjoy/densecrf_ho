@@ -104,7 +104,7 @@ UnaryEnergy* DenseCRF::getUnaryEnergy() {
 ///////////////////////
 MatrixXf DenseCRF::unary_init() const {
     MatrixXf Q;
-    expAndNormalize(Q, unary_->get());
+    expAndNormalize(Q, -unary_->get());
     return Q;
 }
 
