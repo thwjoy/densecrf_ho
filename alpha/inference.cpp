@@ -273,10 +273,20 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     }/**/
     std::cout<<"Run the actual LP"<<std::endl;
     start = clock();
-    Q = crf.lp_inference(Q);
+    srand(start);
+    double timing = -1;
+    for(int it=0; it<500; it++) {
+        std::string partial_out = path_to_output + "-" + std::to_string(it)+ ".bmp";
+        Q = crf.lp_inference(Q);
+        double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        double final_energy = crf.compute_energy(Q);
+        write_down_perf(timing, final_energy, discretized_energy, partial_out);
+        save_map(Q, size, partial_out, dataset_name);
+
+    }
     end = clock();
     std::cout<<"Done"<<std::endl;
-    double timing = (double(end-start)/CLOCKS_PER_SEC);
+    timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
     double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
     write_down_perf(timing, final_energy, discretized_energy, path_to_output);

@@ -35,6 +35,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <set>
 
 /////////////////////////////
 /////  Alloc / Dealloc  /////
@@ -391,7 +392,23 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
 
 void add_noise(MatrixXf & Q, float var) {
     Q += MatrixXf::Random(Q.rows(), Q.cols())*var;
+    for(int col=0; col<Q.cols(); ++col) {
+        Q.col(col) /= Q.col(col).sum();
+    }
 }
+
+struct classcomp {
+  bool operator() (const VectorXf& lhs, const VectorXf& rhs) const
+  {
+    for(int i=0; i<lhs.rows(); ++i)
+    {
+        if(lhs(i)!=rhs(i)){
+            return true;
+        }
+    }
+    return false;
+  }
+};
 
 MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
@@ -399,7 +416,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     MatrixXi ind(M_, N_);
     VectorXi K(N_);
     VectorXd sum(N_);
-    float noise_var = 0.00001;
+    float noise_var = 1e-6;
 
     // Create copies of the original pairwise since we don't want normalization
     int nb_pairwise = pairwise_.size();
@@ -426,6 +443,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
 
     Q = init;
 
+
     // Compute the value of the energy
     double old_energy;
     assert(valid_probability(Q));
@@ -439,14 +457,23 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         // Add the full sum
         no_norm_pairwise[k]->apply(tmp, ones);
-        base_grad += tmp;
+        base_grad -= tmp;
 
         // Remove the diagonal terms
-        base_grad = base_grad.array() - (-1*no_norm_pairwise[k]->parameters()(0));
+        base_grad = base_grad.array() - (1*no_norm_pairwise[k]->parameters()(0));
     }
 
     int it=0;
     do {
+        std::set<VectorXf, classcomp> unique_pixels;
+        VectorXf pix;
+        for(int col=0; col<Q.cols(); ++col) {
+            pix = Q.col(col);
+            unique_pixels.insert(pix);
+        }
+        std::cout << "Different pixels: " << unique_pixels.size() << "\n";
+
+
         ++it;
         old_energy = energy;
         
@@ -454,7 +481,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         grad = base_grad;
 
         // Add changing part
-        add_noise(Q, noise_var);
+        //add_noise(Q, noise_var);
         
         sortRows(Q, ind);
 
@@ -466,7 +493,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
                     tmp2(j, ind(j, i)) = tmp(j, i);
                 }
             }
-            grad -= 2*tmp2;
+            grad += 2*tmp2;
         }
         /////////////////////////////////////////////////////////////////////////
         /*MatrixXf real_grad(M_,N_);
@@ -510,11 +537,11 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         /////////////////////////////////////////////////////////////////////////*/
 
         // Sub-gradient descent step
-        float lr = 1.0/(10000+it);
-        Q += lr*grad;
+        float lr = 1.0/(100000+it);
+        Q -= lr*grad;
 
         // Project solution
-        add_noise(Q, noise_var);
+        //add_noise(Q, noise_var);
 
         sortCols(Q, ind);
         for(int i=0; i<N_; ++i) {
@@ -544,8 +571,15 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         std::cout << it << ": " << energy << "\n";
         //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
         //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
-    } while(it<2);//fabs(old_energy -energy) > 1e-5);
+    } while(it<10);//fabs(old_energy -energy) > 1e-5);
     std::cout <<"final: " << energy << "\n";
+    std::set<VectorXf, classcomp> unique_pixels;
+    VectorXf pix;
+    for(int col=0; col<Q.cols(); ++col) {
+        pix = Q.col(col);
+        unique_pixels.insert(pix);
+    }
+    std::cout << "Different pixels: " << unique_pixels.size() << "\n";
 
 
     free(no_norm_pairwise);
@@ -825,12 +859,12 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_no
     MatrixXf tmp;
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         // Full
-        pairwise_[k]->apply( tmp, Q );
+        no_norm_pairwise[k]->apply( tmp, Q );
         energy -= tmp.sum();
         // Diag
-        energy += Q.rows()*(Q*pairwise_[k]->parameters()(0)).sum();
+        energy += Q.rows()*(Q*no_norm_pairwise[k]->parameters()(0)).sum();
         // Lower
-        pairwise_[k]->apply_lower(tmp, Q, ind);
+        no_norm_pairwise[k]->apply_lower(tmp, Q, ind);
         energy += 2*tmp.sum();
     }
 
