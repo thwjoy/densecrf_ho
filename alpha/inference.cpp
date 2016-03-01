@@ -267,10 +267,7 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     clock_t start, end;
     std::cout<<"Initialize with QP"<<std::endl;
     MatrixXf Q = crf.qp_inference(init);
-    /*MatrixXf Q = (MatrixXf::Random(init.rows(), init.cols()).array()+1)/2;
-    for(int col=0; col<init.cols(); col++) {
-        Q.col(col) /= Q.col(col).sum();
-    }/**/
+
     std::cout<<"Run the actual LP"<<std::endl;
     start = clock();
     srand(start);
