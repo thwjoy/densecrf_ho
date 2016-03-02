@@ -491,15 +491,12 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
-        // Print previous iteration energy
-        std::cout << it << ": " << energy << "\n";
-
 
         // Sub-gradient descent step
-        float lr = 1.0/(10+it);
+        float lr = 1.0/(10000+it);
         Q -= lr*grad;
 
-        // Project solution
+        // Project current estimates on valid space
         sortCols(Q, ind);
         for(int i=0; i<N_; ++i) {
             sum(i) = Q.col(i).sum()-1;
@@ -524,8 +521,11 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-    } while(it<10);//fabs(old_energy -energy) > 1e-5);
-    energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+        energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+        std::cout << it << ": " << energy << "\n";
+        //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
+        //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
+    } while(it<1);//fabs(old_energy -energy) > 1e-5);
     std::cout <<"final: " << energy << "\n";
 
     free(no_norm_pairwise);
