@@ -4,7 +4,7 @@ import os
 import glob
 from collections import namedtuple
 
-Props = namedtuple("Props", ['image_id', 'timing', 'energy'])
+Props = namedtuple("Props", ['image_id', 'timing', 'frac_energy', 'int_energy' ])
 
 def get_properties_per_images(folder_path):
     all_txts = glob.glob(folder_path + '*.txt')
@@ -14,8 +14,9 @@ def get_properties_per_images(folder_path):
             image_id = os.path.basename(txt_file)[:-4]
             content = txt.read().strip().split('\t');
             timing = float(content[0])
-            final_energy = float(content[1])
-            props.append(Props(image_id, timing, final_energy))
+            frac_energy = float(content[1])
+            integer_energy = float(content[2])
+            props.append(Props(image_id, timing, frac_energy, integer_energy))
     props.sort()
 
     return props
@@ -36,16 +37,21 @@ def main():
     first = get_properties_per_images(path_to_first_folder)
     second = get_properties_per_images(path_to_second_folder)
 
-    better_1 = 0
-    better_2 = 0
-    better_same = 0
+    frac_better_1 = 0
+    frac_better_2 = 0
+    frac_better_same = 0
+
+    int_better_1 = 0
+    int_better_2 = 0
+    int_better_same = 0
 
     faster_1 = 0
     faster_2 = 0
     faster_same = 0
 
     total_timing_1 = total_timing_2 = 0
-    total_energy_1 = total_energy_2 = 0
+    total_frac_energy_1 = total_frac_energy_2 = 0
+    total_int_energy_1 = total_int_energy_2 = 0
     for prop1, prop2 in zip(first, second):
         if prop1.timing < prop2.timing:
             faster_1 += 1
@@ -54,23 +60,34 @@ def main():
         else:
             faster_2 += 1
 
-        if prop1.energy < prop2.energy:
-            better_1 += 1
-        elif prop1.energy == prop2.energy:
-            better_same += 1
+        if prop1.frac_energy < prop2.frac_energy:
+            frac_better_1 += 1
+        elif prop1.frac_energy == prop2.frac_energy:
+            frac_better_same += 1
         else:
-            better_2 += 1
+            frac_better_2 += 1
+
+        if prop1.int_energy < prop2.int_energy:
+            int_better_1 += 1
+        elif prop1.int_energy == prop2.int_energy:
+            int_better_same += 1
+        else:
+            int_better_2 += 1
 
         total_timing_1 += prop1.timing
         total_timing_2 += prop2.timing
-        total_energy_1 += prop1.energy
-        total_energy_2 += prop2.energy
+        total_frac_energy_1 += prop1.frac_energy
+        total_frac_energy_2 += prop2.frac_energy
+        total_int_energy_1 += prop1.int_energy
+        total_int_energy_2 += prop2.int_energy
 
     print "First method is faster in %s%% and similar in %s%% of the cases" % ((faster_1 *100) / (faster_1 + faster_2 + faster_same), (faster_same*100) / (faster_1 + faster_2 + faster_same))
-    print "First method reach lower energy in %s%% and same in %s%% of the cases" % ((better_1 *100) / (better_1 + better_2 + better_same), (better_same *100) / (better_1 + better_2 + better_same))
+    print "First method reach lower fractional energy in %s%% and same in %s%% of the cases" % ((frac_better_1 *100) / (frac_better_1 + frac_better_2 + frac_better_same), (frac_better_same *100) / (frac_better_1 + frac_better_2 + frac_better_same))
+    print "First method reach lower integer energy in %s%% and same in %s%% of the cases" % ((int_better_1 *100) / (int_better_1 + int_better_2 + int_better_same), (int_better_same *100) / (int_better_1 + int_better_2 + int_better_same))
 
     print "Average timings: %s vs %s" % (total_timing_1/float(len(first)), total_timing_2/float(len(second)))
-    print "Average energy: %s vs %s" % (total_energy_1/float(len(first)), total_energy_2/float(len(second)))
+    print "Average fractional energy: %s vs %s" % (total_frac_energy_1/float(len(first)), total_frac_energy_2/float(len(second)))
+    print "Average Integer energy: %s vs %s" % (total_int_energy_1/float(len(first)), total_int_energy_2/float(len(second)))
 
     return 0
 
