@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
     std::string path_to_lp_output = "./res-lp.bmp";
     // the image that we are using is from the validation set.
 
-    Potts_weight_set params(3, 2, 50, 15, 3);
+    Potts_weight_set params(1, 0.5, 1, 95.208, 100);
 
     // minimize_dense_alpha_divergence(path_to_image, path_to_unaries, path_to_alpha_output, path_to_parameters, 5);n
     // std::cout << "Unaries" << '\n';
