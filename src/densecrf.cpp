@@ -425,7 +425,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     VectorXd sum(N_);
     float noise_var = 1e-6;
 
-    std::string path_to_trace = "/data/densecrf/trace.txt";
+    std::string path_to_trace = "./trace.txt";
     std::ofstream trace(path_to_trace.c_str());
 
 
@@ -537,8 +537,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
 
         trace << it << '\t' << energy << '\t' << max_energy << '\t' << int_energy << std::endl;
         std::cout << it << ": " << energy << "\n";
-        std::string output_image_max = "/data/densecrf/max_out_" + std::to_string(it) + ".bmp";
-        std::string output_image_int = "/data/densecrf/int_out_" + std::to_string(it) + ".bmp";
+        std::string output_image_max = "./max_out_" + std::to_string(it) + ".bmp";
+        std::string output_image_int = "./int_out_" + std::to_string(it) + ".bmp";
         img_size size = {213, 320};
         save_map(max_rounded, size, output_image_max, "MSRC");
         save_map(int_rounded, size, output_image_int, "MSRC");
