@@ -24,11 +24,13 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
+#include <fstream>
+#include <iostream>
 #include "densecrf.h"
 #include "eigen_utils.hpp"
 #include "newton_cccp.hpp"
 #include "qp.hpp"
+#include "file_storage.hpp"
 #include "permutohedral.h"
 #include "util.h"
 #include "pairwise.h"
@@ -423,6 +425,10 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     VectorXd sum(N_);
     float noise_var = 1e-6;
 
+    std::string path_to_trace = "/data/densecrf/trace.txt";
+    std::ofstream trace(path_to_trace.c_str());
+
+
     // Create copies of the original pairwise since we don't want normalization
     int nb_pairwise = pairwise_.size();
     PairwisePotential** no_norm_pairwise;
@@ -493,7 +499,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         }
 
         // Sub-gradient descent step
-        float lr = 1.0/(10000+it);
+        float lr = 1.0/(100000+it);
         Q -= lr*grad;
 
         // Project current estimates on valid space
@@ -521,12 +527,32 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
+        // This is the LP fractional energy
         energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+        // Compute the Rounded Energy for each rounding method
+        MatrixXf max_rounded = max_rounding(Q);
+        MatrixXf int_rounded = interval_rounding(Q);
+        double max_energy = compute_energy(max_rounded);
+        double int_energy = compute_energy(int_rounded);
+
+        trace << it << '\t' << energy << '\t' << max_energy << '\t' << int_energy << std::endl;
         std::cout << it << ": " << energy << "\n";
-        //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
-        //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
-    } while(it<1);//fabs(old_energy -energy) > 1e-5);
+        std::string output_image_max = "/data/densecrf/max_out_" + std::to_string(it) + ".bmp";
+        std::string output_image_int = "/data/densecrf/int_out_" + std::to_string(it) + ".bmp";
+        img_size size = {213, 320};
+        save_map(max_rounded, size, output_image_max, "MSRC");
+        save_map(int_rounded, size, output_image_int, "MSRC");
+
+
+    } while(it<40);
     std::cout <<"final: " << energy << "\n";
+    std::set<VectorXf, classcomp> unique_pixels;
+    VectorXf pix;
+    for(int col=0; col<Q.cols(); ++col) {
+        pix = Q.col(col);
+        unique_pixels.insert(pix);
+    }
+    std::cout << "Different pixels: " << unique_pixels.size() << "\n";
 
     free(no_norm_pairwise);
     return Q;

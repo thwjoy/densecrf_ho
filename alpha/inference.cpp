@@ -269,6 +269,7 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     MatrixXf Q = crf.qp_inference(init);
 
     std::cout<<"Run the actual LP"<<std::endl;
+    double timing;
     start = clock();
     srand(start);
     double timing = -1;
@@ -282,26 +283,13 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
 
       }/**/
     Q = crf.lp_inference(Q);
-    MatrixXf arg_Q = crf.max_rounding(Q);
-    MatrixXf int_Q = crf.interval_rounding(Q);
-    double timing;
-    double arg_discretized_energy = crf.assignment_energy(crf.currentMap(arg_Q));
-    double int_discretized_energy = crf.assignment_energy(crf.currentMap(int_Q));
-    double final_energy = crf.compute_energy(Q);
     end = clock();
-    std::cout<<"Done"<<std::endl;
     timing = (double(end-start)/CLOCKS_PER_SEC);
-    std::string path_to_interval_output = path_to_output + "interval.bmp";
-    write_down_perf(timing, final_energy, arg_discretized_energy, path_to_output);
-    write_down_perf(timing, final_energy, int_discretized_energy, path_to_interval_output);
-
     // std::cout << "Time taken: " << timing << '\n';
     // std::cout << "Done with inference"<< '\n';
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
-    save_map(arg_Q, size, path_to_output, dataset_name);
-    save_map(int_Q, size, path_to_interval_output, dataset_name);
-
+    save_map(Q, size, path_to_output, dataset_name);
 }
 
 
