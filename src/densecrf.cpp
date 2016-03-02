@@ -570,27 +570,41 @@ MatrixXf DenseCRF::max_rounding(const MatrixXf &estimates) const {
 }
 
 MatrixXf DenseCRF::interval_rounding(const MatrixXf &estimates) const {
-    MatrixXf rounded = MatrixXf::Zero(estimates.rows(), estimates.cols());
+    int nb_random_rounding = 10;
 
-    int assigned_labels = 0;
+    MatrixXf best_rounded;
+    double best_energy = 1e18;
+
+    MatrixXf rounded;
+    int assigned_labels;
     int to_assign = estimates.cols();
+    double rounded_energy;
 
-    std::vector<bool> assigned(to_assign, false);
-    while (assigned_labels < to_assign) {
-        int label_index = rand() % estimates.rows();
-        float interval = (float) rand()/ RAND_MAX;
+    for (int it=0; it<nb_random_rounding; it++) {
+        rounded = MatrixXf::Zero(estimates.rows(), estimates.cols());
+        assigned_labels = 0;
+        std::vector<bool> assigned(to_assign, false);
+        while (assigned_labels < to_assign) {
+            int label_index = rand() % estimates.rows();
+            float interval = (float) rand()/ RAND_MAX;
 
-        for (int col=0; col < to_assign; col++) {
-            if (not assigned[col]) { // check that we need to assign something
-                if (interval <= estimates(label_index, col)) { // check that this pixel should be assigned
-                    assigned[col] = true;
-                    assigned_labels++;
-                    rounded(label_index, col) = 1;
+            for (int col=0; col < to_assign; col++) {
+                if (not assigned[col]) { // check that we need to assign something
+                    if (interval <= estimates(label_index, col)) { // check that this pixel should be assigned
+                        assigned[col] = true;
+                        assigned_labels++;
+                        rounded(label_index, col) = 1;
+                    }
                 }
             }
         }
+        rounded_energy = compute_energy(rounded);
+        if (rounded_energy < best_energy) {
+            best_energy = rounded_energy;
+            best_rounded = rounded;
+        }
     }
-    return rounded;
+    return best_rounded;
 }
 
 
