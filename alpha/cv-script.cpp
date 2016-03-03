@@ -12,7 +12,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     std::string unaries_path = dataset.get_unaries_path(image_name);
     std::string dataset_name = dataset.name;
 
-    img_size size;
+    img_size size = {-1, -1};
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(unaries_path, size);
     unsigned char * img = load_image(image_path, size);

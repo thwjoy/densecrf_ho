@@ -43,7 +43,7 @@ def evaluate_segmentation(spc_std, spc_potts,
     with open(txt_results_file, 'w') as f:
         f.write(exp_path)
         f.write('/n')
-        f.write(ret)
+        f.write(str(ret))
     return -ret
 
 
