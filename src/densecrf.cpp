@@ -310,6 +310,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     double old_energy;
     double energy = compute_energy(Q);
     int convex_rounds = 0;
+    int outer_rounds = 0;
     do {
         // New value of the linearization point.
         old_energy = energy;
@@ -368,7 +369,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
 
             // energy = compute_energy(Q);
             convex_rounds++;
-        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<3 && optimal_step_size != 0);
+        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<10 && optimal_step_size != 0);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
 
@@ -379,7 +380,9 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
         // Compute our current value of the energy;
         // energy = compute_energy(Q);
         energy = dotProduct(Q, 0.5 * (grad + unary) - diag_dom.cwiseProduct(Q_old - Q), temp_dot);
-    } while ( (old_energy -energy) > 100);
+        outer_rounds++;
+    } while ( (old_energy -energy) > 100 && outer_rounds<5);
+
     return Q;
 }
 
@@ -395,11 +398,11 @@ void print_distri(MatrixXf const & Q) {
     VectorXi buckets(nb_buckets+1);
     buckets.fill(0);
     for(int label=0; label<Q.rows(); ++label) {
-               for(int pixel=0; pixel<Q.cols();++pixel) {
-                   ++buckets[floor(Q(label, pixel)*nb_buckets)];
-               }
-               std::cout<<"Q distribution"<<std::endl;
-               std::cout<<buckets.transpose()<<std::endl;
+        for(int pixel=0; pixel<Q.cols();++pixel) {
+            ++buckets[floor(Q(label, pixel)*nb_buckets)];
+        }
+        std::cout<<"Q distribution"<<std::endl;
+        std::cout<<buckets.transpose()<<std::endl;
     }
 }
 
@@ -909,117 +912,117 @@ double DenseCRF::gradient( int n_iterations, const ObjectiveFunction & objective
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
             pairwise_[k]->apply( tmp2, Q[it] );
             tmp1 -= tmp2;
-            }
-            expAndNormalize( Q[it+1], tmp1 );
         }
+        expAndNormalize( Q[it+1], tmp1 );
+    }
 
-        // Compute the objective value
-        MatrixXf b( M_, N_ );
-        double r = objective.evaluate( b, Q[n_iterations] );
-        sumAndNormalize( b, b, Q[n_iterations] );
+    // Compute the objective value
+    MatrixXf b( M_, N_ );
+    double r = objective.evaluate( b, Q[n_iterations] );
+    sumAndNormalize( b, b, Q[n_iterations] );
 
-        // Compute the gradient
+    // Compute the gradient
+    if(unary_grad && unary_)
+        *unary_grad = unary_->gradient( b );
+    if( lbl_cmp_grad )
+        *lbl_cmp_grad = 0*labelCompatibilityParameters();
+    if( kernel_grad )
+        *kernel_grad = 0*kernelParameters();
+
+    for( int it=n_iterations-1; it>=0; it-- ) {
+        // Do the inverse message passing
+        tmp1.fill(0);
+        int ip = 0, ik = 0;
+        // Add up all pairwise potentials
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            // Compute the pairwise gradient expression
+            if( lbl_cmp_grad ) {
+                VectorXf pg = pairwise_[k]->gradient( b, Q[it] );
+                lbl_cmp_grad->segment( ip, pg.rows() ) += pg;
+                ip += pg.rows();
+            }
+            // Compute the kernel gradient expression
+            if( kernel_grad ) {
+                VectorXf pg = pairwise_[k]->kernelGradient( b, Q[it] );
+                kernel_grad->segment( ik, pg.rows() ) += pg;
+                ik += pg.rows();
+            }
+            // Compute the new b
+            pairwise_[k]->applyTranspose( tmp2, b );
+            tmp1 += tmp2;
+        }
+        sumAndNormalize( b, tmp1.array()*Q[it].array(), Q[it] );
+
+        // Add the gradient
         if(unary_grad && unary_)
-            *unary_grad = unary_->gradient( b );
-        if( lbl_cmp_grad )
-            *lbl_cmp_grad = 0*labelCompatibilityParameters();
-        if( kernel_grad )
-            *kernel_grad = 0*kernelParameters();
+            *unary_grad += unary_->gradient( b );
+    }
+    return r;
+}
+VectorXf DenseCRF::unaryParameters() const {
+    if( unary_ )
+        return unary_->parameters();
+    return VectorXf();
+}
+void DenseCRF::setUnaryParameters( const VectorXf & v ) {
+    if( unary_ )
+        unary_->setParameters( v );
+}
+VectorXf DenseCRF::labelCompatibilityParameters() const {
+    std::vector< VectorXf > terms;
+    for( unsigned int k=0; k<pairwise_.size(); k++ )
+        terms.push_back( pairwise_[k]->parameters() );
+    int np=0;
+    for( unsigned int k=0; k<pairwise_.size(); k++ )
+        np += terms[k].rows();
+    VectorXf r( np );
+    for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
+        r.segment( i, terms[k].rows() ) = terms[k];
+        i += terms[k].rows();
+    }
+    return r;
+}
+void DenseCRF::setLabelCompatibilityParameters( const VectorXf & v ) {
+    std::vector< int > n;
+    for( unsigned int k=0; k<pairwise_.size(); k++ )
+        n.push_back( pairwise_[k]->parameters().rows() );
+    int np=0;
+    for( unsigned int k=0; k<pairwise_.size(); k++ )
+        np += n[k];
 
-        for( int it=n_iterations-1; it>=0; it-- ) {
-            // Do the inverse message passing
-            tmp1.fill(0);
-            int ip = 0, ik = 0;
-            // Add up all pairwise potentials
-            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-                // Compute the pairwise gradient expression
-                if( lbl_cmp_grad ) {
-                    VectorXf pg = pairwise_[k]->gradient( b, Q[it] );
-                    lbl_cmp_grad->segment( ip, pg.rows() ) += pg;
-                    ip += pg.rows();
-                }
-                // Compute the kernel gradient expression
-                if( kernel_grad ) {
-                    VectorXf pg = pairwise_[k]->kernelGradient( b, Q[it] );
-                    kernel_grad->segment( ik, pg.rows() ) += pg;
-                    ik += pg.rows();
-                }
-                // Compute the new b
-                pairwise_[k]->applyTranspose( tmp2, b );
-                tmp1 += tmp2;
-            }
-            sumAndNormalize( b, tmp1.array()*Q[it].array(), Q[it] );
+    for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
+        pairwise_[k]->setParameters( v.segment( i, n[k] ) );
+        i += n[k];
+    }
+}
+VectorXf DenseCRF::kernelParameters() const {
+    std::vector< VectorXf > terms;
+    for( unsigned int k=0; k<pairwise_.size(); k++ )
+        terms.push_back( pairwise_[k]->kernelParameters() );
+    int np=0;
+    for( unsigned int k=0; k<pairwise_.size(); k++ )
+        np += terms[k].rows();
+    VectorXf r( np );
+    for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
+        r.segment( i, terms[k].rows() ) = terms[k];
+        i += terms[k].rows();
+    }
+    return r;
+}
+void DenseCRF::setKernelParameters( const VectorXf & v ) {
+    std::vector< int > n;
+    for( unsigned int k=0; k<pairwise_.size(); k++ )
+        n.push_back( pairwise_[k]->kernelParameters().rows() );
+    int np=0;
+    for( unsigned int k=0; k<pairwise_.size(); k++ )
+        np += n[k];
 
-            // Add the gradient
-            if(unary_grad && unary_)
-                *unary_grad += unary_->gradient( b );
-        }
-        return r;
+    for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
+        pairwise_[k]->setKernelParameters( v.segment( i, n[k] ) );
+        i += n[k];
     }
-    VectorXf DenseCRF::unaryParameters() const {
-        if( unary_ )
-            return unary_->parameters();
-        return VectorXf();
-    }
-    void DenseCRF::setUnaryParameters( const VectorXf & v ) {
-        if( unary_ )
-            unary_->setParameters( v );
-    }
-    VectorXf DenseCRF::labelCompatibilityParameters() const {
-        std::vector< VectorXf > terms;
-        for( unsigned int k=0; k<pairwise_.size(); k++ )
-            terms.push_back( pairwise_[k]->parameters() );
-        int np=0;
-        for( unsigned int k=0; k<pairwise_.size(); k++ )
-            np += terms[k].rows();
-        VectorXf r( np );
-        for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
-            r.segment( i, terms[k].rows() ) = terms[k];
-            i += terms[k].rows();
-        }
-        return r;
-    }
-    void DenseCRF::setLabelCompatibilityParameters( const VectorXf & v ) {
-        std::vector< int > n;
-        for( unsigned int k=0; k<pairwise_.size(); k++ )
-            n.push_back( pairwise_[k]->parameters().rows() );
-        int np=0;
-        for( unsigned int k=0; k<pairwise_.size(); k++ )
-            np += n[k];
+}
 
-        for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->setParameters( v.segment( i, n[k] ) );
-            i += n[k];
-        }
-    }
-    VectorXf DenseCRF::kernelParameters() const {
-        std::vector< VectorXf > terms;
-        for( unsigned int k=0; k<pairwise_.size(); k++ )
-            terms.push_back( pairwise_[k]->kernelParameters() );
-        int np=0;
-        for( unsigned int k=0; k<pairwise_.size(); k++ )
-            np += terms[k].rows();
-        VectorXf r( np );
-        for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
-            r.segment( i, terms[k].rows() ) = terms[k];
-            i += terms[k].rows();
-        }
-        return r;
-    }
-    void DenseCRF::setKernelParameters( const VectorXf & v ) {
-        std::vector< int > n;
-        for( unsigned int k=0; k<pairwise_.size(); k++ )
-            n.push_back( pairwise_[k]->kernelParameters().rows() );
-        int np=0;
-        for( unsigned int k=0; k<pairwise_.size(); k++ )
-            np += n[k];
-
-        for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->setKernelParameters( v.segment( i, n[k] ) );
-            i += n[k];
-        }
-    }
-
-    void DenseCRF::compute_kl_divergence(){
-        compute_kl = true;
-    }
+void DenseCRF::compute_kl_divergence(){
+    compute_kl = true;
+}
