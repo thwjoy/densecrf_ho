@@ -526,7 +526,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-        //energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+        energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
         std::cout << it << ": " << energy << "\n";
         //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
         //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;

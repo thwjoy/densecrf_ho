@@ -236,7 +236,7 @@ void Permutohedral::init ( const MatrixXf & feature )
 	delete[] n2;
 }
 #else
-void Permutohedral::init ( const MatrixXf & feature, int hash_size )
+void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 {
 	// Compute the lattice coordinates for each feature [there is going to be a lot of magic here
 	N_ = feature.cols();
@@ -244,11 +244,11 @@ void Permutohedral::init ( const MatrixXf & feature, int hash_size )
 
 	// We want to save the hash table to be able to add more elements afterwards sometimes
 	bool save_hash = false;
-	if(hash_size == -1) {
+	if(nEl_max == -1) {
 		hash_table_ = HashTable( d_,  N_*(d_+1));
 	} else {
 		save_hash = true;
-		hash_table_ = HashTable( d_,  hash_size);
+		hash_table_ = HashTable( d_,  nEl_max*(d_+1));
 	}
 	
 
@@ -733,6 +733,7 @@ void Permutohedral::sseCompute ( float* out, const float* in, int value_size, bo
 void Permutohedral::compute_lower_left ( MatrixXf & out, int middle_low, int middle_high ) const
 {
 	// Here anly one label at a time so always seq
+	assert(out.cols()==N_);
 	seqCompute_lower_left(out.data(), out.rows(), middle_low, middle_high);
 }
 void Permutohedral::compute ( MatrixXf & out, const MatrixXf & in, bool reverse ) const

@@ -147,7 +147,7 @@ protected:
     void seqCompute_lower_left ( float* out, int value_size, int middle_low, int middle_high ) const;
 public:
 	Permutohedral();
-    void init ( const MatrixXf & features, int hash_size=-1 );
+    void init ( const MatrixXf & features, int nEl_max=-1 );
 	void add ( const MatrixXf & features );
 	MatrixXf compute ( const MatrixXf & v, bool reverse=false ) const;
     void compute ( MatrixXf & out, const MatrixXf & in, bool reverse=false ) const;

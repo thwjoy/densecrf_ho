@@ -44,7 +44,7 @@ enum KernelType {
 class Kernel {
 public:
 	virtual ~Kernel();
-    virtual void merge(Kernel & other) = 0;
+    virtual void merge(Kernel & other, MatrixXf const & features, bool overlap=false) = 0;
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const = 0;
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const = 0;
     virtual void apply_lower_left( MatrixXf & out, int middle_low, int middle_high) const = 0;
@@ -64,13 +64,13 @@ protected:
 	void filter( MatrixXf & out, const MatrixXf & in, bool transpose=false ) const;
 public:
 	virtual ~PairwisePotential();
-	PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype=CONST_KERNEL, NormalizationType ntype=NORMALIZE_SYMMETRIC);
+	PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype=CONST_KERNEL, NormalizationType ntype=NORMALIZE_SYMMETRIC, int max_size=-1);
     void apply(MatrixXf & out, const MatrixXf & Q) const;
     void apply_lower(MatrixXf & out, const MatrixXi & ind) const;
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
     void apply_lower_sorted(MatrixXf & out) const;
-    PairwisePotential apply_lower_sorted_merge(MatrixXf & out, MatrixXf const & features) const;
-    void merge(PairwisePotential & other);
+    PairwisePotential* apply_lower_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
+    void merge(PairwisePotential & other, MatrixXf const & features, bool overlap = false);
 	
 	// Get the parameters
 	virtual VectorXf parameters() const;
