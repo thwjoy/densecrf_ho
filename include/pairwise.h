@@ -44,10 +44,10 @@ enum KernelType {
 class Kernel {
 public:
 	virtual ~Kernel();
+    virtual void merge(Kernel & other) = 0;
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const = 0;
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const = 0;
     virtual void apply_lower_left( MatrixXf & out, int middle_low, int middle_high) const = 0;
-    virtual void apply_lower_left( MatrixXf & out, const MatrixXf & Q, int middle_low, int middle_high) const = 0;
 	virtual VectorXf parameters() const = 0;
 	virtual void setParameters( const VectorXf & p ) = 0;
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const = 0;
@@ -67,10 +67,10 @@ public:
 	PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype=CONST_KERNEL, NormalizationType ntype=NORMALIZE_SYMMETRIC);
     void apply(MatrixXf & out, const MatrixXf & Q) const;
     void apply_lower(MatrixXf & out, const MatrixXi & ind) const;
-	void apply_lower(MatrixXf & out, const MatrixXf & Q, const MatrixXi & ind) const;
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
     void apply_lower_sorted(MatrixXf & out) const;
-    void apply_lower_sorted(MatrixXf & out, const MatrixXf & Q) const;
+    PairwisePotential apply_lower_sorted_merge(MatrixXf & out, MatrixXf const & features) const;
+    void merge(PairwisePotential & other);
 	
 	// Get the parameters
 	virtual VectorXf parameters() const;
@@ -78,6 +78,7 @@ public:
 	virtual MatrixXf features() const;
     virtual KernelType ktype() const;
     virtual NormalizationType ntype() const;
+    virtual Kernel* getKernel() const;
 	virtual MatrixXf compatibility_matrix(int nb_labels) const;
 	virtual void setParameters( const VectorXf & v );
 	virtual void setKernelParameters( const VectorXf & v );
