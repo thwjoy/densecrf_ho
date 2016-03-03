@@ -1,14 +1,14 @@
 {
     "language"        : "PYTHON",
-    "main-file"       : "experiment-allparam-qp.py",
-    "experiment-name" : "All-parameters-QP",
+    "main-file"       : "exp-lrqp.py",
+    "experiment-name" : "exp-lrqp",
     "likelihood"      : "NOISELESS",
     "variables" : {
         "spc_std" : {
-            "type" : "INT",
+            "type" : "FLOAT",
             "size" : 1,
             "min"  : 1,
-            "max"  : 100
+            "max"  : 50
         },
         "spc_potts" : {
             "type" : "FLOAT",
@@ -17,16 +17,16 @@
             "max"  : 100
         },
         "bil_spcstd" : {
-            "type" : "INT",
+            "type" : "FLOAT",
             "size" : 1,
             "min"  : 1,
-            "max"  : 100
+            "max"  : 50
         },
         "bil_colstd" : {
-            "type" : "INT",
+            "type" : "FLOAT",
             "size" : 1,
             "min"  : 1,
-            "max"  : 100
+            "max"  : 50
         },
         "bil_potts" : {
             "type" : "FLOAT",
