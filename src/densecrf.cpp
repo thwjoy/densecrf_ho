@@ -374,7 +374,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
             convex_energy = pow(optimal_step_size, 2) * denom + optimal_step_size * num + cst;
 
             // energy = compute_energy(Q);
-            // old_convex_energy = energy + lambda_eig * dotProduct(Q, 2*Q_old -Q, temp_dot);
+            // old_convex_energy = energy + lambda_eig * dotProduct(Qdot_tmp, 2*Q_old -Q, temp_dot);
             // std::cout << old_convex_energy  << '\n';
             // std::cout << convex_energy << '\n';
 
@@ -412,7 +412,8 @@ struct classcomp {
 
 MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
-            tmp2(M_, N_), grad(M_, N_);
+            grad(M_, N_), tmp2(M_, N_);
+    MatrixP dot_tmp(M_,N_);
     MatrixXi ind(M_, N_);
     VectorXi K(N_);
     VectorXd sum(N_);
@@ -447,13 +448,12 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     // Compute the value of the energy
     double old_energy;
     assert(valid_probability(Q));
-    double energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
-    std::cout << "0: " << energy << "\n";
+    double energy = 0;//compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
     //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
     //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
 
     // precompute the constant part of the gradient
-    base_grad = unary;
+    /*base_grad = unary;
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         // Add the full sum
         no_norm_pairwise[k]->apply(tmp, ones);
@@ -461,10 +461,11 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
 
         // Remove the diagonal terms
         base_grad = base_grad.array() - (1*no_norm_pairwise[k]->parameters()(0));
-    }
+    }*/
 
     int it=0;
     do {
+        /*
         std::set<VectorXf, classcomp> unique_pixels;
         VectorXf pix;
         for(int col=0; col<Q.cols(); ++col) {
@@ -472,13 +473,16 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
             unique_pixels.insert(pix);
         }
         std::cout << "Different pixels: " << unique_pixels.size() << "\n";
+        */
 
 
         ++it;
         old_energy = energy;
         
-        // Grad start with constant part
-        grad = base_grad;
+        // Compute the current energy and gradient
+        // Unary
+        energy = dotProduct(unary, Q, dot_tmp);
+        grad = unary;
 
         // Add changing part
         //add_noise(Q, noise_var);
@@ -486,6 +490,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         sortRows(Q, ind);
 
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
+            // Remove lower
             no_norm_pairwise[k]->apply_lower(tmp, ind);
             tmp2.fill(0);
             for(i=0; i<tmp.cols(); ++i) {
@@ -493,11 +498,26 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
                     tmp2(j, ind(j, i)) = tmp(j, i);
                 }
             }
-            grad += 2*tmp2;
+            // Remove lower
+            energy += dotProduct(Q, tmp2, dot_tmp);
+            grad += tmp2;
+            // Add upper
+            no_norm_pairwise[k]->apply_upper(tmp, ind);
+            tmp2.fill(0);
+            for(i=0; i<tmp.cols(); ++i) {
+                for(j=0; j<tmp.rows(); ++j) {
+                    tmp2(j, ind(j, i)) = tmp(j, i);
+                }
+            }
+            // Add upper
+            energy -= dotProduct(Q, tmp2, dot_tmp);
+            grad -= tmp2;
         }
+        std::cout << it << ": " << energy << "\n";
+
 
         // Sub-gradient descent step
-        float lr = 1.0/(100000+it);
+        float lr = 1.0/(1000+it);
         Q -= lr*grad;
 
         // Project solution
@@ -526,20 +546,13 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-        energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
-        std::cout << it << ": " << energy << "\n";
+        //energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+        //std::cout << it << ": " << energy << "\n";
         //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
         //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
-    } while(it<5);//fabs(old_energy -energy) > 1e-5);
-    std::cout <<"final: " << energy << "\n";
-    std::set<VectorXf, classcomp> unique_pixels;
-    VectorXf pix;
-    for(int col=0; col<Q.cols(); ++col) {
-        pix = Q.col(col);
-        unique_pixels.insert(pix);
-    }
-    std::cout << "Different pixels: " << unique_pixels.size() << "\n";
-
+    } while(it<1);//fabs(old_energy -energy) > 1e-5);
+    //energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+    //std::cout <<"final: " << energy << "\n";
 
     free(no_norm_pairwise);
     return Q;
@@ -815,16 +828,31 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_no
     }
     // Add all pairwise terms
     sortRows(Q, ind);
-    MatrixXf tmp;
+    MatrixXf tmp(Q.rows(), Q.cols());
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
-        // Remove once the full
+        /*
+        // Add once the full
         no_norm_pairwise[k]->apply( tmp, Q );
-        energy += tmp.sum();
-        // Add the diagonal
-        energy += Q.rows()*(Q*no_norm_pairwise[k]->parameters()(0)).sum();
-        // Add twice the lower matrix
+        assert(tmp.maxCoeff()<1e-3);
+        energy -= tmp.sum();
+        // Remove the diagonal
+        energy -= (Q*no_norm_pairwise[k]->parameters()(0)).sum();
+        // Remove twice the lower matrix
         no_norm_pairwise[k]->apply_lower(tmp, ind);
-        energy -= 2*dotProduct(Q, tmp, dot_tmp);;
+        assert(tmp.maxCoeff()<1e-3);
+        energy += 2*dotProduct(Q, tmp, dot_tmp);
+        */
+
+        // Add the upper
+        no_norm_pairwise[k]->apply_upper(tmp, ind);
+        assert(tmp.maxCoeff()<1e-3);
+        energy -= dotProduct(Q, tmp, dot_tmp);
+        // Remove the lower
+        no_norm_pairwise[k]->apply_upper(tmp, ind);
+        assert(tmp.maxCoeff()<1e-3);
+        energy += dotProduct(Q, tmp, dot_tmp);
+
+
     }
 
     return energy;
