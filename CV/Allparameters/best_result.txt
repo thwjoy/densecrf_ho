@@ -1,8 +1,0 @@
-Minimum of observed values is -34.520806, at location:
-                NAME          TYPE       VALUE
-                ----          ----       -----
-                spc_std       int        3           
-                spc_potts     float      38.819931   
-                bil_potts     float      50.000000   
-                bil_spcstd    int        48          
-                bil_colstd    int        4  
