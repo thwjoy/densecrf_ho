@@ -499,7 +499,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         }
 
         // Sub-gradient descent step
-        float lr = 1.0/(100000+it);
+        float lr = 1.0/(10000+it);
         Q -= lr*grad;
 
         // Project current estimates on valid space
@@ -539,7 +539,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         std::cout << it << ": " << energy << "\n";
         std::string output_image_max = "./max_out_" + std::to_string(it) + ".bmp";
         std::string output_image_int = "./int_out_" + std::to_string(it) + ".bmp";
-        img_size size = {213, 320};
+        img_size size = {320, 213};
         save_map(max_rounded, size, output_image_max, "MSRC");
         save_map(int_rounded, size, output_image_int, "MSRC");
 
