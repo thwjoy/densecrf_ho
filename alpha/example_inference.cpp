@@ -9,8 +9,8 @@ int main(int argc, char* argv[]) {
         path_to_unaries = "/data/MSRC/texton_unaries/2_14_s.c_unary";
         path_to_image = "/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/2_14_s.bmp";
     } else if(dataset_name == "Pascal2010"){
-        path_to_unaries = "/data/PascalVOC2010/logit_unaries/2007_006704.c_unary";
-        path_to_image = "/data/PascalVOC2010/JPEGImages/2007_006704.jpg";
+        path_to_unaries = "/data/PascalVOC2010/logit_unaries/2008_000645.c_unary";
+        path_to_image = "/data/PascalVOC2010/JPEGImages/2008_000645.jpg";
     }
 
 
