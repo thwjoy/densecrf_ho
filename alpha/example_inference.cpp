@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Lafferty QP"  << '\n';
     minimize_LR_QP(path_to_image, path_to_unaries, params, path_to_qplroutput, dataset_name);
     std::cout << "CCCP QP" << '\n';
-    minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
+    //minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
     std::cout << "LP" << '\n';
     minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_output, dataset_name);
 }

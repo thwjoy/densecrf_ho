@@ -410,6 +410,19 @@ struct classcomp {
   }
 };
 
+void print_distri(MatrixXf const & Q) {
+    int nb_buckets = 20;
+    VectorXi buckets(nb_buckets+1);
+    buckets.fill(0);
+    for(int label=0; label<Q.rows(); ++label) {
+        for(int pixel=0; pixel<Q.cols();++pixel) {
+            ++buckets[floor(Q(label, pixel)*nb_buckets)];
+        }
+    }
+    std::cout<<"Q distribution"<<std::endl;
+    std::cout<<buckets.transpose()<<std::endl;
+}
+
 MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
             grad(M_, N_), tmp2(M_, N_);
@@ -449,32 +462,10 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     double old_energy;
     assert(valid_probability(Q));
     double energy = 0;//compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
-    //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
-    //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
-
-    // precompute the constant part of the gradient
-    /*base_grad = unary;
-    for( unsigned int k=0; k<nb_pairwise; k++ ) {
-        // Add the full sum
-        no_norm_pairwise[k]->apply(tmp, ones);
-        base_grad -= tmp;
-
-        // Remove the diagonal terms
-        base_grad = base_grad.array() - (1*no_norm_pairwise[k]->parameters()(0));
-    }*/
 
     int it=0;
     do {
-        /*
-        std::set<VectorXf, classcomp> unique_pixels;
-        VectorXf pix;
-        for(int col=0; col<Q.cols(); ++col) {
-            pix = Q.col(col);
-            unique_pixels.insert(pix);
-        }
-        std::cout << "Different pixels: " << unique_pixels.size() << "\n";
-        */
-
+        print_distri(Q);
 
         ++it;
         old_energy = energy;
@@ -484,11 +475,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         energy = dotProduct(unary, Q, dot_tmp);
         grad = unary;
 
-        // Add changing part
-        //add_noise(Q, noise_var);
-        
+        // Pairwise
         sortRows(Q, ind);
-
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
             // Remove lower
             no_norm_pairwise[k]->apply_lower(tmp, ind);
@@ -498,9 +486,9 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
                     tmp2(j, ind(j, i)) = tmp(j, i);
                 }
             }
-            // Remove lower
             energy += dotProduct(Q, tmp2, dot_tmp);
             grad += tmp2;
+
             // Add upper
             no_norm_pairwise[k]->apply_upper(tmp, ind);
             tmp2.fill(0);
@@ -509,19 +497,18 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
                     tmp2(j, ind(j, i)) = tmp(j, i);
                 }
             }
-            // Add upper
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
+        // Print previous iteration energy
         std::cout << it << ": " << energy << "\n";
 
 
         // Sub-gradient descent step
-        float lr = 1.0/(1000+it);
+        float lr = 1.0/(10+it);
         Q -= lr*grad;
 
         // Project solution
-
         sortCols(Q, ind);
         for(int i=0; i<N_; ++i) {
             sum(i) = Q.col(i).sum()-1;
@@ -546,13 +533,9 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-        //energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
-        //std::cout << it << ": " << energy << "\n";
-        //std::cout << ((Q.array()-Q.mean()).array()*(Q.array()-Q.mean()).array()).mean() << "\n";
-        //std::cout<<Q.rightCols(5).topRows(5)<<std::endl;
-    } while(it<1);//fabs(old_energy -energy) > 1e-5);
-    //energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
-    //std::cout <<"final: " << energy << "\n";
+    } while(it<10);//fabs(old_energy -energy) > 1e-5);
+    energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+    std::cout <<"final: " << energy << "\n";
 
     free(no_norm_pairwise);
     return Q;
