@@ -481,6 +481,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
+        // Print previous iteration energy
+        std::cout << it << ": " << energy << "\n";
 
         // Sub-gradient descent step
         float lr = 1.0/(10000+it);
