@@ -45,6 +45,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_cccp_inference(Q);
             }
             make_dir(path_to_subexp_results);
+            end = clock();
             timing = (double(end-start)/CLOCKS_PER_SEC);
             double final_energy = crf.compute_energy(Q);
             double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
