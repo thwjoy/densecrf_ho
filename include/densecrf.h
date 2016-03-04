@@ -90,6 +90,11 @@ public:
     // Run the energy minimisation on the LP
     MatrixXf lp_inference(MatrixXf & init) const;
 
+	// Perform the rounding based on argmaxes
+	MatrixXf max_rounding(const MatrixXf & estimates) const;
+	// Perform randomized roundings
+	MatrixXf interval_rounding(const MatrixXf & estimates) const;
+
 	// Run the inference with gradually lower lambda values.
 	MatrixXf grad_inference(const MatrixXf & init) const;
 

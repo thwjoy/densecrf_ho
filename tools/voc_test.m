@@ -1,4 +1,4 @@
-function score = voc_test(path)
+function score = voc_test(path, dataset_split)
 addpath('/data/PascalVOC2010/VOCdevkit/VOCcode');
 
 VOCinit;
@@ -6,14 +6,14 @@ VOCinit;
 
 
 VOCopts.datadir = '/data/PascalVOC2010';
-testset = 'Validation';
+testset = dataset_split;
 
 
 gtimgpath= '/data/PascalVOC2010/SegmentationClass/%s.png';
 imgsetpath= '/data/PascalVOC2010/split/%s.txt';
 respath_tmpl=[path '/%s.png'];
 
-path_to_test_set = '/data/PascalVOC2010/split/Validation.txt';
+path_to_test_set = ['/data/PascalVOC2010/split/' dataset_split '.txt'];
 [gtids,t]=textread(path_to_test_set,'%s %d');
 
 num = 21; % Number of classes

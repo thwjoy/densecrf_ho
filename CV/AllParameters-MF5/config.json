@@ -1,7 +1,7 @@
 {
     "language"        : "PYTHON",
-    "main-file"       : "exp-qpcccp.py",
-    "experiment-name" : "exp-qpcccy",
+    "main-file"       : "exp-mf5.py",
+    "experiment-name" : "exp-mf5",
     "likelihood"      : "NOISELESS",
     "variables" : {
         "spc_std" : {

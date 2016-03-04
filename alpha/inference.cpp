@@ -267,35 +267,29 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     clock_t start, end;
     std::cout<<"Initialize with QP"<<std::endl;
     MatrixXf Q = crf.qp_inference(init);
-    /*MatrixXf Q = (MatrixXf::Random(init.rows(), init.cols()).array()+1)/2;
-    for(int col=0; col<init.cols(); col++) {
-        Q.col(col) /= Q.col(col).sum();
-    }/**/
+
     std::cout<<"Run the actual LP"<<std::endl;
-    start = clock();
-    srand(start);
     double timing = -1;
     /*for(int it=0; it<20; it++) {
-        std::string partial_out = path_to_output + "-" + std::to_string(it)+ ".bmp";
-        Q = crf.lp_inference(Q);
-        double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
-        double final_energy = crf.compute_energy(Q);
-        write_down_perf(timing, final_energy, discretized_energy, partial_out);
-        save_map(Q, size, partial_out, dataset_name);
-
-    }/**/
+      std::string partial_out = path_to_output + "-" + std::to_string(it)+ ".bmp";
+      Q = crf.lp_inference(Q);
+      double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+      double final_energy = crf.compute_energy(Q);
+      write_down_perf(timing, final_energy, discretized_energy, partial_out);
+      save_map(Q, size, partial_out, dataset_name);
+      }/**/
+    start = clock();
+    srand(start);
     Q = crf.lp_inference(Q);
     end = clock();
-    std::cout<<"Done"<<std::endl;
     timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
     double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
     write_down_perf(timing, final_energy, discretized_energy, path_to_output);
-
-    // std::cout << "Time taken: " << timing << '\n';
-    // std::cout << "Done with inference"<< '\n';
-    // Perform the MAP estimation on the fully factorized distribution
-    // and write the results to an image file with a dumb color code
+// std::cout << "Time taken: " << timing << '\n';
+// std::cout << "Done with inference"<< '\n';
+// Perform the MAP estimation on the fully factorized distribution
+// and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
 }
 

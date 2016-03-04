@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2013, Philipp Krähenbühl
+
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -24,7 +25,6 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
 #include "densecrf.h"
 #include "eigen_utils.hpp"
 #include "newton_cccp.hpp"
@@ -43,10 +43,10 @@
 DenseCRF::DenseCRF(int N, int M) : N_(N), M_(M), unary_(0) {
 }
 DenseCRF::~DenseCRF() {
-	if (unary_)
-		delete unary_;
-	for( unsigned int i=0; i<pairwise_.size(); i++ )
-		delete pairwise_[i];
+    if (unary_)
+        delete unary_;
+    for( unsigned int i=0; i<pairwise_.size(); i++ )
+        delete pairwise_[i];
 }
 DenseCRF2D::DenseCRF2D(int W, int H, int M) : DenseCRF(W*H,M), W_(W), H_(H) {
 }
@@ -56,49 +56,49 @@ DenseCRF2D::~DenseCRF2D() {
 /////  Pairwise Potentials  /////
 /////////////////////////////////
 void DenseCRF::addPairwiseEnergy (const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type) {
-	assert( features.cols() == N_ );
-	addPairwiseEnergy( new PairwisePotential( features, function, kernel_type, normalization_type ) );
+    assert( features.cols() == N_ );
+    addPairwiseEnergy( new PairwisePotential( features, function, kernel_type, normalization_type ) );
 }
 void DenseCRF::addPairwiseEnergy ( PairwisePotential* potential ){
-	pairwise_.push_back( potential );
+    pairwise_.push_back( potential );
 }
 void DenseCRF2D::addPairwiseGaussian ( float sx, float sy, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type ) {
-	MatrixXf feature( 2, N_ );
-	for( int j=0; j<H_; j++ )
-		for( int i=0; i<W_; i++ ){
-			feature(0,j*W_+i) = i / sx;
-			feature(1,j*W_+i) = j / sy;
-		}
-	addPairwiseEnergy( feature, function, kernel_type, normalization_type );
+    MatrixXf feature( 2, N_ );
+    for( int j=0; j<H_; j++ )
+        for( int i=0; i<W_; i++ ){
+            feature(0,j*W_+i) = i / sx;
+            feature(1,j*W_+i) = j / sy;
+        }
+    addPairwiseEnergy( feature, function, kernel_type, normalization_type );
 }
 void DenseCRF2D::addPairwiseBilateral ( float sx, float sy, float sr, float sg, float sb, const unsigned char* im, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type ) {
-	MatrixXf feature( 5, N_ );
-	for( int j=0; j<H_; j++ )
-		for( int i=0; i<W_; i++ ){
-			feature(0,j*W_+i) = i / sx;
-			feature(1,j*W_+i) = j / sy;
-			feature(2,j*W_+i) = im[(i+j*W_)*3+0] / sr;
-			feature(3,j*W_+i) = im[(i+j*W_)*3+1] / sg;
-			feature(4,j*W_+i) = im[(i+j*W_)*3+2] / sb;
-		}
-	addPairwiseEnergy( feature, function, kernel_type, normalization_type );
+    MatrixXf feature( 5, N_ );
+    for( int j=0; j<H_; j++ )
+        for( int i=0; i<W_; i++ ){
+            feature(0,j*W_+i) = i / sx;
+            feature(1,j*W_+i) = j / sy;
+            feature(2,j*W_+i) = im[(i+j*W_)*3+0] / sr;
+            feature(3,j*W_+i) = im[(i+j*W_)*3+1] / sg;
+            feature(4,j*W_+i) = im[(i+j*W_)*3+2] / sb;
+        }
+    addPairwiseEnergy( feature, function, kernel_type, normalization_type );
 }
 //////////////////////////////
 /////  Unary Potentials  /////
 //////////////////////////////
 void DenseCRF::setUnaryEnergy ( UnaryEnergy * unary ) {
-	if( unary_ ) delete unary_;
-	unary_ = unary;
+    if( unary_ ) delete unary_;
+    unary_ = unary;
 }
 void DenseCRF::setUnaryEnergy( const MatrixXf & unary ) {
-	setUnaryEnergy( new ConstUnaryEnergy( unary ) );
+    setUnaryEnergy( new ConstUnaryEnergy( unary ) );
 }
 void  DenseCRF::setUnaryEnergy( const MatrixXf & L, const MatrixXf & f ) {
-	setUnaryEnergy( new LogisticUnaryEnergy( L, f ) );
+    setUnaryEnergy( new LogisticUnaryEnergy( L, f ) );
 }
 
 UnaryEnergy* DenseCRF::getUnaryEnergy() {
-	return unary_;
+    return unary_;
 }
 ///////////////////////
 /////  Inference  /////
@@ -110,88 +110,88 @@ MatrixXf DenseCRF::unary_init() const {
 }
 
 void normalize(MatrixXf & out, const MatrixXf & in){
-	out.resize(in.rows(), in.cols());
-	VectorXf norm_constants = in.colwise().sum();
-	out = in.array().rowwise() / norm_constants.array().transpose();
+    out.resize(in.rows(), in.cols());
+    VectorXf norm_constants = in.colwise().sum();
+    out = in.array().rowwise() / norm_constants.array().transpose();
 }
 
 void expAndNormalize ( MatrixXf & out, const MatrixXf & in ) {
-	out.resize( in.rows(), in.cols() );
-	for( int i=0; i<out.cols(); i++ ){
-		VectorXf b = in.col(i);
-		b.array() -= b.maxCoeff();
-		b = b.array().exp();
-		out.col(i) = b / b.array().sum();
-	}
+    out.resize( in.rows(), in.cols() );
+    for( int i=0; i<out.cols(); i++ ){
+        VectorXf b = in.col(i);
+        b.array() -= b.maxCoeff();
+        b = b.array().exp();
+        out.col(i) = b / b.array().sum();
+    }
 }
 void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q ) {
-	out.resize( in.rows(), in.cols() );
-	for( int i=0; i<in.cols(); i++ ){
-		VectorXf b = in.col(i);
-		VectorXf q = Q.col(i);
-		out.col(i) = b.array().sum()*q - b;
-	}
+    out.resize( in.rows(), in.cols() );
+    for( int i=0; i<in.cols(); i++ ){
+        VectorXf b = in.col(i);
+        VectorXf q = Q.col(i);
+        out.col(i) = b.array().sum()*q - b;
+    }
 }
 
 MatrixXf DenseCRF::inference ( const MatrixXf & init, int n_iterations ) const {
-	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
-	unary.fill(0);
-	if( unary_ ){
-		unary = unary_->get();
-	}
+    MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2;
+    unary.fill(0);
+    if( unary_ ){
+        unary = unary_->get();
+    }
     Q = init;
 
-	for( int it=0; it<n_iterations; it++ ) {
-		tmp1 = -unary;
-		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-			pairwise_[k]->apply( tmp2, Q );
-			tmp1 -= tmp2;
-		}
-		expAndNormalize( Q, tmp1 );
-	}
-	return Q;
+    for( int it=0; it<n_iterations; it++ ) {
+        tmp1 = -unary;
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp2, Q );
+            tmp1 -= tmp2;
+        }
+        expAndNormalize( Q, tmp1 );
+    }
+    return Q;
 }
 
 MatrixXf DenseCRF::inference (const MatrixXf & init) const {
-	MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_);
-	float old_kl, kl;
-	unary.fill(0);
-	if( unary_ ){
-		unary = unary_->get();
-	}
+    MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_);
+    float old_kl, kl;
+    unary.fill(0);
+    if( unary_ ){
+        unary = unary_->get();
+    }
 
     Q = init;
 
     if (compute_kl) {
-		old_kl = 0;
-		kl = klDivergence(Q);
-	}
+        old_kl = 0;
+        kl = klDivergence(Q);
+    }
 
-	bool keep_inferring = true;
-	old_Q = Q;
-	int count = 0;
-	while(keep_inferring) {
-		old_kl = kl;
-		tmp1 = -unary;
-		for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-			pairwise_[k]->apply( tmp2, Q );
-			tmp1 -= tmp2;
-		}
-		expAndNormalize( Q, tmp1 );
+    bool keep_inferring = true;
+    old_Q = Q;
+    int count = 0;
+    while(keep_inferring) {
+        old_kl = kl;
+        tmp1 = -unary;
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp2, Q );
+            tmp1 -= tmp2;
+        }
+        expAndNormalize( Q, tmp1 );
 
 
-		if (compute_kl) {
-			kl = klDivergence(Q);
-			float kl_change = old_kl - kl;
-			keep_inferring = (kl_change > 0.001);
-			old_kl = kl;
-		} else {
-			float Q_change = (old_Q - Q).squaredNorm();
-			keep_inferring = (Q_change > 0.001);
-		}
-		old_Q = Q;
-		count++;
-	}
+        if (compute_kl) {
+            kl = klDivergence(Q);
+            float kl_change = old_kl - kl;
+            keep_inferring = (kl_change > 0.001);
+            old_kl = kl;
+        } else {
+            float Q_change = (old_Q - Q).squaredNorm();
+            keep_inferring = (Q_change > 0.001);
+        }
+        old_Q = Q;
+        count++;
+    }
     return Q;
 }
 
@@ -308,6 +308,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     double old_energy;
     double energy = compute_energy(Q);
     int convex_rounds = 0;
+    int outer_rounds = 0;
     do {
         // New value of the linearization point.
         old_energy = energy;
@@ -366,7 +367,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
 
             // energy = compute_energy(Q);
             convex_rounds++;
-        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<3 && optimal_step_size != 0);
+        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<10 && optimal_step_size != 0);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
 
@@ -377,7 +378,9 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
         // Compute our current value of the energy;
         // energy = compute_energy(Q);
         energy = dotProduct(Q, 0.5 * (grad + unary) - diag_dom.cwiseProduct(Q_old - Q), temp_dot);
-    } while ( (old_energy -energy) > 100);
+        outer_rounds++;
+    } while ( (old_energy -energy) > 100 && outer_rounds<5);
+
     return Q;
 }
 
@@ -396,14 +399,14 @@ void print_distri(MatrixXf const & Q) {
         for(int pixel=0; pixel<Q.cols();++pixel) {
             ++buckets[floor(Q(label, pixel)*nb_buckets)];
         }
+        std::cout<<"Q distribution"<<std::endl;
+        std::cout<<buckets.transpose()<<std::endl;
     }
-    std::cout<<"Q distribution"<<std::endl;
-    std::cout<<buckets.transpose()<<std::endl;
 }
 
 MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
-            grad(M_, N_), tmp2(M_, N_);
+        grad(M_, N_), tmp2(M_, N_);
     MatrixP dot_tmp(M_,N_);
     MatrixXi ind(M_, N_);
     VectorXi K(N_);
@@ -420,7 +423,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
             new PottsCompatibility(pairwise_[k]->parameters()(0)),
             pairwise_[k]->ktype(),
             NO_NORMALIZATION
-        );
+            );
     }
 
     ones.fill(1);
@@ -447,7 +450,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
 
         ++it;
         old_energy = energy;
-        
+
         // Compute the current energy and gradient
         // Unary
         energy = dotProduct(unary, Q, dot_tmp);
@@ -478,15 +481,12 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
-        // Print previous iteration energy
-        std::cout << it << ": " << energy << "\n";
-
 
         // Sub-gradient descent step
-        float lr = 1.0/(10+it);
+        float lr = 1.0/(10000+it);
         Q -= lr*grad;
 
-        // Project solution
+        // Project current estimates on valid space
         sortCols(Q, ind);
         for(int i=0; i<N_; ++i) {
             sum(i) = Q.col(i).sum()-1;
@@ -511,13 +511,63 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-    } while(it<10);//fabs(old_energy -energy) > 1e-5);
+    } while(it<40);
+    // This is the LP fractional energy
     energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
     std::cout <<"final: " << energy << "\n";
-
     free(no_norm_pairwise);
     return Q;
 }
+
+
+MatrixXf DenseCRF::max_rounding(const MatrixXf &estimates) const {
+    MatrixXf rounded = MatrixXf::Zero(estimates.rows(), estimates.cols());
+    int argmax;
+    for (int col=0; col<estimates.cols(); col++) {
+        estimates.col(col).maxCoeff(&argmax);
+        rounded(argmax, col) = 1;
+    }
+    return rounded;
+}
+
+MatrixXf DenseCRF::interval_rounding(const MatrixXf &estimates) const {
+    int nb_random_rounding = 10;
+
+    MatrixXf best_rounded;
+    double best_energy = 1e18;
+
+    MatrixXf rounded;
+    int assigned_labels;
+    int to_assign = estimates.cols();
+    double rounded_energy;
+
+    for (int it=0; it<nb_random_rounding; it++) {
+        rounded = MatrixXf::Zero(estimates.rows(), estimates.cols());
+        assigned_labels = 0;
+        std::vector<bool> assigned(to_assign, false);
+        while (assigned_labels < to_assign) {
+            int label_index = rand() % estimates.rows();
+            float interval = (float) rand()/ RAND_MAX;
+
+            for (int col=0; col < to_assign; col++) {
+                if (not assigned[col]) { // check that we need to assign something
+                    if (interval <= estimates(label_index, col)) { // check that this pixel should be assigned
+                        assigned[col] = true;
+                        assigned_labels++;
+                        rounded(label_index, col) = 1;
+                    }
+                }
+            }
+        }
+        rounded_energy = compute_energy(rounded);
+        if (rounded_energy < best_energy) {
+            best_energy = rounded_energy;
+            best_rounded = rounded;
+        }
+    }
+    return best_rounded;
+}
+
 
 MatrixXf DenseCRF::cccp_inference(const MatrixXf & init) const {
     MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
@@ -685,7 +735,7 @@ VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
 MatrixXf DenseCRF::startInference() const{
     MatrixXf Q( M_, N_ );
     Q.fill(0);
-	
+
     // Initialize using the unary energies
     if( unary_ )
         expAndNormalize( Q, -unary_->get() );
@@ -696,13 +746,13 @@ void DenseCRF::stepInference( MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2 ) c
     tmp1.fill(0);
     if( unary_ )
         tmp1 -= unary_->get();
-	
+
     // Add up all pairwise potentials
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp2, Q );
         tmp1 -= tmp2;
     }
-	
+
     // Exponentiate and normalize
     expAndNormalize( Q, tmp1 );
 }
@@ -731,7 +781,7 @@ double DenseCRF::klDivergence( const MatrixXf & Q ) const {
             for( int l=0; l<Q.rows(); l++ )
                 kl += unary(l,i)*Q(l,i);
     }
-	
+
     // Add all pairwise terms
     MatrixXf tmp;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -823,7 +873,7 @@ double DenseCRF::gradient( int n_iterations, const ObjectiveFunction & objective
         }
         expAndNormalize( Q[it+1], tmp1 );
     }
-	
+
     // Compute the objective value
     MatrixXf b( M_, N_ );
     double r = objective.evaluate( b, Q[n_iterations] );
@@ -836,7 +886,7 @@ double DenseCRF::gradient( int n_iterations, const ObjectiveFunction & objective
         *lbl_cmp_grad = 0*labelCompatibilityParameters();
     if( kernel_grad )
         *kernel_grad = 0*kernelParameters();
-	
+
     for( int it=n_iterations-1; it>=0; it-- ) {
         // Do the inverse message passing
         tmp1.fill(0);
@@ -897,7 +947,7 @@ void DenseCRF::setLabelCompatibilityParameters( const VectorXf & v ) {
     int np=0;
     for( unsigned int k=0; k<pairwise_.size(); k++ )
         np += n[k];
-	
+
     for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->setParameters( v.segment( i, n[k] ) );
         i += n[k];
@@ -924,7 +974,7 @@ void DenseCRF::setKernelParameters( const VectorXf & v ) {
     int np=0;
     for( unsigned int k=0; k<pairwise_.size(); k++ )
         np += n[k];
-	
+
     for( unsigned int k=0,i=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->setKernelParameters( v.segment( i, n[k] ) );
         i += n[k];

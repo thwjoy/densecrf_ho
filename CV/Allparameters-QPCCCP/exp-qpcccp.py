@@ -2,16 +2,19 @@ import subprocess
 import matlab.engine
 import os
 
+experiment_suffix = "qpcccp"
+
+
 def generate_segmentation(spc_std, spc_potts,
                           bil_spcstd, bil_colstd, bil_potts):
-    path_to_executable = '/home/rudy/workspace/densecrf/build/alpha/cv-script'
+    path_to_executable = '/data/CV/cv-script'
     split = "Validation"
     dataset = "Pascal2010"
 
     exp_path = '/'.join(map(str, [spc_std, spc_potts, bil_spcstd,
                                   bil_colstd, bil_potts]))
 
-    results_path = "/data/CV/Allparams/" + exp_path + "/"
+    results_path = "/data/CV/" + experiment_suffix + "/" + exp_path + "/"
     try:
         os.makedirs(results_path)
     except OSError:
@@ -19,6 +22,7 @@ def generate_segmentation(spc_std, spc_potts,
     subprocess.call([path_to_executable,
                      split,
                      dataset,
+                     experiment_suffix,
                      results_path,
                      str(spc_std), str(spc_potts),
                      str(bil_spcstd), str(bil_colstd), str(bil_potts)])
@@ -29,13 +33,18 @@ def evaluate_segmentation(spc_std, spc_potts,
     eng = matlab.engine.start_matlab()
     exp_path = '/'.join(map(str, [spc_std, spc_potts, bil_spcstd,
                                   bil_colstd, bil_potts]))
-    path_to_results = "/data/CV/Allparams/" + exp_path + "/mf5"
-    ret = eng.voc_test(path_to_results)
-
+    path_to_results = "/data/CV/" + experiment_suffix + "/" + exp_path + "/" + experiment_suffix
+    eng.addpath('/data/CV/', nargout=0)
+    ret = eng.voc_test(path_to_results, "Validation")
     # This returns the value of the average accuracy. Spearmint
     # minimize things and we want to maximise this, so we should
     # return the negative
-    return - ret
+    txt_results_file = path_to_results + '/results.txt'
+    with open(txt_results_file, 'w') as f:
+        f.write(exp_path)
+        f.write('/n')
+        f.write(str(ret))
+    return -ret
 
 
 # Write a function like this called 'main'
