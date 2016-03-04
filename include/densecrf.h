@@ -86,7 +86,9 @@ public:
 	// First one is the Lafferty-Ravikumar version of the QP
 	MatrixXf qp_inference(const MatrixXf & init) const;
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
-	MatrixXf qp_cccp_inference(const MatrixXf & init) const;
+    MatrixXf qp_cccp_inference(const MatrixXf & init) const;
+    // Run the energy minimisation on the LP
+    MatrixXf lp_inference(MatrixXf & init) const;
 
 	// Run the inference with gradually lower lambda values.
 	MatrixXf grad_inference(const MatrixXf & init) const;
@@ -119,8 +121,11 @@ public: /* Debugging functions */
 	// Compute the KL-divergence of a set of marginals
 	double klDivergence( const MatrixXf & Q ) const;
 
-	// Compute the energy associated with a relaxation
-	double compute_energy( const MatrixXf & Q) const;
+    // Compute the energy associated with the QP relaxation
+    double compute_energy( const MatrixXf & Q) const;
+
+    // Compute the energy associated with the LP relaxation
+    double compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const;
 
 	// Compute the value of a Lafferty-Ravikumar QP
 	double compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const;

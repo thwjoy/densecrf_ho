@@ -13,3 +13,5 @@ bool all_strict_positive(const VectorXf & vect);
 bool valid_probability(const MatrixXf & proba);
 
 typeP dotProduct(const MatrixXf & M1, const MatrixXf & M2, MatrixP & temp);
+void sortRows(const MatrixXf & M, MatrixXi & ind);
+void sortCols(const MatrixXf & M, MatrixXi & ind);

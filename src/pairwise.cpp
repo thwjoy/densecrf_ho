@@ -37,29 +37,18 @@ protected:
 	VectorXf norm_;
 	MatrixXf f_;
 	MatrixXf parameters_;
-	void initLattice( const MatrixXf & f ) {
-		const int N = f.cols();
-		lattice_.init( f );
-		
-		norm_ = lattice_.compute( VectorXf::Ones( N ).transpose() ).transpose();
-		
-		if ( ntype_ == NO_NORMALIZATION ) {
-			float mean_norm = 0;
-			for ( int i=0; i<N; i++ )
-				mean_norm += norm_[i];
-			mean_norm = N / mean_norm;
-			for ( int i=0; i<N; i++ )
-				norm_[i] = mean_norm;
-		}
-		else if ( ntype_ == NORMALIZE_SYMMETRIC ) {
-			for ( int i=0; i<N; i++ )
-				norm_[i] = 1.0 / sqrt(norm_[i]+1e-20);
-		}
-		else {
-			for ( int i=0; i<N; i++ )
-				norm_[i] = 1.0 / (norm_[i]+1e-20);
-		}
-	}
+	void initLattice( const MatrixXf & f, int max_size=-1 );
+    void merge(const Kernel & other, MatrixXf const & features, bool overlap) {
+    	// The normallizations won't be correct
+    	assert(ntype_==NO_NORMALIZATION);
+    	const MatrixXf & f = other.features();
+    	if(overlap) {
+    		lattice_.add( f.rightCols(f.cols()-1) );
+    	} else {
+    		lattice_.add( f );
+    	}
+    	f_ = features;
+    }
 	void filter( MatrixXf & out, const MatrixXf & in, bool transpose ) const {
 		// Read in the values
 		if( ntype_ == NORMALIZE_SYMMETRIC || (ntype_ == NORMALIZE_BEFORE && !transpose) || (ntype_ == NORMALIZE_AFTER && transpose))
@@ -77,6 +66,18 @@ protected:
 		// Normalize again
 		if( ntype_ == NORMALIZE_SYMMETRIC || (ntype_ == NORMALIZE_BEFORE && transpose) || (ntype_ == NORMALIZE_AFTER && !transpose))
 			out = out*norm_.asDiagonal();
+	}
+	void filter_lower_left( MatrixXf & out, int middle_low, int middle_high ) const {
+		// Normalization makes no sense here since this would always return 1
+	
+		// Filter
+			lattice_.compute_lower_left( out, middle_low, middle_high );
+	}
+	void filter_upper_right( MatrixXf & out, int middle_low, int middle_high ) const {
+		// Normalization makes no sense here since this would always return 1
+	
+		// Filter
+			lattice_.compute_upper_right( out, middle_low, middle_high );
 	}
 	// Compute d/df a^T*K*b
 	MatrixXf kernelGradient( const MatrixXf & a, const MatrixXf & b ) const {
@@ -113,12 +114,18 @@ protected:
 		}
 	}
 public:
-	DenseKernel(const MatrixXf & f, KernelType ktype, NormalizationType ntype):f_(f), ktype_(ktype), ntype_(ntype) {
+	DenseKernel(const MatrixXf & f, KernelType ktype, NormalizationType ntype, int max_size):f_(f), ktype_(ktype), ntype_(ntype) {
 		if (ktype_ == DIAG_KERNEL)
 			parameters_ = VectorXf::Ones( f.rows() );
 		else if( ktype == FULL_KERNEL )
 			parameters_ = MatrixXf::Identity( f.rows(), f.rows() );
-		initLattice( f );
+		initLattice( f, max_size );
+	}
+	virtual void apply_lower_left( MatrixXf & out, int middle_low, int middle_high) const {
+		filter_lower_left(out, middle_low, middle_high);
+	}
+	virtual void apply_upper_right( MatrixXf & out, int middle_low, int middle_high) const {
+		filter_lower_left(out, middle_low, middle_high);
 	}
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const {
 		filter( out, Q, false );
@@ -165,14 +172,45 @@ public:
 	virtual MatrixXf features() const {
 		return f_;
 	}
+
+	virtual KernelType ktype() const {
+		return ktype_;
+	}
+
+	virtual NormalizationType ntype() const {
+		return ntype_;
+	}
 };
+
+void DenseKernel::initLattice( const MatrixXf & f, int max_size ) {
+	const int N = f.cols();
+	lattice_.init( f, max_size );
+	
+	
+	if ( ntype_ != NO_NORMALIZATION ) {
+		norm_ = lattice_.compute( VectorXf::Ones( N ).transpose() ).transpose();
+
+		if ( ntype_ == NORMALIZE_SYMMETRIC ) {
+		for ( int i=0; i<N; i++ )
+				norm_[i] = 1.0 / sqrt(norm_[i]+1e-20);
+		}
+		else {
+			for ( int i=0; i<N; i++ )
+				norm_[i] = 1.0 / (norm_[i]+1e-20);
+		}
+	}
+}
 
 PairwisePotential::~PairwisePotential(){
 	delete compatibility_;
 	delete kernel_;
 }
-PairwisePotential::PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype, NormalizationType ntype) : compatibility_(compatibility) {
-	kernel_ = new DenseKernel( features, ktype, ntype );
+PairwisePotential::PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype, NormalizationType ntype, int max_size) : compatibility_(compatibility) {
+	kernel_ = new DenseKernel( features, ktype, ntype, max_size );
+}
+void PairwisePotential::merge(PairwisePotential & other, MatrixXf const & features, bool overlap) {
+	assert(compatibility_->parameters()(0) == other.parameters()(0));
+	kernel_->merge(*other.getKernel(), features, overlap);
 }
 void PairwisePotential::apply(MatrixXf & out, const MatrixXf & Q) const {
 	kernel_->apply( out, Q );
@@ -184,6 +222,158 @@ void PairwisePotential::applyTranspose(MatrixXf & out, const MatrixXf & Q) const
 	kernel_->applyTranspose( out, Q );
 	// Apply the compatibility
 	compatibility_->applyTranspose( out, out );
+}
+void PairwisePotential::apply_lower(MatrixXf & out, const MatrixXi & ind) const {
+	MatrixXf const & features = kernel_->features();
+	MatrixXf sorted_features = features;
+	MatrixXf single_label_out(1, features.cols());
+
+	for(int label=0; label<ind.rows(); ++label) {
+		// Sort the features with the scores for this label
+		for(int j=0; j<features.cols(); ++j) {
+			sorted_features.col(j) = features.col(ind(label, j));
+		}
+
+		single_label_out.fill(0);
+		PairwisePotential* p = apply_lower_sorted_merge(single_label_out, sorted_features, sorted_features.cols());
+		delete p;
+		out.row(label) = single_label_out;
+	}
+	compatibility_->apply(out, out);
+}
+void PairwisePotential::apply_upper(MatrixXf & out, const MatrixXi & ind) const {
+	MatrixXf const & features = kernel_->features();
+	MatrixXf sorted_features = features;
+	MatrixXf single_label_out(1, features.cols());
+
+	for(int label=0; label<ind.rows(); ++label) {
+		// Sort the features with the scores for this label
+		for(int j=0; j<features.cols(); ++j) {
+			sorted_features.col(j) = features.col(ind(label, j));
+		}
+
+		single_label_out.fill(0);
+		PairwisePotential* p = apply_upper_sorted_merge(single_label_out, sorted_features, sorted_features.cols());
+		delete p;
+		out.row(label) = single_label_out;
+	}
+	compatibility_->apply(out, out);
+}
+PairwisePotential* PairwisePotential::apply_lower_sorted_merge(
+		MatrixXf & out,
+		MatrixXf const & features,
+		int max_size ) const {
+	int size = out.cols();
+
+	if(size <= 0) {
+		// This should never happen, this would create an empty permutohedral
+		assert(false);
+	} else if(size<=2) {
+		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
+		double alpha = 1.0 / 0.6;
+		for(int c=0; c<out.cols(); ++c)
+			out(0, c) = 0;
+		for(int c=0; c<out.cols(); ++c) {
+            for(int b=0; b<c; ++b) {
+                VectorXf featDiff = (features.col(c) - features.col(b));
+                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
+            }
+        }
+
+		PairwisePotential* pairwise = new PairwisePotential(
+			features,
+			new PottsCompatibility(compatibility_->parameters()(0)),
+			CONST_KERNEL,
+			NO_NORMALIZATION,
+			max_size
+		);
+		return pairwise;
+	} else {
+		int middle_low, middle_high;
+		bool overlap = false;
+		if(size%2==0) {
+			middle_low = size/2;
+			middle_high = size/2;
+		} else if(size%2==1) {
+			middle_low = floor(size/2.0);
+			middle_high = floor(size/2.0) + 1;
+			overlap = true;
+		}
+
+		MatrixXf out_tmp(1,middle_high);
+		out_tmp.fill(0);
+		PairwisePotential* upper_pairwise = apply_lower_sorted_merge(out_tmp, features.leftCols(middle_high), max_size);
+		out.leftCols(middle_high) += out_tmp;
+
+		out_tmp.fill(0);
+		PairwisePotential* lower_pairwise = apply_lower_sorted_merge(out_tmp, features.rightCols(middle_high), middle_high);
+		out.rightCols(middle_high) += out_tmp;
+
+		upper_pairwise->merge(*lower_pairwise, features, overlap);
+		delete lower_pairwise;
+
+		upper_pairwise->getKernel()->apply_lower_left(out, middle_low, middle_high);
+
+		return upper_pairwise;
+	}
+}
+PairwisePotential* PairwisePotential::apply_upper_sorted_merge(
+		MatrixXf & out,
+		MatrixXf const & features,
+		int max_size ) const {
+	int size = out.cols();
+
+	if(size <= 0) {
+		// This should never happen, this would create an empty permutohedral
+		assert(false);
+	} else if(size<=2) {
+		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
+		double alpha = 1.0 / 0.6;
+		for(int c=0; c<out.cols(); ++c)
+			out(0, c) = 0;
+		for(int c=0; c<out.cols(); ++c) {
+            for(int b=c+1; b<out.cols(); ++b) {
+                VectorXf featDiff = (features.col(c) - features.col(b));
+                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
+            }
+        }
+
+		PairwisePotential* pairwise = new PairwisePotential(
+			features,
+			new PottsCompatibility(compatibility_->parameters()(0)),
+			CONST_KERNEL,
+			NO_NORMALIZATION,
+			max_size
+		);
+		return pairwise;
+	} else {
+		int middle_low, middle_high;
+		bool overlap = false;
+		if(size%2==0) {
+			middle_low = size/2;
+			middle_high = size/2;
+		} else if(size%2==1) {
+			middle_low = floor(size/2.0);
+			middle_high = floor(size/2.0) + 1;
+			overlap = true;
+		}
+
+		MatrixXf out_tmp(1,middle_high);
+		out_tmp.fill(0);
+		PairwisePotential* upper_pairwise = apply_upper_sorted_merge(out_tmp, features.leftCols(middle_high), max_size);
+		out.leftCols(middle_high) += out_tmp;
+
+		out_tmp.fill(0);
+		PairwisePotential* lower_pairwise = apply_upper_sorted_merge(out_tmp, features.rightCols(middle_high), middle_high);
+		out.rightCols(middle_high) += out_tmp;
+
+		upper_pairwise->merge(*lower_pairwise, features, overlap);
+		delete lower_pairwise;
+
+		upper_pairwise->getKernel()->apply_upper_right(out, middle_low, middle_high);
+
+		return upper_pairwise;
+	}
 }
 VectorXf PairwisePotential::parameters() const {
 	return compatibility_->parameters();
@@ -211,6 +401,15 @@ VectorXf PairwisePotential::kernelGradient( const MatrixXf & b, const MatrixXf &
 }
 MatrixXf PairwisePotential::features() const {
 	return kernel_->features();
+}
+KernelType PairwisePotential::ktype() const {
+	return kernel_->ktype();
+}
+NormalizationType PairwisePotential::ntype() const {
+	return kernel_->ntype();
+}
+Kernel* PairwisePotential::getKernel() const {
+	return kernel_;
 }
 MatrixXf PairwisePotential::compatibility_matrix(int nb_labels) const {
 	return compatibility_->matrixForm(nb_labels);

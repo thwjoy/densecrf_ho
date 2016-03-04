@@ -35,6 +35,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <set>
 
 /////////////////////////////
 /////  Alloc / Dealloc  /////
@@ -380,6 +381,144 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     return Q;
 }
 
+void add_noise(MatrixXf & Q, float var) {
+    Q += MatrixXf::Random(Q.rows(), Q.cols())*var;
+    for(int col=0; col<Q.cols(); ++col) {
+        Q.col(col) /= Q.col(col).sum();
+    }
+}
+
+void print_distri(MatrixXf const & Q) {
+    int nb_buckets = 20;
+    VectorXi buckets(nb_buckets+1);
+    buckets.fill(0);
+    for(int label=0; label<Q.rows(); ++label) {
+        for(int pixel=0; pixel<Q.cols();++pixel) {
+            ++buckets[floor(Q(label, pixel)*nb_buckets)];
+        }
+    }
+    std::cout<<"Q distribution"<<std::endl;
+    std::cout<<buckets.transpose()<<std::endl;
+}
+
+MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
+    MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
+            grad(M_, N_), tmp2(M_, N_);
+    MatrixP dot_tmp(M_,N_);
+    MatrixXi ind(M_, N_);
+    VectorXi K(N_);
+    VectorXd sum(N_);
+    float noise_var = 1e-6;
+
+    // Create copies of the original pairwise since we don't want normalization
+    int nb_pairwise = pairwise_.size();
+    PairwisePotential** no_norm_pairwise;
+    no_norm_pairwise = (PairwisePotential**) malloc(pairwise_.size()*sizeof(PairwisePotential*));
+    for( unsigned int k=0; k<nb_pairwise; k++ ) {
+        no_norm_pairwise[k] = new PairwisePotential(
+            pairwise_[k]->features(),
+            new PottsCompatibility(pairwise_[k]->parameters()(0)),
+            pairwise_[k]->ktype(),
+            NO_NORMALIZATION
+        );
+    }
+
+    ones.fill(1);
+
+    int i,j;
+
+    // Get parameters
+    unary.fill(0);
+    if(unary_){
+        unary = unary_->get();
+    }
+
+    Q = init;
+
+
+    // Compute the value of the energy
+    double old_energy;
+    assert(valid_probability(Q));
+    double energy = 0;//compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+
+    int it=0;
+    do {
+        print_distri(Q);
+
+        ++it;
+        old_energy = energy;
+        
+        // Compute the current energy and gradient
+        // Unary
+        energy = dotProduct(unary, Q, dot_tmp);
+        grad = unary;
+
+        // Pairwise
+        sortRows(Q, ind);
+        for( unsigned int k=0; k<nb_pairwise; k++ ) {
+            // Remove lower
+            no_norm_pairwise[k]->apply_lower(tmp, ind);
+            tmp2.fill(0);
+            for(i=0; i<tmp.cols(); ++i) {
+                for(j=0; j<tmp.rows(); ++j) {
+                    tmp2(j, ind(j, i)) = tmp(j, i);
+                }
+            }
+            energy += dotProduct(Q, tmp2, dot_tmp);
+            grad += tmp2;
+
+            // Add upper
+            no_norm_pairwise[k]->apply_upper(tmp, ind);
+            tmp2.fill(0);
+            for(i=0; i<tmp.cols(); ++i) {
+                for(j=0; j<tmp.rows(); ++j) {
+                    tmp2(j, ind(j, i)) = tmp(j, i);
+                }
+            }
+            energy -= dotProduct(Q, tmp2, dot_tmp);
+            grad -= tmp2;
+        }
+        // Print previous iteration energy
+        std::cout << it << ": " << energy << "\n";
+
+
+        // Sub-gradient descent step
+        float lr = 1.0/(10+it);
+        Q -= lr*grad;
+
+        // Project solution
+        sortCols(Q, ind);
+        for(int i=0; i<N_; ++i) {
+            sum(i) = Q.col(i).sum()-1;
+            K(i) = -1;
+        }
+        for(int i=0; i<N_; ++i) {
+            for(int k=M_; k>0; --k) {
+                double uk = Q(ind(k-1, i), i);
+                if(sum(i)/k < uk) {
+                    K(i) = k;
+                    break;
+                }
+                sum(i) -= uk;
+            }
+        }
+        tmp.fill(0);
+        for(int i=0; i<N_; ++i) {
+            for(int k=0; k<M_; ++k) {
+                tmp(k, i) = std::max(Q(k, i) - sum(i)/K(i), (double)0);
+            }
+        }
+        Q = tmp;
+
+        assert(valid_probability(Q));
+    } while(it<10);//fabs(old_energy -energy) > 1e-5);
+    energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+    std::cout <<"final: " << energy << "\n";
+
+    free(no_norm_pairwise);
+    return Q;
+}
+
 MatrixXf DenseCRF::cccp_inference(const MatrixXf & init) const {
     MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
     float old_kl, kl;
@@ -636,6 +775,34 @@ double DenseCRF::compute_energy(const MatrixXf & Q) const {
         pairwise_[k]->apply( tmp, Q );
         energy += dotProduct(Q, tmp, dot_tmp);
     }
+    return energy;
+}
+
+double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const {
+    double energy = 0;
+    MatrixP dot_tmp;
+    MatrixXi ind(M_, N_);
+    // Add the unary term
+    if( unary_ ) {
+        MatrixXf unary = unary_->get();
+        energy += dotProduct(unary, Q, dot_tmp);
+    }
+    // Add all pairwise terms
+    sortRows(Q, ind);
+    MatrixXf tmp(Q.rows(), Q.cols());
+    for( unsigned int k=0; k<nb_pairwise; k++ ) {
+        // Add the upper
+        no_norm_pairwise[k]->apply_upper(tmp, ind);
+        assert(tmp.maxCoeff()<1e-3);
+        energy -= dotProduct(Q, tmp, dot_tmp);
+        // Remove the lower
+        no_norm_pairwise[k]->apply_upper(tmp, ind);
+        assert(tmp.maxCoeff()<1e-3);
+        energy += dotProduct(Q, tmp, dot_tmp);
+
+
+    }
+
     return energy;
 }
 

@@ -144,28 +144,33 @@ unsigned char * load_image( const std::string & path_to_image, img_size size){
     return char_img;
 }
 
-MatrixXf load_unary( const std::string & path_to_unary, img_size& size) {
+MatrixXf load_unary( const std::string & path_to_unary, img_size& size, int max_label) {
 
     ProbImage texton;
     texton.decompress(path_to_unary.c_str());
     texton.boostToProb();
 
-    MatrixXf unaries( texton.depth(), texton.width() * texton.height());
+    if(size.width<=0 && size.height<=0) {
+        size = {texton.width(), texton.height()};
+    }
+    if(max_label<=0) {
+        max_label = texton.depth();
+    }
+
+    MatrixXf unaries( max_label, size.width * size.height);
     int i,j,k;
-    for(i=0; i<texton.height(); ++i){
-        for(j=0; j<texton.width(); ++j){
-            for(k=0; k<texton.depth(); ++k){
+    for(i=0; i<size.height; ++i){
+        for(j=0; j<size.width; ++j){
+            for(k=0; k<max_label; ++k){
                 // careful with the index position, the operator takes
                 // x (along width), then y (along height)
 
                 // Also note that these are probabilities, what we
                 // want are unaries, so we need to
-                unaries(k, i*texton.width() + j) = -log( texton(j,i,k));
+                unaries(k, i*size.width + j) = -log( texton(j,i,k));
             }
         }
     }
-
-    size = {texton.width(), texton.height()};
 
     return unaries;
 }

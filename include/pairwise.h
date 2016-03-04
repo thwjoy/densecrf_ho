@@ -44,12 +44,17 @@ enum KernelType {
 class Kernel {
 public:
 	virtual ~Kernel();
+    virtual void merge(const Kernel & other, MatrixXf const & features, bool overlap=false) = 0;
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const = 0;
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const = 0;
+    virtual void apply_lower_left( MatrixXf & out, int middle_low, int middle_high) const = 0;
+    virtual void apply_upper_right( MatrixXf & out, int middle_low, int middle_high) const = 0;
 	virtual VectorXf parameters() const = 0;
 	virtual void setParameters( const VectorXf & p ) = 0;
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const = 0;
 	virtual MatrixXf features() const = 0;
+    virtual KernelType ktype() const = 0;
+    virtual NormalizationType ntype() const = 0;
 };
 
 class PairwisePotential{
@@ -60,14 +65,22 @@ protected:
 	void filter( MatrixXf & out, const MatrixXf & in, bool transpose=false ) const;
 public:
 	virtual ~PairwisePotential();
-	PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype=CONST_KERNEL, NormalizationType ntype=NORMALIZE_SYMMETRIC);
-	void apply(MatrixXf & out, const MatrixXf & Q) const;
+	PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype=CONST_KERNEL, NormalizationType ntype=NORMALIZE_SYMMETRIC, int max_size=-1);
+    void apply(MatrixXf & out, const MatrixXf & Q) const;
+    void apply_lower(MatrixXf & out, const MatrixXi & ind) const;
+    void apply_upper(MatrixXf & out, const MatrixXi & ind) const;
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
+    PairwisePotential* apply_lower_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
+    PairwisePotential* apply_upper_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
+    void merge(PairwisePotential & other, MatrixXf const & features, bool overlap = false);
 	
 	// Get the parameters
 	virtual VectorXf parameters() const;
 	virtual VectorXf kernelParameters() const;
 	virtual MatrixXf features() const;
+    virtual KernelType ktype() const;
+    virtual NormalizationType ntype() const;
+    virtual Kernel* getKernel() const;
 	virtual MatrixXf compatibility_matrix(int nb_labels) const;
 	virtual void setParameters( const VectorXf & v );
 	virtual void setKernelParameters( const VectorXf & v );
