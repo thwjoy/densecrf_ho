@@ -388,19 +388,6 @@ void add_noise(MatrixXf & Q, float var) {
     }
 }
 
-struct classcomp {
-  bool operator() (const VectorXf& lhs, const VectorXf& rhs) const
-  {
-    for(int i=0; i<lhs.rows(); ++i)
-    {
-        if(lhs(i)!=rhs(i)){
-            return true;
-        }
-    }
-    return false;
-  }
-};
-
 void print_distri(MatrixXf const & Q) {
     int nb_buckets = 20;
     VectorXi buckets(nb_buckets+1);
@@ -804,19 +791,6 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_no
     sortRows(Q, ind);
     MatrixXf tmp(Q.rows(), Q.cols());
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
-        /*
-        // Add once the full
-        no_norm_pairwise[k]->apply( tmp, Q );
-        assert(tmp.maxCoeff()<1e-3);
-        energy -= tmp.sum();
-        // Remove the diagonal
-        energy -= (Q*no_norm_pairwise[k]->parameters()(0)).sum();
-        // Remove twice the lower matrix
-        no_norm_pairwise[k]->apply_lower(tmp, ind);
-        assert(tmp.maxCoeff()<1e-3);
-        energy += 2*dotProduct(Q, tmp, dot_tmp);
-        */
-
         // Add the upper
         no_norm_pairwise[k]->apply_upper(tmp, ind);
         assert(tmp.maxCoeff()<1e-3);

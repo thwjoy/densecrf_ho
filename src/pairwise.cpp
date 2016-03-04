@@ -241,30 +241,6 @@ void PairwisePotential::apply_lower(MatrixXf & out, const MatrixXi & ind) const 
 	}
 	compatibility_->apply(out, out);
 }
-void PairwisePotential::apply_lower2(MatrixXf & out, const MatrixXi & ind) const {
-	MatrixXf const & features = kernel_->features();
-	MatrixXf sorted_features = features;
-	MatrixXf single_label_out(1, features.cols());
-
-	for(int label=0; label<ind.rows(); ++label) {
-		// Sort the features with the scores for this label
-		for(int j=0; j<features.cols(); ++j) {
-			sorted_features.col(j) = features.col(ind(label, j));
-		}
-
-		single_label_out.fill(0);
-		// Create a new lattice with these features
-		PairwisePotential sorted_pairwise(
-			sorted_features,
-			new PottsCompatibility(1),
-			CONST_KERNEL,
-			NO_NORMALIZATION
-		);
-		sorted_pairwise.apply_lower_sorted(single_label_out);
-		out.row(label) = single_label_out;
-	}
-	compatibility_->apply(out, out);
-}
 void PairwisePotential::apply_upper(MatrixXf & out, const MatrixXi & ind) const {
 	MatrixXf const & features = kernel_->features();
 	MatrixXf sorted_features = features;
@@ -397,63 +373,6 @@ PairwisePotential* PairwisePotential::apply_upper_sorted_merge(
 		upper_pairwise->getKernel()->apply_upper_right(out, middle_low, middle_high);
 
 		return upper_pairwise;
-	}
-}
-void PairwisePotential::apply_lower_sorted(MatrixXf & out) const {
-	MatrixXf const & features = kernel_->features();
-	int size = out.cols();
-
-	if(size <= 1) {
-		// Only a=b term remaining
-		return;
-	} else if(size<=2) {
-		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
-		double alpha = 1.0 / 0.6;
-		for(int c=0; c<out.cols(); ++c)
-			out(0, c) = 0;
-		for(int c=0; c<out.cols(); ++c) {
-            for(int b=0; b<c; ++b) {
-                VectorXf featDiff = (features.col(c) - features.col(b));
-                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
-            }
-        }
-	} else {
-		int middle_low, middle_high;
-		if(size%2==0) {
-			middle_low = size/2;
-			middle_high = size/2;
-		} else if(size%2==1) {
-			middle_low = floor(size/2.0);
-			middle_high = floor(size/2.0) + 1;
-		}
-
-		// Compute the lower left part
-		out.fill(0);
-		kernel_->apply_lower_left(out, middle_low, middle_high);
-
-		// Compute the upper left
-		PairwisePotential upper_pairwise(
-			features.leftCols(middle_high),
-			new PottsCompatibility(compatibility_->parameters()(0)),
-			CONST_KERNEL,
-			NO_NORMALIZATION
-		);
-		MatrixXf upper_out(1,middle_high);
-		upper_out.fill(0);
-		upper_pairwise.apply_lower_sorted(upper_out);
-		out.leftCols(middle_high) += upper_out;
-
-		// Compute the lower right
-		PairwisePotential lower_pairwise(
-			features.rightCols(middle_high),
-			new PottsCompatibility(compatibility_->parameters()(0)),
-			CONST_KERNEL,
-			NO_NORMALIZATION
-		);
-		MatrixXf lower_out(1,middle_high);
-		lower_out.fill(0);
-		lower_pairwise.apply_lower_sorted(lower_out);
-		out.rightCols(middle_high) += lower_out;
 	}
 }
 VectorXf PairwisePotential::parameters() const {

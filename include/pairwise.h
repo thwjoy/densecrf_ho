@@ -68,10 +68,8 @@ public:
 	PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype=CONST_KERNEL, NormalizationType ntype=NORMALIZE_SYMMETRIC, int max_size=-1);
     void apply(MatrixXf & out, const MatrixXf & Q) const;
     void apply_lower(MatrixXf & out, const MatrixXi & ind) const;
-    void apply_lower2(MatrixXf & out, const MatrixXi & ind) const;
     void apply_upper(MatrixXf & out, const MatrixXi & ind) const;
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
-    void apply_lower_sorted(MatrixXf & out) const;
     PairwisePotential* apply_lower_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
     PairwisePotential* apply_upper_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
     void merge(PairwisePotential & other, MatrixXf const & features, bool overlap = false);
