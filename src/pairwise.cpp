@@ -38,14 +38,17 @@ protected:
 	MatrixXf f_;
 	MatrixXf parameters_;
 	void initLattice( const MatrixXf & f, int max_size=-1 );
+    const Permutohedral & getPermu() const {
+    	return lattice_;
+    }
     void merge(const Kernel & other, MatrixXf const & features, bool overlap) {
     	// The normallizations won't be correct
     	assert(ntype_==NO_NORMALIZATION);
-    	const MatrixXf & f = other.features();
+    	const Permutohedral & other_lattice = other.getPermu();
     	if(overlap) {
-    		lattice_.add( f.rightCols(f.cols()-1) );
+    		lattice_.add( other_lattice, 1 );
     	} else {
-    		lattice_.add( f );
+    		lattice_.add( other_lattice );
     	}
     	f_ = features;
     }
@@ -125,7 +128,7 @@ public:
 		filter_lower_left(out, middle_low, middle_high);
 	}
 	virtual void apply_upper_right( MatrixXf & out, int middle_low, int middle_high) const {
-		filter_lower_left(out, middle_low, middle_high);
+		filter_upper_right(out, middle_low, middle_high);
 	}
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const {
 		filter( out, Q, false );
@@ -259,6 +262,24 @@ void PairwisePotential::apply_upper(MatrixXf & out, const MatrixXi & ind) const 
 	}
 	compatibility_->apply(out, out);
 }
+void PairwisePotential::apply_upper_minus_lower(MatrixXf & out, const MatrixXi & ind) const {
+	MatrixXf const & features = kernel_->features();
+	MatrixXf sorted_features = features;
+	MatrixXf single_label_out(1, features.cols());
+
+	for(int label=0; label<ind.rows(); ++label) {
+		// Sort the features with the scores for this label
+		for(int j=0; j<features.cols(); ++j) {
+			sorted_features.col(j) = features.col(ind(label, j));
+		}
+
+		single_label_out.fill(0);
+		PairwisePotential* p = apply_upper_minus_lower_sorted_merge(single_label_out, sorted_features, sorted_features.cols());
+		delete p;
+		out.row(label) = single_label_out;
+	}
+	compatibility_->apply(out, out);
+}
 PairwisePotential* PairwisePotential::apply_lower_sorted_merge(
 		MatrixXf & out,
 		MatrixXf const & features,
@@ -268,7 +289,7 @@ PairwisePotential* PairwisePotential::apply_lower_sorted_merge(
 	if(size <= 0) {
 		// This should never happen, this would create an empty permutohedral
 		assert(false);
-	} else if(size<=2) {
+	} else if(size<=SMALLEST_BLOCK) {
 		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
 		double alpha = 1.0 / 0.6;
 		for(int c=0; c<out.cols(); ++c)
@@ -326,7 +347,7 @@ PairwisePotential* PairwisePotential::apply_upper_sorted_merge(
 	if(size <= 0) {
 		// This should never happen, this would create an empty permutohedral
 		assert(false);
-	} else if(size<=2) {
+	} else if(size<=SMALLEST_BLOCK) {
 		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
 		double alpha = 1.0 / 0.6;
 		for(int c=0; c<out.cols(); ++c)
@@ -370,6 +391,76 @@ PairwisePotential* PairwisePotential::apply_upper_sorted_merge(
 		upper_pairwise->merge(*lower_pairwise, features, overlap);
 		delete lower_pairwise;
 
+		upper_pairwise->getKernel()->apply_upper_right(out, middle_low, middle_high);
+
+		return upper_pairwise;
+	}
+}
+PairwisePotential* PairwisePotential::apply_upper_minus_lower_sorted_merge(
+		MatrixXf & out,
+		MatrixXf const & features,
+		int max_size ) const {
+	int size = out.cols();
+
+	if(size <= 0) {
+		// This should never happen, this would create an empty permutohedral
+		assert(false);
+	} else if(size<=SMALLEST_BLOCK) {
+		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
+		double alpha = 1.0 / 0.6;
+		for(int c=0; c<out.cols(); ++c)
+			out(0, c) = 0;
+		for(int c=0; c<out.cols(); ++c) {
+			// Remove lower
+            for(int b=0; b<c; ++b) {
+                VectorXf featDiff = (features.col(c) - features.col(b));
+                out(0, c) -= exp(-featDiff.squaredNorm()) * alpha;
+            }
+			// Add upper
+            for(int b=c+1; b<out.cols(); ++b) {
+                VectorXf featDiff = (features.col(c) - features.col(b));
+                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
+            }
+        }
+
+		PairwisePotential* pairwise = new PairwisePotential(
+			features,
+			new PottsCompatibility(compatibility_->parameters()(0)),
+			CONST_KERNEL,
+			NO_NORMALIZATION,
+			max_size
+		);
+		return pairwise;
+	} else {
+		int middle_low, middle_high;
+		bool overlap = false;
+		if(size%2==0) {
+			middle_low = size/2;
+			middle_high = size/2;
+		} else if(size%2==1) {
+			middle_low = floor(size/2.0);
+			middle_high = floor(size/2.0) + 1;
+			overlap = true;
+		}
+
+		MatrixXf out_tmp(1,middle_high);
+		out_tmp.fill(0);
+		PairwisePotential* upper_pairwise = apply_upper_minus_lower_sorted_merge(out_tmp, features.leftCols(middle_high), max_size);
+		out.leftCols(middle_high) += out_tmp;
+
+		out_tmp.fill(0);
+		PairwisePotential* lower_pairwise = apply_upper_minus_lower_sorted_merge(out_tmp, features.rightCols(middle_high), middle_high);
+		out.rightCols(middle_high) += out_tmp;
+
+		upper_pairwise->merge(*lower_pairwise, features, overlap);
+		delete lower_pairwise;
+
+		// Remove lower
+		out *= -1;
+		upper_pairwise->getKernel()->apply_lower_left(out, middle_low, middle_high);
+		out *= -1;
+
+		// Add upper
 		upper_pairwise->getKernel()->apply_upper_right(out, middle_low, middle_high);
 
 		return upper_pairwise;

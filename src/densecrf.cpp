@@ -449,8 +449,6 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
 
     int it=0;
     do {
-        print_distri(Q);
-
         ++it;
         old_energy = energy;
 
@@ -462,19 +460,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         // Pairwise
         sortRows(Q, ind);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
-            // Remove lower
-            no_norm_pairwise[k]->apply_lower(tmp, ind);
-            tmp2.fill(0);
-            for(i=0; i<tmp.cols(); ++i) {
-                for(j=0; j<tmp.rows(); ++j) {
-                    tmp2(j, ind(j, i)) = tmp(j, i);
-                }
-            }
-            energy += dotProduct(Q, tmp2, dot_tmp);
-            grad += tmp2;
-
-            // Add upper
-            no_norm_pairwise[k]->apply_upper(tmp, ind);
+            // Add upper minus lower
+            no_norm_pairwise[k]->apply_upper_minus_lower(tmp, ind);
             tmp2.fill(0);
             for(i=0; i<tmp.cols(); ++i) {
                 for(j=0; j<tmp.rows(); ++j) {
@@ -488,7 +475,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         std::cout << it << ": " << energy << "\n";
 
         // Sub-gradient descent step
-        float lr = 1.0/(10000+it);
+        float lr = 1.0/(2000+it);
         Q -= lr*grad;
 
         // Project current estimates on valid space
@@ -516,9 +503,9 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-    } while(it<40);
+    } while(it<10);
     // This is the LP fractional energy
-    energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+    //energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
     std::cout <<"final: " << energy << "\n";
     free(no_norm_pairwise);
     return Q;
@@ -846,16 +833,10 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_no
     sortRows(Q, ind);
     MatrixXf tmp(Q.rows(), Q.cols());
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
-        // Add the upper
-        no_norm_pairwise[k]->apply_upper(tmp, ind);
+        // Add the upper minus the lower
+        no_norm_pairwise[k]->apply_upper_minus_lower(tmp, ind);
         assert(tmp.maxCoeff()<1e-3);
         energy -= dotProduct(Q, tmp, dot_tmp);
-        // Remove the lower
-        no_norm_pairwise[k]->apply_upper(tmp, ind);
-        assert(tmp.maxCoeff()<1e-3);
-        energy += dotProduct(Q, tmp, dot_tmp);
-
-
     }
 
     return energy;

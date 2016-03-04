@@ -28,6 +28,8 @@
 #include "labelcompatibility.h"
 #include "permutohedral.h"
 
+#define SMALLEST_BLOCK 15
+
 // The filter in the dense CRF can be normalized in a few different ways
 enum NormalizationType {
 	NO_NORMALIZATION,    // No normalization whatsoever (will lead to a substantial approximation error)
@@ -55,6 +57,7 @@ public:
 	virtual MatrixXf features() const = 0;
     virtual KernelType ktype() const = 0;
     virtual NormalizationType ntype() const = 0;
+    virtual const Permutohedral & getPermu() const = 0;
 };
 
 class PairwisePotential{
@@ -69,9 +72,11 @@ public:
     void apply(MatrixXf & out, const MatrixXf & Q) const;
     void apply_lower(MatrixXf & out, const MatrixXi & ind) const;
     void apply_upper(MatrixXf & out, const MatrixXi & ind) const;
+    void apply_upper_minus_lower(MatrixXf & out, const MatrixXi & ind) const;
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
     PairwisePotential* apply_lower_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
     PairwisePotential* apply_upper_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
+    PairwisePotential* apply_upper_minus_lower_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
     void merge(PairwisePotential & other, MatrixXf const & features, bool overlap = false);
 	
 	// Get the parameters
