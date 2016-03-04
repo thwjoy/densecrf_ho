@@ -25,8 +25,6 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include <fstream>
-#include <iostream>
 #include "densecrf.h"
 #include "eigen_utils.hpp"
 #include "newton_cccp.hpp"
@@ -406,19 +404,6 @@ void print_distri(MatrixXf const & Q) {
     }
 }
 
-struct classcomp {
-    bool operator() (const VectorXf& lhs, const VectorXf& rhs) const
-        {
-            for(int i=0; i<lhs.rows(); ++i)
-            {
-                if(lhs(i)!=rhs(i)){
-                    return true;
-                }
-            }
-            return false;
-        }
-};
-
 MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
     MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
         grad(M_, N_), tmp2(M_, N_);
@@ -526,18 +511,10 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-        // This is the LP fractional energy
     } while(it<40);
+    // This is the LP fractional energy
     energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
     std::cout <<"final: " << energy << "\n";
-    std::set<VectorXf, classcomp> unique_pixels;
-    VectorXf pix;
-    for(int col=0; col<Q.cols(); ++col) {
-        pix = Q.col(col);
-        unique_pixels.insert(pix);
-    }
-    std::cout << "Different pixels: " << unique_pixels.size() << "\n";
-
     free(no_norm_pairwise);
     return Q;
 }
