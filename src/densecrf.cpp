@@ -275,6 +275,9 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
         }
         // Take a step
         Q += optimal_step_size * sx;
+        if (not valid_probability(Q)) {
+            std::cout << "Bad proba" << '\n';
+        }
         // Compute the gradient at the new estimates.
         grad += 2* optimal_step_size * psisx;
         //energy = compute_LR_QP_value(Q, diag_dom);

@@ -31,6 +31,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
         if (not file_exist(output_path)) {
             clock_t start, end;
             double timing;
+            std::cout << image_path << std::endl;
             start = clock();
             Q = crf.unary_init();
             if (method == "mf5") {
