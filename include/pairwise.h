@@ -57,6 +57,7 @@ public:
 	virtual MatrixXf features() const = 0;
     virtual KernelType ktype() const = 0;
     virtual NormalizationType ntype() const = 0;
+    virtual const Permutohedral & getPermu() const = 0;
 };
 
 class PairwisePotential{

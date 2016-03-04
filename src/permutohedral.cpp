@@ -35,7 +35,7 @@ inline int round(double X) {
 
 #ifdef __SSE__
 // SSE Permutoheral lattice
-//# define SSE_PERMUTOHEDRAL
+# define SSE_PERMUTOHEDRAL
 #endif
 
 #if defined(SSE_PERMUTOHEDRAL)
@@ -52,13 +52,34 @@ inline int round(double X) {
 
 Permutohedral::Permutohedral():N_( 0 ), M_( 0 ), d_( 0 ), hash_table_(0,0) {
 }
+int Permutohedral::getSize() const {
+	return N_;
+}
+const std::vector<int> &Permutohedral::getRank() const {
+	return rank_;
+}
+const std::vector<int> &Permutohedral::getOffset() const {
+	return offset_;
+}
+const std::vector<float> &Permutohedral::getBarycentric() const {
+	return barycentric_;
+}
+const HashTable &Permutohedral::getHash() const {
+	return hash_table_;
+}
 #ifdef SSE_PERMUTOHEDRAL
-void Permutohedral::init ( const MatrixXf & feature )
+void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 {
 	// Compute the lattice coordinates for each feature [there is going to be a lot of magic here
 	N_ = feature.cols();
 	d_ = feature.rows();
-	HashTable hash_table( d_, N_/**(d_+1)*/ );
+
+	// We want to save the hash table to be able to add more elements afterwards sometimes
+	if(nEl_max == -1) {
+		hash_table_ = HashTable( d_,  N_*(d_+1));
+	} else {
+		hash_table_ = HashTable( d_,  nEl_max*(d_+1));
+	}
 	
 	const int blocksize = sizeof(__m128) / sizeof(float);
 	const __m128 invdplus1   = _mm_set1_ps( 1.0f / (d_+1) );
@@ -185,7 +206,7 @@ void Permutohedral::init ( const MatrixXf & feature )
 				for( int i=0; i<d_; i++ ){
 					key[i] = frem0[i*blocksize+j] + canonical[ remainder*(d_+1) + (int)frank[i*blocksize+j] ];
 				}
-				offset_[ (j+k)*(d_+1)+remainder ] = hash_table.find( key, true );
+				offset_[ (j+k)*(d_+1)+remainder ] = hash_table_.find( key, true );
 				rank_[ (j+k)*(d_+1)+remainder ] = frank[remainder*blocksize+j];
 				barycentric_[ (j+k)*(d_+1)+remainder ] = barycentric[ j*(d_+2)+remainder ];
 			}
@@ -209,7 +230,7 @@ void Permutohedral::init ( const MatrixXf & feature )
 	// Find the Neighbors of each lattice point
 	
 	// Get the number of vertices in the lattice
-	M_ = hash_table.size();
+	M_ = hash_table_.size();
 	
 	// Create the neighborhood structure
 	blur_neighbors_.resize( (d_+1)*M_ );
@@ -220,7 +241,7 @@ void Permutohedral::init ( const MatrixXf & feature )
 	// For each of d+1 axes,
 	for( int j = 0; j <= d_; j++ ){
 		for( int i=0; i<M_; i++ ){
-			const short * key = hash_table.getKey( i );
+			const short * key = hash_table_.getKey( i );
 			for( int k=0; k<d_; k++ ){
 				n1[k] = key[k] - 1;
 				n2[k] = key[k] + 1;
@@ -228,8 +249,8 @@ void Permutohedral::init ( const MatrixXf & feature )
 			n1[j] = key[j] + d_;
 			n2[j] = key[j] - d_;
 			
-			blur_neighbors_[j*M_+i].n1 = hash_table.find( n1 );
-			blur_neighbors_[j*M_+i].n2 = hash_table.find( n2 );
+			blur_neighbors_[j*M_+i].n1 = hash_table_.find( n1 );
+			blur_neighbors_[j*M_+i].n2 = hash_table_.find( n2 );
 		}
 	}
 	delete[] n1;
@@ -243,11 +264,9 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 	d_ = feature.rows();
 
 	// We want to save the hash table to be able to add more elements afterwards sometimes
-	bool save_hash = false;
 	if(nEl_max == -1) {
 		hash_table_ = HashTable( d_,  N_*(d_+1));
 	} else {
-		save_hash = true;
 		hash_table_ = HashTable( d_,  nEl_max*(d_+1));
 	}
 	
@@ -397,134 +416,38 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 
 	delete[] n1;
 	delete[] n2;
-
-	if(!save_hash) {
-		hash_table_ = HashTable(0,0);
-	}
 }
 #endif
-void Permutohedral::add ( const MatrixXf & feature ) {
+void Permutohedral::add ( const Permutohedral & other_permu, int feat_offset ) {
+	// Other permutohedral size
+	int size = other_permu.getSize();
+
 	// Compute the lattice coordinates for each feature [there is going to be a lot of magic here
 	int old_N = N_;
-	N_ = N_ + feature.cols();
-	assert(d_==feature.rows());
+	N_ = N_ + size - feat_offset;
 	assert(hash_table_.size() > 0);
 
 	// Allocate the class memory
 	offset_.resize( (d_+1)*N_ );
 	rank_.resize( (d_+1)*N_ );
 	barycentric_.resize( (d_+1)*N_ );
-	
-	// Allocate the local memory
-	float * scale_factor = new float[d_];
-	float * elevated = new float[d_+1];
-	float * rem0 = new float[d_+1];
-	float * barycentric = new float[d_+2];
-	short * rank = new short[d_+1];
-	short * canonical = new short[(d_+1)*(d_+1)];
-	short * key = new short[d_+1];
-	
-	// Compute the canonical simplex
-	for( int i=0; i<=d_; i++ ){
-		for( int j=0; j<=d_-i; j++ )
-			canonical[i*(d_+1)+j] = i;
-		for( int j=d_-i+1; j<=d_; j++ )
-			canonical[i*(d_+1)+j] = i - (d_+1);
-	}
-	
-	// Expected standard deviation of our filter (p.6 in [Adams etal 2010])
-	float inv_std_dev = sqrt(2.0 / 3.0)*(d_+1);
-	// Compute the diagonal part of E (p.5 in [Adams etal 2010])
-	for( int i=0; i<d_; i++ )
-		scale_factor[i] = 1.0 / sqrt( double((i+2)*(i+1)) ) * inv_std_dev;
-	
-	// Compute the simplex each feature lies in
-	for( int k=0; k<feature.cols(); k++ ){
-		// Elevate the feature ( y = Ep, see p.5 in [Adams etal 2010])
-		const float * f = &feature(0,k);
-		
-		// sm contains the sum of 1..n of our faeture vector
-		float sm = 0;
-		for( int j=d_; j>0; j-- ){
-			float cf = f[j-1]*scale_factor[j-1];
-			elevated[j] = sm - j*cf;
-			sm += cf;
-		}
-		elevated[0] = sm;
-		
-		// Find the closest 0-colored simplex through rounding
-		float down_factor = 1.0f / (d_+1);
-		float up_factor = (d_+1);
-		int sum = 0;
-		for( int i=0; i<=d_; i++ ){
-			//int rd1 = round( down_factor * elevated[i]);
-			int rd2;
-			float v = down_factor * elevated[i];
-			float up = ceilf(v)*up_factor;
-			float down = floorf(v)*up_factor;
-			if (up - elevated[i] < elevated[i] - down) rd2 = (short)up;
-			else rd2 = (short)down;
 
-			//if(rd1!=rd2)
-			//	break;
+	// Add the elements from the other permutohedral
+	const HashTable & other_hash_table = other_permu.getHash();
+	const std::vector<int> & other_rank = other_permu.getRank();
+	const std::vector<int> & other_offset = other_permu.getOffset();
+	const std::vector<float> & other_bary = other_permu.getBarycentric();
 
-			rem0[i] = rd2;
-			sum += rd2*down_factor;
-		}
-		
-		// Find the simplex we are in and store it in rank (where rank describes what position coorinate i has in the sorted order of the features values)
-		for( int i=0; i<=d_; i++ )
-			rank[i] = 0;
-		for( int i=0; i<d_; i++ ){
-			double di = elevated[i] - rem0[i];
-			for( int j=i+1; j<=d_; j++ )
-				if ( di < elevated[j] - rem0[j])
-					rank[i]++;
-				else
-					rank[j]++;
-		}
-		
-		// If the point doesn't lie on the plane (sum != 0) bring it back
-		for( int i=0; i<=d_; i++ ){
-			rank[i] += sum;
-			if ( rank[i] < 0 ){
-				rank[i] += d_+1;
-				rem0[i] += d_+1;
-			}
-			else if ( rank[i] > d_ ){
-				rank[i] -= d_+1;
-				rem0[i] -= d_+1;
-			}
-		}
-		
-		// Compute the barycentric coordinates (p.10 in [Adams etal 2010])
-		for( int i=0; i<=d_+1; i++ )
-			barycentric[i] = 0;
-		for( int i=0; i<=d_; i++ ){
-			float v = (elevated[i] - rem0[i])*down_factor;
-			barycentric[d_-rank[i]  ] += v;
-			barycentric[d_-rank[i]+1] -= v;
-		}
-		// Wrap around
-		barycentric[0] += 1.0 + barycentric[d_+1];
-		
+	for( int k=feat_offset; k<size; k++ ){
 		// Compute all vertices and their offset
 		for( int remainder=0; remainder<=d_; remainder++ ){
-			for( int i=0; i<d_; i++ )
-				key[i] = rem0[i] + canonical[ remainder*(d_+1) + rank[i] ];
-			offset_[ (old_N + k)*(d_+1)+remainder ] = hash_table_.find( key, true );
-			rank_[ (old_N + k)*(d_+1)+remainder ] = rank[remainder];
-			barycentric_[ (old_N + k)*(d_+1)+remainder ] = barycentric[ remainder ];
+			int offset = other_offset[k*(d_+1)+remainder];
+			const short * key = other_hash_table.getKey( offset );
+			offset_[ (old_N + k - feat_offset)*(d_+1)+remainder ] = hash_table_.find( key, true );
+			rank_[ (old_N + k - feat_offset)*(d_+1)+remainder ] = other_rank[k*(d_+1)+remainder];
+			barycentric_[ (old_N + k - feat_offset)*(d_+1)+remainder ] = other_bary[k*(d_+1)+remainder];
 		}
 	}
-	delete [] scale_factor;
-	delete [] elevated;
-	delete [] rem0;
-	delete [] barycentric;
-	delete [] rank;
-	delete [] canonical;
-	delete [] key;
-	
 	
 	// Find the Neighbors of each lattice point
 	

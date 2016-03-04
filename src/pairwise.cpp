@@ -38,14 +38,17 @@ protected:
 	MatrixXf f_;
 	MatrixXf parameters_;
 	void initLattice( const MatrixXf & f, int max_size=-1 );
+    const Permutohedral & getPermu() const {
+    	return lattice_;
+    }
     void merge(const Kernel & other, MatrixXf const & features, bool overlap) {
     	// The normallizations won't be correct
     	assert(ntype_==NO_NORMALIZATION);
-    	const MatrixXf & f = other.features();
+    	const Permutohedral & other_lattice = other.getPermu();
     	if(overlap) {
-    		lattice_.add( f.rightCols(f.cols()-1) );
+    		lattice_.add( other_lattice, 1 );
     	} else {
-    		lattice_.add( f );
+    		lattice_.add( other_lattice );
     	}
     	f_ = features;
     }
