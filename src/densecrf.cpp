@@ -527,8 +527,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
 
         assert(valid_probability(Q));
         // This is the LP fractional energy
-        energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
     } while(it<40);
+    energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
     std::cout <<"final: " << energy << "\n";
     std::set<VectorXf, classcomp> unique_pixels;
     VectorXf pix;
