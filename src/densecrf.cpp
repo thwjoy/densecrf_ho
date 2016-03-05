@@ -266,7 +266,15 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
 
         optimal_step_size = - num / (2 * denom);
         if (optimal_step_size > 1) {
+            // Respect the bounds.
             optimal_step_size = 1;
+        }
+        if (optimal_step_size < 0) {
+            // Stay between the current step and the optimal.
+            // Theoretically shouldn't happen but we accumulate
+            // floating point errors when we compute the polynomial
+            // coefficients.
+            optimal_step_size = 0;
         }
         if (denom == 0) {
             // This means that the conditional gradient is the same
