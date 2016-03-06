@@ -651,6 +651,93 @@ void Permutohedral::seqCompute_upper_right ( float* out, int value_size, int mid
 	delete[] values;
 	delete[] new_values;
 }
+#include <unordered_set>
+void Permutohedral::seqCompute_upper_minus_lower ( float* out, int low, int middle_low, int middle_high, int high ) const
+{
+	// Shift all values by 1 such that -1 -> 0 (used for blurring)
+	float * values = new float[ M_+2 ];
+	float * new_values = new float[ M_+2 ];
+	std::unordered_set<int> activated;
+	
+	//// Upper
+	memset(values, 0, (M_+2)*sizeof(float));
+	memset(new_values, 0, (M_+2)*sizeof(float));
+	activated.clear();
+	
+	// Splatting
+	for( int i=middle_high; i<high; i++ ){
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j];
+			float w = barycentric_[i*(d_+1)+j];
+			values[ o+1 ] += w * 1;
+			activated.insert(o);
+		}
+	}
+	for( int i=low; i<middle_low; ++i) {
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j];
+			activated.insert(o);
+		}
+	}
+
+	// Blurring
+	for( int j=0; j<=d_ && j>=0; j++ ){
+		for( int i:activated ){
+			int n1 = blur_neighbors_[j*M_+i].n1;
+			int n2 = blur_neighbors_[j*M_+i].n2;
+			//std::cout<<i<<" "<<n1<<" "<<n2<<std::endl;
+			new_values[i+1] = values[i+1]+0.5*(values[n1+1] + values[n2+1]);
+		}
+		std::swap( values, new_values );
+	}
+	// Alpha is a magic scaling constant (write Andrew if you really wanna understand this)
+	float alpha = 1.0f / (1+powf(2, -d_));
+	
+	// Slicing
+	for( int i=low;  i<middle_low; i++ ){
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j]+1;
+			float w = barycentric_[i*(d_+1)+j];
+			out[ i ] += w * values[ o ] * alpha;
+		}
+	}
+	
+	//// Lower
+	memset(values, 0, (M_+2)*sizeof(float));
+	memset(new_values, 0, (M_+2)*sizeof(float));
+	
+	// Splatting
+	for( int i=low; i<middle_low; i++ ){
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j];
+			float w = barycentric_[i*(d_+1)+j];
+			values[ o+1 ] += w * 1;
+		}
+	}
+
+	// Blurring
+	for( int j=0; j<=d_ && j>=0; j++ ){
+		for( int i:activated ){
+			int n1 = blur_neighbors_[j*M_+i].n1;
+			int n2 = blur_neighbors_[j*M_+i].n2;
+			new_values[i+1] = values[i+1]+0.5*(values[n1+1] + values[n2+1]);
+		}
+		std::swap( values, new_values );
+	}
+	
+	// Slicing
+	for( int i=middle_high;  i<high; i++ ){
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j]+1;
+			float w = barycentric_[i*(d_+1)+j];
+			out[ i ] -= w * values[ o ] * alpha;
+		}
+	}
+	
+	
+	delete[] values;
+	delete[] new_values;
+}
 #ifdef SSE_PERMUTOHEDRAL
 void Permutohedral::sseCompute ( float* out, const float* in, int value_size, bool reverse ) const
 {
@@ -730,6 +817,12 @@ void Permutohedral::compute_upper_right ( MatrixXf & out, int middle_low, int mi
 	// Here anly one label at a time so always seq
 	assert(out.cols()==N_);
 	seqCompute_upper_right(out.data(), out.rows(), middle_low, middle_high);
+}
+void Permutohedral::compute_upper_minus_lower ( MatrixXf & out, int low, int middle_low, int middle_high, int high ) const
+{
+	// Here anly one label at a time so always seq
+	assert(out.cols()==N_);
+	seqCompute_upper_minus_lower(out.data(), low, middle_low, middle_high, high);
 }
 void Permutohedral::compute ( MatrixXf & out, const MatrixXf & in, bool reverse ) const
 {

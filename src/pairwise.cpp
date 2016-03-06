@@ -82,6 +82,12 @@ protected:
 		// Filter
 			lattice_.compute_upper_right( out, middle_low, middle_high );
 	}
+	void filter_upper_minus_lower( MatrixXf & out, int low, int middle_low, int middle_high, int high ) const {
+		// Normalization makes no sense here since this would always return 1
+	
+		// Filter
+			lattice_.compute_upper_minus_lower( out, low, middle_low, middle_high, high );
+	}
 	// Compute d/df a^T*K*b
 	MatrixXf kernelGradient( const MatrixXf & a, const MatrixXf & b ) const {
 		MatrixXf g = 0*f_;
@@ -130,6 +136,9 @@ public:
 	virtual void apply_upper_right( MatrixXf & out, int middle_low, int middle_high) const {
 		filter_upper_right(out, middle_low, middle_high);
 	}
+	virtual void apply_upper_minus_lower( MatrixXf & out, int low, int middle_low, int middle_high, int high) const {
+		filter_upper_minus_lower(out, low, middle_low, middle_high, high);
+	}
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const {
 		filter( out, Q, false );
 	}
@@ -172,7 +181,7 @@ public:
 		}
 	}
 
-	virtual MatrixXf features() const {
+	virtual MatrixXf const & features() const {
 		return f_;
 	}
 
@@ -262,7 +271,7 @@ void PairwisePotential::apply_upper(MatrixXf & out, const MatrixXi & ind) const 
 	}
 	compatibility_->apply(out, out);
 }
-void PairwisePotential::apply_upper_minus_lower(MatrixXf & out, const MatrixXi & ind) const {
+void PairwisePotential::apply_upper_minus_lower2(MatrixXf & out, const MatrixXi & ind) const {
 	MatrixXf const & features = kernel_->features();
 	MatrixXf sorted_features = features;
 	MatrixXf single_label_out(1, features.cols());
@@ -279,6 +288,58 @@ void PairwisePotential::apply_upper_minus_lower(MatrixXf & out, const MatrixXi &
 		out.row(label) = single_label_out;
 	}
 	compatibility_->apply(out, out);
+}
+void PairwisePotential::apply_upper_minus_lower(MatrixXf & out, const MatrixXi & ind) const {
+	MatrixXf const & features = kernel_->features();
+	MatrixXf sorted_features = features;
+	MatrixXf single_label_out(1, features.cols());
+
+	for(int label=0; label<ind.rows(); ++label) {
+		// Sort the features with the scores for this label
+		for(int j=0; j<features.cols(); ++j) {
+			sorted_features.col(j) = features.col(ind(label, j));
+		}
+
+		PairwisePotential pairwise(sorted_features, new PottsCompatibility(1));
+
+		single_label_out.fill(0);
+		pairwise.apply_upper_minus_lower_sorted_slice(single_label_out, 0, sorted_features.cols());
+		out.row(label) = single_label_out;
+	}
+	compatibility_->apply(out, out);
+}
+void PairwisePotential::apply_upper_minus_lower_sorted_slice(MatrixXf & out, int min, int max) const {
+	int size = max-min;
+	if(size <= 0) {
+		// This should never happen
+		assert(false);
+	} else if(size<=SMALLEST_BLOCK) {
+		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
+		MatrixXf const & features = kernel_->features();
+		double alpha = 1.0 / 0.6;
+		for(int c=min; c<max; ++c) {
+            for(int b=min; b<c; ++b) {
+                VectorXf featDiff = (features.col(c) - features.col(b));
+                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
+            }
+        }
+	} else {
+		int middle_low, middle_high;
+		if(size%2==0) {
+			middle_low = min + size/2;
+			middle_high = min + size/2;
+		} else if(size%2==1) {
+			middle_low = floor(min + size/2.0);
+			middle_high = floor(min + size/2.0) + 1;
+		}
+
+		// Upper left
+		apply_upper_minus_lower_sorted_slice(out, min, middle_high);
+		// Lower right
+		apply_upper_minus_lower_sorted_slice(out, middle_low, max);
+		// Lower left
+		kernel_->apply_upper_minus_lower(out, min, middle_low, middle_high, max);
+	}
 }
 PairwisePotential* PairwisePotential::apply_lower_sorted_merge(
 		MatrixXf & out,

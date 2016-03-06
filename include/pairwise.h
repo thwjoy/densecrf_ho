@@ -51,10 +51,11 @@ public:
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const = 0;
     virtual void apply_lower_left( MatrixXf & out, int middle_low, int middle_high) const = 0;
     virtual void apply_upper_right( MatrixXf & out, int middle_low, int middle_high) const = 0;
+    virtual void apply_upper_minus_lower( MatrixXf & out, int low, int middle_low, int middle_high, int high) const = 0;
 	virtual VectorXf parameters() const = 0;
 	virtual void setParameters( const VectorXf & p ) = 0;
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const = 0;
-	virtual MatrixXf features() const = 0;
+	virtual MatrixXf const & features() const = 0;
     virtual KernelType ktype() const = 0;
     virtual NormalizationType ntype() const = 0;
     virtual const Permutohedral & getPermu() const = 0;
@@ -73,10 +74,12 @@ public:
     void apply_lower(MatrixXf & out, const MatrixXi & ind) const;
     void apply_upper(MatrixXf & out, const MatrixXi & ind) const;
     void apply_upper_minus_lower(MatrixXf & out, const MatrixXi & ind) const;
+    void apply_upper_minus_lower2(MatrixXf & out, const MatrixXi & ind) const;
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
     PairwisePotential* apply_lower_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
     PairwisePotential* apply_upper_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
     PairwisePotential* apply_upper_minus_lower_sorted_merge(MatrixXf & out, MatrixXf const & features, int max_size) const;
+    void apply_upper_minus_lower_sorted_slice(MatrixXf & out, int min, int max) const;
     void merge(PairwisePotential & other, MatrixXf const & features, bool overlap = false);
 	
 	// Get the parameters
