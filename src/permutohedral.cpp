@@ -651,18 +651,19 @@ void Permutohedral::seqCompute_upper_right ( float* out, int value_size, int mid
 	delete[] values;
 	delete[] new_values;
 }
-#include <unordered_set>
 void Permutohedral::seqCompute_upper_minus_lower ( float* out, int low, int middle_low, int middle_high, int high ) const
 {
 	// Shift all values by 1 such that -1 -> 0 (used for blurring)
 	float * values = new float[ M_+2 ];
 	float * new_values = new float[ M_+2 ];
-	std::unordered_set<int> activated;
+	bool * activated = new bool[M_];
+	std::vector<int> list;
+	list.reserve(d_*M_);
 	
 	//// Upper
 	memset(values, 0, (M_+2)*sizeof(float));
 	memset(new_values, 0, (M_+2)*sizeof(float));
-	activated.clear();
+	memset(activated, 0, M_*sizeof(bool));
 	
 	// Splatting
 	for( int i=middle_high; i<high; i++ ){
@@ -670,22 +671,25 @@ void Permutohedral::seqCompute_upper_minus_lower ( float* out, int low, int midd
 			int o = offset_[i*(d_+1)+j];
 			float w = barycentric_[i*(d_+1)+j];
 			values[ o+1 ] += w * 1;
-			activated.insert(o);
+			if(!activated[o]) {
+				list.push_back(o);
+			}
 		}
 	}
 	for( int i=low; i<middle_low; ++i) {
 		for( int j=0; j<=d_; j++ ){
 			int o = offset_[i*(d_+1)+j];
-			activated.insert(o);
+			if(!activated[o]) {
+				list.push_back(o);
+			}
 		}
 	}
 
 	// Blurring
 	for( int j=0; j<=d_ && j>=0; j++ ){
-		for( int i:activated ){
+		for( int i:list ){
 			int n1 = blur_neighbors_[j*M_+i].n1;
 			int n2 = blur_neighbors_[j*M_+i].n2;
-			//std::cout<<i<<" "<<n1<<" "<<n2<<std::endl;
 			new_values[i+1] = values[i+1]+0.5*(values[n1+1] + values[n2+1]);
 		}
 		std::swap( values, new_values );
@@ -717,7 +721,7 @@ void Permutohedral::seqCompute_upper_minus_lower ( float* out, int low, int midd
 
 	// Blurring
 	for( int j=0; j<=d_ && j>=0; j++ ){
-		for( int i:activated ){
+		for( int i:list ){
 			int n1 = blur_neighbors_[j*M_+i].n1;
 			int n2 = blur_neighbors_[j*M_+i].n2;
 			new_values[i+1] = values[i+1]+0.5*(values[n1+1] + values[n2+1]);
