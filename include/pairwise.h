@@ -28,7 +28,7 @@
 #include "labelcompatibility.h"
 #include "permutohedral.h"
 
-#define SMALLEST_BLOCK 15
+#define SMALLEST_BLOCK 30
 
 // The filter in the dense CRF can be normalized in a few different ways
 enum NormalizationType {

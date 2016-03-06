@@ -670,16 +670,19 @@ void Permutohedral::seqCompute_upper_minus_lower ( float* out, int low, int midd
 		for( int j=0; j<=d_; j++ ){
 			int o = offset_[i*(d_+1)+j];
 			float w = barycentric_[i*(d_+1)+j];
-			values[ o+1 ] += w * 1;
+			values[ o+1 ] += w;
 			if(!activated[o]) {
+				activated[o] = true;
 				list.push_back(o);
 			}
 		}
 	}
+
 	for( int i=low; i<middle_low; ++i) {
 		for( int j=0; j<=d_; j++ ){
 			int o = offset_[i*(d_+1)+j];
 			if(!activated[o]) {
+				activated[o] = true;
 				list.push_back(o);
 			}
 		}
@@ -715,7 +718,7 @@ void Permutohedral::seqCompute_upper_minus_lower ( float* out, int low, int midd
 		for( int j=0; j<=d_; j++ ){
 			int o = offset_[i*(d_+1)+j];
 			float w = barycentric_[i*(d_+1)+j];
-			values[ o+1 ] += w * 1;
+			values[ o+1 ] += w;
 		}
 	}
 
