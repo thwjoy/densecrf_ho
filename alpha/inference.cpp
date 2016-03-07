@@ -57,6 +57,7 @@ void minimize_dense_alpha_divergence(std::string path_to_image, std::string path
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
+    delete[] img;
 
 }
 
@@ -94,6 +95,7 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
+    delete[] img;
 }
 
 void minimize_mean_field_fixed_iter(std::string path_to_image, std::string path_to_unaries,
@@ -130,6 +132,7 @@ void minimize_mean_field_fixed_iter(std::string path_to_image, std::string path_
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
+    delete[] img;
 }
 
 
@@ -167,6 +170,7 @@ void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
+    delete[] img;
 }
 
 void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
@@ -203,6 +207,7 @@ void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
+    delete[] img;
 }
 
 void minimize_concave_QP_cccp(std::string path_to_image, std::string path_to_unaries,
@@ -279,11 +284,12 @@ void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_una
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
+    delete[] img;
 }
 
 void minimize_LP(std::string path_to_image, std::string path_to_unaries,
                       Potts_weight_set parameters, std::string path_to_output,
-                      std::string dataset_name) {
+                      std::string dataset_name, bool use_cond_grad) {
     img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
@@ -304,7 +310,11 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     std::cout<<"Initialize with QP"<<std::endl;
     MatrixXf Q = crf.qp_inference(init);
 
-    std::cout<<"Run the actual LP"<<std::endl;
+    if(use_cond_grad) {
+        std::cout<<"Run the actual LP CG"<<std::endl;
+    } else {
+        std::cout<<"Run the actual LP SG"<<std::endl;
+    }
     double timing = -1;
     /*for(int it=0; it<20; it++) {
       std::string partial_out = path_to_output + "-" + std::to_string(it)+ ".bmp";
@@ -316,7 +326,7 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
       }/**/
     start = clock();
     srand(start);
-    Q = crf.lp_inference(Q);
+    Q = crf.lp_inference(Q, use_cond_grad);
     end = clock();
     timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
@@ -327,8 +337,8 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
 // Perform the MAP estimation on the fully factorized distribution
 // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
+    delete[] img;
 }
-
 
 void gradually_minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
                                    Potts_weight_set parameters, std::string path_to_output,
@@ -360,6 +370,7 @@ void gradually_minimize_mean_field(std::string path_to_image, std::string path_t
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
+    delete[] img;
 }
 
 void unaries_baseline(std::string path_to_unaries, std::string path_to_output, std::string dataset_name){
@@ -391,5 +402,6 @@ label_matrix minimize_mean_field(std::string path_to_image, std::string path_to_
     MatrixXf Q = crf.inference(init);
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
+    delete[] img;
     return get_label_matrix(Q, size);
 }

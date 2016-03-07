@@ -618,6 +618,7 @@ void Permutohedral::seqCompute_upper_minus_lower ( float* out, int low, int midd
 	
 	delete[] values;
 	delete[] new_values;
+	delete[] activated;
 }
 #ifdef SSE_PERMUTOHEDRAL
 void Permutohedral::sseCompute ( float* out, const float* in, int value_size, bool reverse ) const
