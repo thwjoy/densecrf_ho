@@ -492,7 +492,7 @@ void print_distri(MatrixXf const & Q) {
 
 MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     MatrixXf Q(M_, N_), best_Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
-        grad(M_, N_), tmp2(M_, N_), desc(M_, N_);
+        grad(M_, N_), tmp2(M_, N_), desc(M_, N_), tmp_single_line(1, N_);
     MatrixP dot_tmp(M_,N_);
     MatrixXi ind(M_, N_);
     VectorXi K(N_);
@@ -529,7 +529,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     // Compute the value of the energy
     double old_energy;
     assert(valid_probability(Q));
-    double energy = 0;//compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
+    double energy = 0;
 
     int it=0;
     do {
@@ -544,19 +544,32 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
         // Pairwise
         sortRows(Q, ind);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
-            // Add upper minus lower
-            no_norm_pairwise[k]->apply_upper_minus_lower(tmp, ind);
-            tmp2.fill(0);
-            for(i=0; i<tmp.cols(); ++i) {
-                for(j=0; j<tmp.rows(); ++j) {
-                    tmp2(j, ind(j, i)) = tmp(j, i);
+            // Special case for 2 labels (used mainly for alpha expansion)
+            if(Q.rows()==2) {
+                // Compute only for one label
+                no_norm_pairwise[k]->apply_upper_minus_lower(tmp_single_line, ind.row(0));
+                tmp2.fill(0);
+                for(i=0; i<tmp.cols(); ++i) {
+                    tmp2(0, ind(0, i)) = tmp_single_line(i);
+                }
+                // Closed form solution for the other label
+                tmp2.row(1) = - tmp2.row(0);
+            } else {
+                // Add upper minus lower
+                no_norm_pairwise[k]->apply_upper_minus_lower(tmp, ind);
+                tmp2.fill(0);
+                for(i=0; i<tmp.cols(); ++i) {
+                    for(j=0; j<tmp.rows(); ++j) {
+                        tmp2(j, ind(j, i)) = tmp(j, i);
+                    }
                 }
             }
+                
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
         // Print previous iteration energy
-        std::cout << it << ": " << energy << "\n";
+        // std::cout << it << ": " << energy << "\n";
 
         // Sub-gradient descent step
         double int_energy = 0;
@@ -647,9 +660,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
 
         assert(valid_probability(Q));
     } while(it<5);
-    // This is the LP fractional energy
-    //energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
-    std::cout <<"final projected energy: " << best_int_energy << "\n";
+    // std::cout <<"final projected energy: " << best_int_energy << "\n";
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         delete no_norm_pairwise[k];
     }
