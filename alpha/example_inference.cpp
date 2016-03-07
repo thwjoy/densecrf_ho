@@ -42,6 +42,6 @@ int main(int argc, char* argv[]) {
     // // minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
     std::cout << "LP SG line search" << '\n';
     minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_sg_line_output, dataset_name, false);
-    std::cout << "LP CG line seaerch" << '\n';
+    std::cout << "LP CG line search" << '\n';
     minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_cg_line_output, dataset_name, true);
 }

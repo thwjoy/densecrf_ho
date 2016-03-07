@@ -307,14 +307,8 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     //crf.compute_kl_divergence();
     MatrixXf init = crf.unary_init();
     clock_t start, end;
-    std::cout<<"Initialize with QP"<<std::endl;
     MatrixXf Q = crf.qp_inference(init);
 
-    if(use_cond_grad) {
-        std::cout<<"Run the actual LP CG"<<std::endl;
-    } else {
-        std::cout<<"Run the actual LP SG"<<std::endl;
-    }
     double timing = -1;
     /*for(int it=0; it<20; it++) {
       std::string partial_out = path_to_output + "-" + std::to_string(it)+ ".bmp";
