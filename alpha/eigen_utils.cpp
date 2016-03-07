@@ -1,4 +1,5 @@
 #include "eigen_utils.hpp"
+#include <iostream>
 
 bool all_close_to_zero(const VectorXf & vec, float ref){
     for (int i = 0; i<vec.size() ; i++) {
@@ -27,7 +28,14 @@ bool all_strict_positive(const VectorXf & vec){
     return true;
 }
 
-
+void clamp_and_normalize(VectorXf & prob){
+    for (int row=0; row < prob.size(); row++) {
+        if (prob(row) < 0) {
+            prob(row) = 0;
+        }
+    }
+    prob = prob / prob.sum();
+}
 
 bool valid_probability(const MatrixXf & proba){
     for (int i=0; i<proba.cols(); i++) {
@@ -40,6 +48,21 @@ bool valid_probability(const MatrixXf & proba){
     }
     return true;
 }
+
+bool valid_probability_debug(const MatrixXf & proba){
+    for (int i=0; i<proba.cols(); i++) {
+        if (not all_positive(proba.col(i))) {
+            std::cout << "Col " << i << " has negative values"<< '\n';
+            std::cout << proba.col(i).transpose() << '\n';
+        }
+        if (fabs(proba.col(i).sum()-1)>1e-6) {
+            std::cout << "Col " << i << " doesn't sum to 1, sum to " << proba.col(i).sum()<< '\n';
+        }
+    }
+    return true;
+}
+
+
 
 typeP dotProduct(const MatrixXf & M1, const MatrixXf & M2, MatrixP & temp){
     // tmp is an already allocated and well dimensioned temporary

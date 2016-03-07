@@ -205,6 +205,42 @@ void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
     save_map(Q, size, path_to_output, dataset_name);
 }
 
+void minimize_concave_QP_cccp(std::string path_to_image, std::string path_to_unaries,
+                              Potts_weight_set parameters, std::string path_to_output,
+                              std::string dataset_name) {
+    img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
+    // Load the unaries potentials for our image.
+    MatrixXf unaries = load_unary(path_to_unaries, size);
+    unsigned char * img = load_image(path_to_image, size);
+
+    // Load a crf
+    DenseCRF2D crf(size.width, size.height, unaries.rows());
+
+    crf.setUnaryEnergy(unaries);
+    crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
+                            new PottsCompatibility(parameters.spatial_potts_weight));
+    crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
+                             parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
+                             img, new PottsCompatibility(parameters.bilat_potts_weight));
+    //crf.compute_kl_divergence();
+    MatrixXf init = crf.unary_init();
+    clock_t start, end;
+    start = clock();
+    MatrixXf Q = crf.concave_qp_cccp_inference(init);
+    end = clock();
+    double timing = (double(end-start)/CLOCKS_PER_SEC);
+    double final_energy = crf.compute_energy(Q);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
+
+    // std::cout << "Time taken: " << timing << '\n';
+    // std::cout << "Done with inference"<< '\n';
+    // Perform the MAP estimation on the fully factorized distribution
+    // and write the results to an image file with a dumb color code
+    save_map(Q, size, path_to_output, dataset_name);
+}
+
+
 
 
 void minimize_cccp_mean_field(std::string path_to_image, std::string path_to_unaries,

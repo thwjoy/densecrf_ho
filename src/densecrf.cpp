@@ -296,14 +296,86 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
     return Q;
 }
 
+MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
+    MatrixXf Q(M_, N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
+        desc(M_, N_), sx(M_, N_), outer_grad(M_,N_), psis(M_, N_);
+    MatrixP temp_dot(M_,N_);
+    // Get parameters
+    unary.fill(0);
+    if(unary_){
+        unary = unary_->get();
+    }
+
+    Q = init;
+    // Compute the value of the energy
+    double old_energy;
+    double energy = compute_energy(Q);
+    int outer_rounds = 0;
+    double identity_coefficient = 0;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        identity_coefficient += pairwise_[k]->parameters()(0);
+    }
+
+    MatrixXf inv_KKT(M_+1, M_+1);
+    for (int i=0; i < M_; i++) {
+        for (int j=0; j < M_; j++) {
+            inv_KKT(i,j) = -1 / (M_ * 2*identity_coefficient);
+            if (i==j) {
+                inv_KKT(i,j) += 1/ (2*identity_coefficient);
+            }
+        }
+        inv_KKT(M_, i) = 1.0/M_;
+        inv_KKT(i, M_) = 1.0/M_;
+    }
+    inv_KKT(M_,M_) = -2*identity_coefficient / M_;
+
+    // MatrixXf KKT(M_+1, M_+1);
+    // KKT.fill(0);
+    // for (int i=0; i < M_; i++) {
+    //     KKT(i,i) = 2 * identity_coefficient;
+    //     KKT(M_, i) = 1;
+    //     KKT(i, M_) = 1;
+    // }
+    // std::cout << inv_KKT*KKT << '\n';
+
+    do {
+        // New value of the linearization point.
+        old_energy = energy;
+        psis.fill(0);
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, Q);
+            psis += tmp;
+        }
+        outer_grad = unary + 2 * psis;
+        VectorXf state(M_ + 1);
+        VectorXf target(M_ + 1);
+        VectorXf new_Q(M_);
+        for (int var = 0; var < N_; ++var) {
+            target.head(M_) = -outer_grad.col(var);
+            target(M_) = 1;
+            state = inv_KKT * target;
+            new_Q = state.head(M_);
+            clamp_and_normalize(new_Q);
+            Q.col(var) = new_Q;
+        }
+
+        //valid_probability_debug(Q);
+
+        // Compute our current value of the energy;
+        energy = compute_energy(Q);
+        outer_rounds++;
+    } while ( (old_energy -energy) > 100 && outer_rounds < 100);
+    return Q;
+}
+
 MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
         desc(M_, N_), sx(M_, N_), psis(M_, N_), diag_dom(M_,N_);
     MatrixP temp_dot(M_,N_);
     // Compute the smallest eigenvalues, that we need to make bigger
     // than 0, to ensure that the problem is convex.
-    diag_dom.fill(0);
     MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
+    diag_dom.fill(0);
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, full_ones);
         diag_dom += tmp;
