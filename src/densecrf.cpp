@@ -315,64 +315,56 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         identity_coefficient += pairwise_[k]->parameters()(0);
     }
+
+    MatrixXf inv_KKT(M_+1, M_+1);
+    for (int i=0; i < M_; i++) {
+        for (int j=0; j < M_; j++) {
+            inv_KKT(i,j) = -1 / (M_ * 2*identity_coefficient);
+            if (i==j) {
+                inv_KKT(i,j) += 1/ (2*identity_coefficient);
+            }
+        }
+        inv_KKT(M_, i) = 1.0/M_;
+        inv_KKT(i, M_) = 1.0/M_;
+    }
+    inv_KKT(M_,M_) = -2*identity_coefficient / M_;
+
+    // MatrixXf KKT(M_+1, M_+1);
+    // KKT.fill(0);
+    // for (int i=0; i < M_; i++) {
+    //     KKT(i,i) = 2 * identity_coefficient;
+    //     KKT(M_, i) = 1;
+    //     KKT(i, M_) = 1;
+    // }
+    // std::cout << inv_KKT*KKT << '\n';
+
     do {
         // New value of the linearization point.
         old_energy = energy;
-
-
-        double old_convex_energy;
-        int convex_rounds = 0;
-        double optimal_step_size = 0;
         psis.fill(0);
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
             pairwise_[k]->apply( tmp, Q);
             psis += tmp;
         }
         outer_grad = unary + 2 * psis;
-        double convex_energy = identity_coefficient * Q.squaredNorm() + dotProduct(Q, outer_grad, temp_dot);
-        do {
-            grad = outer_grad+ 2* identity_coefficient * Q;
-            old_convex_energy = convex_energy;
+        VectorXf state(M_ + 1);
+        VectorXf target(M_ + 1);
+        VectorXf new_Q(M_);
+        for (int var = 0; var < N_; ++var) {
+            target.head(M_) = -outer_grad.col(var);
+            target(M_) = 1;
+            state = inv_KKT * target;
+            new_Q = state.head(M_);
+            clamp_and_normalize(new_Q);
+            Q.col(var) = new_Q;
+        }
 
-            // Get a Descent direction by minimising < \nabla E, s >
-            descent_direction(desc, grad);
-
-            // Solve for the best step size of the convex problem. It
-            // is - frac{\phi^T(s-x) + 2 x^T \psi (s-x) + 2(x-x_old)^T
-            // d (s-x)}{2 (s-x) (\psi+d) (s-x)}
-            sx = desc - Q;
-
-            double num = dotProduct(sx, 2*identity_coefficient * Q + outer_grad, temp_dot);
-            assert(num<=0); // This is negative if desc is really the good minimizer
-
-            double denom = identity_coefficient * desc.squaredNorm();
-            assert(denom>0); // This is positive if we did our decomposition correctly
-
-            // double cst = identity_coefficient * Q.squaredNorm() + dotProduct(Q, outer_grad, temp_dot);
-
-            optimal_step_size = - num/ (2 *denom);
-            if (optimal_step_size > 1) {
-                optimal_step_size = 1;
-            } else if( optimal_step_size < 0){
-                optimal_step_size = 0;
-            }
-
-            Q += optimal_step_size * sx;
-            // Compute gradient of the convex problem at the new position
-
-            // std::cout << "Coefficients: "<< denom << '\t' << num << '\t' << cst << '\n';
-            convex_energy = identity_coefficient * Q.squaredNorm() + dotProduct(Q, outer_grad, temp_dot);
-            // energy = compute_energy(Q);
-            convex_rounds++;
-            std::cout << old_convex_energy - convex_energy << '\n';
-        } while ( (old_convex_energy - convex_energy) > 100 && optimal_step_size != 0);
-        // We are now (almost) at a minimum of the convexified problem, so we
-        // stop solving the convex problem and get a new convex approximation.
+        //valid_probability_debug(Q);
 
         // Compute our current value of the energy;
         energy = compute_energy(Q);
         outer_rounds++;
-    } while ( (old_energy -energy) > 100);
+    } while ( (old_energy -energy) > 100 && outer_rounds < 100);
     return Q;
 }
 
