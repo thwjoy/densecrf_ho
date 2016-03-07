@@ -47,39 +47,101 @@ inline int round(double X) {
 #endif
 
 /************************************************/
+/***                Hash Table                ***/
+/************************************************/
+
+class HashTable{
+protected:
+	size_t key_size_, filled_, capacity_;
+	std::vector< short > keys_;
+	std::vector< int > table_;
+	void grow(){
+		// Create the new memory and copy the values in
+		int old_capacity = capacity_;
+		capacity_ *= 2;
+		std::vector<short> old_keys( (old_capacity+10)*key_size_ );
+		std::copy( keys_.begin(), keys_.end(), old_keys.begin() );
+		std::vector<int> old_table( capacity_, -1 );
+		
+		// Swap the memory
+		table_.swap( old_table );
+		keys_.swap( old_keys );
+		
+		// Reinsert each element
+		for( int i=0; i<old_capacity; i++ )
+			if (old_table[i] >= 0){
+				int e = old_table[i];
+				size_t h = hash( getKey(e) ) % capacity_;
+				for(; table_[h] >= 0; h = h<capacity_-1 ? h+1 : 0);
+				table_[h] = e;
+			}
+	}
+	size_t hash( const short * k ) {
+		size_t r = 0;
+		for( size_t i=0; i<key_size_; i++ ){
+			r += k[i];
+			r *= 1664525;
+		}
+		return r;
+	}
+public:
+	explicit HashTable( int key_size, int n_elements ) : key_size_ ( key_size ), filled_(0), capacity_(2*n_elements), keys_((capacity_/2+10)*key_size_), table_(2*n_elements,-1) {
+	}
+	int size() const {
+		return filled_;
+	}
+	void reset() {
+		filled_ = 0;
+		std::fill( table_.begin(), table_.end(), -1 );
+	}
+	int find( const short * k, bool create = false ){
+		if (2*filled_ >= capacity_) grow();
+		// Get the hash value
+		size_t h = hash( k ) % capacity_;
+		// Find the element with he right key, using linear probing
+		while(1){
+			int e = table_[h];
+			if (e==-1){
+				if (create){
+					// Insert a new key and return the new id
+					for( size_t i=0; i<key_size_; i++ )
+						keys_[ filled_*key_size_+i ] = k[i];
+					return table_[h] = filled_++;
+				}
+				else
+					return -1;
+			}
+			// Check if the current key is The One
+			bool good = true;
+			for( size_t i=0; i<key_size_ && good; i++ )
+				if (keys_[ e*key_size_+i ] != k[i])
+					good = false;
+			if (good)
+				return e;
+			// Continue searching
+			h++;
+			if (h==capacity_) h = 0;
+		}
+	}
+	const short * getKey( int i ) const{
+		return &keys_[i*key_size_];
+	}
+
+};
+
+/************************************************/
 /***          Permutohedral Lattice           ***/
 /************************************************/
 
-Permutohedral::Permutohedral():N_( 0 ), M_( 0 ), d_( 0 ), hash_table_(0,0) {
-}
-int Permutohedral::getSize() const {
-	return N_;
-}
-const std::vector<int> &Permutohedral::getRank() const {
-	return rank_;
-}
-const std::vector<int> &Permutohedral::getOffset() const {
-	return offset_;
-}
-const std::vector<float> &Permutohedral::getBarycentric() const {
-	return barycentric_;
-}
-const HashTable &Permutohedral::getHash() const {
-	return hash_table_;
+Permutohedral::Permutohedral():N_( 0 ), M_( 0 ), d_( 0 ) {
 }
 #ifdef SSE_PERMUTOHEDRAL
-void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
+void Permutohedral::init ( const MatrixXf & feature )
 {
 	// Compute the lattice coordinates for each feature [there is going to be a lot of magic here
 	N_ = feature.cols();
 	d_ = feature.rows();
-
-	// We want to save the hash table to be able to add more elements afterwards sometimes
-	if(nEl_max == -1) {
-		hash_table_ = HashTable( d_,  N_*(d_+1));
-	} else {
-		hash_table_ = HashTable( d_,  nEl_max*(d_+1));
-	}
+	HashTable hash_table( d_, N_/**(d_+1)*/ );
 	
 	const int blocksize = sizeof(__m128) / sizeof(float);
 	const __m128 invdplus1   = _mm_set1_ps( 1.0f / (d_+1) );
@@ -206,7 +268,7 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 				for( int i=0; i<d_; i++ ){
 					key[i] = frem0[i*blocksize+j] + canonical[ remainder*(d_+1) + (int)frank[i*blocksize+j] ];
 				}
-				offset_[ (j+k)*(d_+1)+remainder ] = hash_table_.find( key, true );
+				offset_[ (j+k)*(d_+1)+remainder ] = hash_table.find( key, true );
 				rank_[ (j+k)*(d_+1)+remainder ] = frank[remainder*blocksize+j];
 				barycentric_[ (j+k)*(d_+1)+remainder ] = barycentric[ j*(d_+2)+remainder ];
 			}
@@ -230,7 +292,7 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 	// Find the Neighbors of each lattice point
 	
 	// Get the number of vertices in the lattice
-	M_ = hash_table_.size();
+	M_ = hash_table.size();
 	
 	// Create the neighborhood structure
 	blur_neighbors_.resize( (d_+1)*M_ );
@@ -241,7 +303,7 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 	// For each of d+1 axes,
 	for( int j = 0; j <= d_; j++ ){
 		for( int i=0; i<M_; i++ ){
-			const short * key = hash_table_.getKey( i );
+			const short * key = hash_table.getKey( i );
 			for( int k=0; k<d_; k++ ){
 				n1[k] = key[k] - 1;
 				n2[k] = key[k] + 1;
@@ -249,27 +311,20 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 			n1[j] = key[j] + d_;
 			n2[j] = key[j] - d_;
 			
-			blur_neighbors_[j*M_+i].n1 = hash_table_.find( n1 );
-			blur_neighbors_[j*M_+i].n2 = hash_table_.find( n2 );
+			blur_neighbors_[j*M_+i].n1 = hash_table.find( n1 );
+			blur_neighbors_[j*M_+i].n2 = hash_table.find( n2 );
 		}
 	}
 	delete[] n1;
 	delete[] n2;
 }
 #else
-void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
+void Permutohedral::init ( const MatrixXf & feature )
 {
 	// Compute the lattice coordinates for each feature [there is going to be a lot of magic here
 	N_ = feature.cols();
 	d_ = feature.rows();
-
-	// We want to save the hash table to be able to add more elements afterwards sometimes
-	if(nEl_max == -1) {
-		hash_table_ = HashTable( d_,  N_*(d_+1));
-	} else {
-		hash_table_ = HashTable( d_,  nEl_max*(d_+1));
-	}
-	
+	HashTable hash_table( d_, N_*(d_+1) );
 
 	// Allocate the class memory
 	offset_.resize( (d_+1)*N_ );
@@ -373,7 +428,7 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 		for( int remainder=0; remainder<=d_; remainder++ ){
 			for( int i=0; i<d_; i++ )
 				key[i] = rem0[i] + canonical[ remainder*(d_+1) + rank[i] ];
-			offset_[ k*(d_+1)+remainder ] = hash_table_.find( key, true );
+			offset_[ k*(d_+1)+remainder ] = hash_table.find( key, true );
 			rank_[ k*(d_+1)+remainder ] = rank[remainder];
 			barycentric_[ k*(d_+1)+remainder ] = barycentric[ remainder ];
 		}
@@ -390,7 +445,7 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 	// Find the Neighbors of each lattice point
 	
 	// Get the number of vertices in the lattice
-	M_ = hash_table_.size();
+	M_ = hash_table.size();
 	
 	// Create the neighborhood structure
 	blur_neighbors_.resize( (d_+1)*M_ );
@@ -401,7 +456,7 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 	// For each of d+1 axes,
 	for( int j = 0; j <= d_; j++ ){
 		for( int i=0; i<M_; i++ ){
-			const short * key = hash_table_.getKey( i );
+			const short * key = hash_table.getKey( i );
 			for( int k=0; k<d_; k++ ){
 				n1[k] = key[k] - 1;
 				n2[k] = key[k] + 1;
@@ -409,93 +464,14 @@ void Permutohedral::init ( const MatrixXf & feature, int nEl_max )
 			n1[j] = key[j] + d_;
 			n2[j] = key[j] - d_;
 			
-			blur_neighbors_[j*M_+i].n1 = hash_table_.find( n1 );
-			blur_neighbors_[j*M_+i].n2 = hash_table_.find( n2 );
-		}
-	}
-
-	delete[] n1;
-	delete[] n2;
-}
-#endif
-void Permutohedral::add ( const Permutohedral & other_permu, int feat_offset ) {
-	// Other permutohedral size
-	int size = other_permu.getSize();
-
-	// Compute the lattice coordinates for each feature [there is going to be a lot of magic here
-	int old_N = N_;
-	N_ = N_ + size - feat_offset;
-	assert(hash_table_.size() > 0);
-
-	// Allocate the class memory
-	offset_.resize( (d_+1)*N_ );
-	rank_.resize( (d_+1)*N_ );
-	barycentric_.resize( (d_+1)*N_ );
-
-	// Add the elements from the other permutohedral
-	const HashTable & other_hash_table = other_permu.getHash();
-	const std::vector<int> & other_rank = other_permu.getRank();
-	const std::vector<int> & other_offset = other_permu.getOffset();
-	const std::vector<float> & other_bary = other_permu.getBarycentric();
-
-	for( int k=feat_offset; k<size; k++ ){
-		// Compute all vertices and their offset
-		for( int remainder=0; remainder<=d_; remainder++ ){
-			int offset = other_offset[k*(d_+1)+remainder];
-			const short * key = other_hash_table.getKey( offset );
-			offset_[ (old_N + k - feat_offset)*(d_+1)+remainder ] = hash_table_.find( key, true );
-			rank_[ (old_N + k - feat_offset)*(d_+1)+remainder ] = other_rank[k*(d_+1)+remainder];
-			barycentric_[ (old_N + k - feat_offset)*(d_+1)+remainder ] = other_bary[k*(d_+1)+remainder];
-		}
-	}
-	
-	// Find the Neighbors of each lattice point
-	
-	// Get the number of vertices in the lattice
-	int old_M = M_;
-	M_ = hash_table_.size();
-	
-	// Create the neighborhood structure
-	//blur_neighbors_.resize( (d_+1)*M_ );
-	std::vector<Neighbors> new_blur_neighbors((d_+1)*M_);
-	for( int j = 0; j <= d_; j++ ){
-		for(int i=0; i<old_M; ++i) {
-			new_blur_neighbors[j*M_+i] = blur_neighbors_[j*old_M+i];
-		}
-	}
-	std::swap(blur_neighbors_, new_blur_neighbors);
-	new_blur_neighbors.resize(0);
-	
-	short * n1 = new short[d_+1];
-	short * n2 = new short[d_+1];
-
-	// For each of d+1 axes,
-	for( int j = 0; j <= d_; j++ ){
-		for( int i=old_M; i<M_; i++ ){
-			const short * key = hash_table_.getKey( i );
-			for( int k=0; k<d_; k++ ){
-				n1[k] = key[k] - 1;
-				n2[k] = key[k] + 1;
-			}
-			n1[j] = key[j] + d_;
-			n2[j] = key[j] - d_;
-			
-			int n1_index = hash_table_.find( n1 );
-			blur_neighbors_[j*M_+i].n1 = n1_index;
-			if(n1_index != -1) {
-				blur_neighbors_[j*M_+n1_index].n2 = i;
-			}
-			int n2_index = hash_table_.find( n2 );
-			blur_neighbors_[j*M_+i].n2 = n2_index;
-			if(n2_index != -1) {
-				blur_neighbors_[j*M_+n2_index].n1 = i;
-			}
+			blur_neighbors_[j*M_+i].n1 = hash_table.find( n1 );
+			blur_neighbors_[j*M_+i].n2 = hash_table.find( n2 );
 		}
 	}
 	delete[] n1;
 	delete[] n2;
 }
-
+#endif
 void Permutohedral::seqCompute ( float* out, const float* in, int value_size, bool reverse ) const
 {
 	// Shift all values by 1 such that -1 -> 0 (used for blurring)
@@ -537,108 +513,6 @@ void Permutohedral::seqCompute ( float* out, const float* in, int value_size, bo
 	for( int i=0; i<N_; i++ ){
 		for( int k=0; k<value_size; k++ )
 			out[i*value_size+k] = 0;
-		for( int j=0; j<=d_; j++ ){
-			int o = offset_[i*(d_+1)+j]+1;
-			float w = barycentric_[i*(d_+1)+j];
-			for( int k=0; k<value_size; k++ )
-				out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
-		}
-	}
-	
-	
-	delete[] values;
-	delete[] new_values;
-}
-void Permutohedral::seqCompute_lower_left ( float* out, int value_size, int middle_low, int middle_high ) const
-{
-	// Shift all values by 1 such that -1 -> 0 (used for blurring)
-	float * values = new float[ (M_+2)*value_size ];
-	float * new_values = new float[ (M_+2)*value_size ];
-	
-	for( int i=0; i<(M_+2)*value_size; i++ )
-		values[i] = new_values[i] = 0;
-	
-	// Splatting
-	for( int i=0;  i<middle_low; i++ ){
-		for( int j=0; j<=d_; j++ ){
-			int o = offset_[i*(d_+1)+j]+1;
-			float w = barycentric_[i*(d_+1)+j];
-			for( int k=0; k<value_size; k++ )
-				values[ o*value_size+k ] += w * 1;
-		}
-	}
-
-	// Blurring
-	for( int j=0; j<=d_ && j>=0; j++ ){
-		for( int i=0; i<M_; i++ ){
-			float * old_val = values + (i+1)*value_size;
-			float * new_val = new_values + (i+1)*value_size;
-			
-			int n1 = blur_neighbors_[j*M_+i].n1+1;
-			int n2 = blur_neighbors_[j*M_+i].n2+1;
-			float * n1_val = values + n1*value_size;
-			float * n2_val = values + n2*value_size;
-			for( int k=0; k<value_size; k++ )
-				new_val[k] = old_val[k]+0.5*(n1_val[k] + n2_val[k]);
-		}
-		std::swap( values, new_values );
-	}
-	// Alpha is a magic scaling constant (write Andrew if you really wanna understand this)
-	float alpha = 1.0f / (1+powf(2, -d_));
-	
-	// Slicing
-	for( int i=middle_high; i<N_; i++ ){
-		for( int j=0; j<=d_; j++ ){
-			int o = offset_[i*(d_+1)+j]+1;
-			float w = barycentric_[i*(d_+1)+j];
-			for( int k=0; k<value_size; k++ )
-				out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
-		}
-	}
-	
-	
-	delete[] values;
-	delete[] new_values;
-}
-void Permutohedral::seqCompute_upper_right ( float* out, int value_size, int middle_low, int middle_high ) const
-{
-	// Shift all values by 1 such that -1 -> 0 (used for blurring)
-	float * values = new float[ (M_+2)*value_size ];
-	float * new_values = new float[ (M_+2)*value_size ];
-	
-	for( int i=0; i<(M_+2)*value_size; i++ )
-		values[i] = new_values[i] = 0;
-	
-	// Splatting
-	for( int i=middle_high; i<N_; i++ ){
-		for( int j=0; j<=d_; j++ ){
-			int o = offset_[i*(d_+1)+j]+1;
-			float w = barycentric_[i*(d_+1)+j];
-			for( int k=0; k<value_size; k++ )
-				values[ o*value_size+k ] += w * 1;
-		}
-	}
-
-	// Blurring
-	for( int j=0; j<=d_ && j>=0; j++ ){
-		for( int i=0; i<M_; i++ ){
-			float * old_val = values + (i+1)*value_size;
-			float * new_val = new_values + (i+1)*value_size;
-			
-			int n1 = blur_neighbors_[j*M_+i].n1+1;
-			int n2 = blur_neighbors_[j*M_+i].n2+1;
-			float * n1_val = values + n1*value_size;
-			float * n2_val = values + n2*value_size;
-			for( int k=0; k<value_size; k++ )
-				new_val[k] = old_val[k]+0.5*(n1_val[k] + n2_val[k]);
-		}
-		std::swap( values, new_values );
-	}
-	// Alpha is a magic scaling constant (write Andrew if you really wanna understand this)
-	float alpha = 1.0f / (1+powf(2, -d_));
-	
-	// Slicing
-	for( int i=0;  i<middle_low; i++ ){
 		for( int j=0; j<=d_; j++ ){
 			int o = offset_[i*(d_+1)+j]+1;
 			float w = barycentric_[i*(d_+1)+j];
@@ -813,18 +687,6 @@ void Permutohedral::sseCompute ( float* out, const float* in, int value_size, bo
 	seqCompute( out, in, value_size, reverse );
 }
 #endif
-void Permutohedral::compute_lower_left ( MatrixXf & out, int middle_low, int middle_high ) const
-{
-	// Here anly one label at a time so always seq
-	assert(out.cols()==N_);
-	seqCompute_lower_left(out.data(), out.rows(), middle_low, middle_high);
-}
-void Permutohedral::compute_upper_right ( MatrixXf & out, int middle_low, int middle_high ) const
-{
-	// Here anly one label at a time so always seq
-	assert(out.cols()==N_);
-	seqCompute_upper_right(out.data(), out.rows(), middle_low, middle_high);
-}
 void Permutohedral::compute_upper_minus_lower ( MatrixXf & out, int low, int middle_low, int middle_high, int high ) const
 {
 	// Here anly one label at a time so always seq
