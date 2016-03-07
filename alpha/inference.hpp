@@ -23,7 +23,7 @@ void minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
 
 void minimize_LP(std::string path_to_image, std::string path_to_unaries,
                  Potts_weight_set parameters, std::string path_to_output,
-                 std::string dataset_name);
+                 std::string dataset_name, bool use_cond_grad);
 
 void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
                     Potts_weight_set parameters, std::string path_to_output,

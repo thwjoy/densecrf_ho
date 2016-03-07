@@ -21,7 +21,8 @@ int main(int argc, char* argv[]) {
     std::string path_to_qplroutput = "/data/densecrf/res-lrqp.bmp";
     std::string path_to_qpcccp_output = "/data/densecrf/res-cccp-qp.bmp";
     std::string path_to_fixed_iter_output = "/data/densecrf/res-fixediter-mf.bmp";
-    std::string path_to_lp_output = "/data/densecrf/res-lp.bmp";
+    std::string path_to_lp_cg_line_output = "/data/densecrf/res-lp-cg_line.bmp";
+    std::string path_to_lp_sg_line_output = "/data/densecrf/res-lp-sg_line.bmp";
     // the image that we are using is from the validation set.
 
     Potts_weight_set params(3, 2, 50, 15, 3);
@@ -35,10 +36,12 @@ int main(int argc, char* argv[]) {
     // minimize_cccp_mean_field(path_to_image, path_to_unaries, params, path_to_cccp_output, dataset_name);
     // std::cout << "Fixed Iter Meanfield"  << '\n';
     // minimize_mean_field_fixed_iter(path_to_image, path_to_unaries, params, path_to_fixed_iter_output, dataset_name, 5);
-    // std::cout << "Lafferty QP"  << '\n';
-    // minimize_LR_QP(path_to_image, path_to_unaries, params, path_to_qplroutput, dataset_name);
-    // std::cout << "CCCP QP" << '\n';
-    // minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
-    std::cout << "LP" << '\n';
-    minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_output, dataset_name);
+    std::cout << "Lafferty QP"  << '\n';
+    minimize_LR_QP(path_to_image, path_to_unaries, params, path_to_qplroutput, dataset_name);
+    // // std::cout << "CCCP QP" << '\n';
+    // // minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
+    std::cout << "LP SG line search" << '\n';
+    minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_sg_line_output, dataset_name, false);
+    std::cout << "LP CG line seaerch" << '\n';
+    minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_cg_line_output, dataset_name, true);
 }

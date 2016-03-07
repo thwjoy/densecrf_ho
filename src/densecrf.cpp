@@ -374,6 +374,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     MatrixP temp_dot(M_,N_);
     // Compute the smallest eigenvalues, that we need to make bigger
     // than 0, to ensure that the problem is convex.
+    diag_dom.fill(0);
     MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
     diag_dom.fill(0);
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -489,14 +490,13 @@ void print_distri(MatrixXf const & Q) {
     }
 }
 
-MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
-    MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
-        grad(M_, N_), tmp2(M_, N_);
+MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
+    MatrixXf Q(M_, N_), best_Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
+        grad(M_, N_), tmp2(M_, N_), desc(M_, N_);
     MatrixP dot_tmp(M_,N_);
     MatrixXi ind(M_, N_);
     VectorXi K(N_);
     VectorXd sum(N_);
-    float noise_var = 1e-6;
 
     // Create copies of the original pairwise since we don't want normalization
     int nb_pairwise = pairwise_.size();
@@ -523,6 +523,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
 
     Q = init;
 
+    best_Q = Q;
+    double best_int_energy = assignment_energy(currentMap(Q));
 
     // Compute the value of the energy
     double old_energy;
@@ -557,40 +559,102 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         std::cout << it << ": " << energy << "\n";
 
         // Sub-gradient descent step
-        float lr = 1.0/(10000+it);
-        Q -= lr*grad;
+        double int_energy = 0;
+        if(use_cond_grad) {
+            descent_direction(desc, grad);
 
-        // Project current estimates on valid space
-        sortCols(Q, ind);
-        for(int i=0; i<N_; ++i) {
-            sum(i) = Q.col(i).sum()-1;
-            K(i) = -1;
-        }
-        for(int i=0; i<N_; ++i) {
-            for(int k=M_; k>0; --k) {
-                double uk = Q(ind(k-1, i), i);
-                if(sum(i)/k < uk) {
-                    K(i) = k;
-                    break;
+            float min = 0.0;
+            float max = 1.0;
+            double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
+            int split = 0;
+            min_int_energy = assignment_energy(currentMap(Q));
+            max_int_energy = assignment_energy(currentMap(desc));
+            do {
+                split++;
+                double left_third = (2*min + max)/3.0;
+                double right_third = (min + 2*max)/3.0;
+                left_third_int_energy = assignment_energy(currentMap(Q+(desc-Q)*left_third));
+                right_third_int_energy = assignment_energy(currentMap(Q+(desc-Q)*right_third));
+                if(left_third_int_energy < right_third_int_energy) {
+                    max = right_third;
+                    max_int_energy = right_third_int_energy;
+                    int_energy = left_third_int_energy;
+                } else {
+                    min = left_third;
+                    min_int_energy = left_third_int_energy;
+                    int_energy = right_third_int_energy;
                 }
-                sum(i) -= uk;
+            } while(max-min > 0.001);
+            //std::cout<<" learning rate: "<<(max+min)/2.0<<" expected: "<<min_int_energy<<std::endl;
+
+            Q += 0.5*(max+min)*(desc - Q);
+        } else {
+            float min = 0.0;
+            float max = 1e-3;
+            double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
+            int split = 0;
+            min_int_energy = assignment_energy(currentMap(Q));
+            max_int_energy = assignment_energy(currentMap(Q-max*grad));
+            do {
+                split++;
+                double left_third = (2*min + max)/3.0;
+                double right_third = (min + 2*max)/3.0;
+                left_third_int_energy = assignment_energy(currentMap(Q-left_third*grad));
+                right_third_int_energy = assignment_energy(currentMap(Q-right_third*grad));
+                if(left_third_int_energy < right_third_int_energy) {
+                    max = right_third;
+                    max_int_energy = right_third_int_energy;
+                    int_energy = left_third_int_energy;
+                } else {
+                    min = left_third;
+                    min_int_energy = left_third_int_energy;
+                    int_energy = right_third_int_energy;
+                }
+            } while(max-min > 0.00001);
+            //std::cout<<" learning rate: "<<(max+min)/2.0<<" expected: "<<min_int_energy<<std::endl;
+
+            Q -= 0.5*(max+min)*grad;
+
+            // Project current estimates on valid space
+            sortCols(Q, ind);
+            for(int i=0; i<N_; ++i) {
+                sum(i) = Q.col(i).sum()-1;
+                K(i) = -1;
             }
-        }
-        tmp.fill(0);
-        for(int i=0; i<N_; ++i) {
-            for(int k=0; k<M_; ++k) {
-                tmp(k, i) = std::max(Q(k, i) - sum(i)/K(i), (double)0);
+            for(int i=0; i<N_; ++i) {
+                for(int k=M_; k>0; --k) {
+                    double uk = Q(ind(k-1, i), i);
+                    if(sum(i)/k < uk) {
+                        K(i) = k;
+                        break;
+                    }
+                    sum(i) -= uk;
+                }
             }
+            tmp.fill(0);
+            for(int i=0; i<N_; ++i) {
+                for(int k=0; k<M_; ++k) {
+                    tmp(k, i) = std::max(Q(k, i) - sum(i)/K(i), (double)0);
+                }
+            }
+            Q = tmp;
         }
-        Q = tmp;
+
+        if(int_energy < best_int_energy) {
+            best_Q = Q;
+            best_int_energy = int_energy;
+        }
 
         assert(valid_probability(Q));
-    } while(it<1);
+    } while(it<5);
     // This is the LP fractional energy
     //energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
-    std::cout <<"final: " << energy << "\n";
+    std::cout <<"final projected energy: " << best_int_energy << "\n";
+    for( unsigned int k=0; k<nb_pairwise; k++ ) {
+        delete no_norm_pairwise[k];
+    }
     free(no_norm_pairwise);
-    return Q;
+    return best_Q;
 }
 
 
