@@ -490,11 +490,64 @@ void print_distri(MatrixXf const & Q) {
     }
 }
 
+void get_limited_indices(MatrixXf const & Q, std::vector<int> & indices) {
+    VectorXd accum = Q.cast<double>().rowwise().sum();
+    indices.clear();
+
+    double represented = 0;
+    int max_ind;
+    while(represented < 0.9 * Q.cols() && indices.size() < Q.rows()) {
+        int max_val = accum.maxCoeff(&max_ind);
+        indices.push_back(max_ind);
+        accum[max_ind] = 0;
+        represented += max_val;
+    }
+}
+
+MatrixXf get_restricted_matrix(MatrixXf const & in, std::vector<int> const & indices) {
+    MatrixXf out(indices.size(), in.cols());
+    out.fill(0);
+
+    for(int i=0; i<indices.size(); i++) {
+        out.row(i) = in.row(indices[i]);
+    }
+
+    return out;
+}
+
+MatrixXf get_extended_matrix(MatrixXf const & in, std::vector<int> const & indices, int max_rows) {
+    MatrixXf out(max_rows, in.cols());
+    out.fill(0);
+
+    for(int i=0; i<indices.size(); i++) {
+        out.row(indices[i]) = in.row(i);
+    }
+
+    return out;
+}
+
+void renormalize(MatrixXf & Q) {
+    for(int i=0; i<Q.cols(); i++) {
+        Q.col(i) /= Q.col(i).sum();
+    }
+}
+
 MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
-    MatrixXf Q(M_, N_), best_Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
-        grad(M_, N_), tmp2(M_, N_), desc(M_, N_), tmp_single_line(1, N_);
-    MatrixP dot_tmp(M_,N_);
-    MatrixXi ind(M_, N_);
+    // Restrict number of labels in the computation
+    std::vector<int> indices;
+    get_limited_indices(init, indices);
+    int restricted_M = indices.size();
+    MatrixXf unary = get_restricted_matrix(unary_->get(), indices);
+    MatrixXf Q = get_restricted_matrix(init, indices);
+    renormalize(Q);
+
+    // std::cout<<"Using only "<<indices.size()<<" labels"<<std::endl;
+
+
+    MatrixXf best_Q(restricted_M, N_), ones(restricted_M, N_), base_grad(restricted_M, N_), tmp(restricted_M, N_),
+        grad(restricted_M, N_), tmp2(restricted_M, N_), desc(restricted_M, N_), tmp_single_line(1, N_);
+    MatrixP dot_tmp(restricted_M, N_);
+    MatrixXi ind(restricted_M, N_);
     VectorXi K(N_);
     VectorXd sum(N_);
 
@@ -514,14 +567,6 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     ones.fill(1);
 
     int i,j;
-
-    // Get parameters
-    unary.fill(0);
-    if(unary_){
-        unary = unary_->get();
-    }
-
-    Q = init;
 
     best_Q = Q;
     double best_int_energy = assignment_energy(currentMap(Q));
@@ -624,7 +669,6 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                     int_energy = right_third_int_energy;
                 }
             } while(max-min > 0.00001);
-            //std::cout<<" learning rate: "<<(max+min)/2.0<<" expected: "<<min_int_energy<<std::endl;
 
             Q -= 0.5*(max+min)*grad;
 
@@ -635,7 +679,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 K(i) = -1;
             }
             for(int i=0; i<N_; ++i) {
-                for(int k=M_; k>0; --k) {
+                for(int k=restricted_M; k>0; --k) {
                     double uk = Q(ind(k-1, i), i);
                     if(sum(i)/k < uk) {
                         K(i) = k;
@@ -646,7 +690,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
             }
             tmp.fill(0);
             for(int i=0; i<N_; ++i) {
-                for(int k=0; k<M_; ++k) {
+                for(int k=0; k<restricted_M; ++k) {
                     tmp(k, i) = std::max(Q(k, i) - sum(i)/K(i), (double)0);
                 }
             }
@@ -665,6 +709,9 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
         delete no_norm_pairwise[k];
     }
     free(no_norm_pairwise);
+
+    // Reconstruct an output with the correct number of labels
+    best_Q = get_extended_matrix(best_Q, indices, M_);
     return best_Q;
 }
 
