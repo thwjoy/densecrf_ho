@@ -489,7 +489,7 @@ void print_distri(MatrixXf const & Q) {
     }
 }
 
-MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
+MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cg) const {
     MatrixXf Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_), unary(M_, N_),
         grad(M_, N_), tmp2(M_, N_);
     MatrixP dot_tmp(M_,N_);

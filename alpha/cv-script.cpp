@@ -44,7 +44,15 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_cccp_inference(Q);
             } else if (method == "concave_qpcccp"){
                 Q = crf.concave_qp_cccp_inference(Q);
+            } else if (method == "sg_lp"){
+                Q = crf.qp_inference(Q);
+                Q = crf.lp_inference(Q, false);
+            } else if (method == "cg_lp"){
+                Q = crf.qp_inference(Q);
+                Q = crf.lp_inference(Q, true);
             }
+
+
             make_dir(path_to_subexp_results);
             end = clock();
             timing = (double(end-start)/CLOCKS_PER_SEC);
