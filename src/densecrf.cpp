@@ -216,6 +216,7 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
     // Note: All the terms in the pairwise matrix are negatives
     // so to get the sum of the abs value, you need to get the
     // product with the matrix full of -1.
+    diag_dom.fill(0);
     MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, full_ones);
@@ -301,6 +302,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     MatrixP temp_dot(M_,N_);
     // Compute the smallest eigenvalues, that we need to make bigger
     // than 0, to ensure that the problem is convex.
+    diag_dom.fill(0);
     MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, full_ones);
