@@ -483,7 +483,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         std::cout << it << ": " << energy << "\n";
 
         // Sub-gradient descent step
-        float lr = 1.0/(2000+it);
+        float lr = 1.0/(10000+it);
         Q -= lr*grad;
 
         // Project current estimates on valid space
@@ -511,7 +511,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init) const {
         Q = tmp;
 
         assert(valid_probability(Q));
-    } while(it<10);
+    } while(it<1);
     // This is the LP fractional energy
     //energy = compute_energy_LP(Q, no_norm_pairwise, nb_pairwise);
     std::cout <<"final: " << energy << "\n";
