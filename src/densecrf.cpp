@@ -318,7 +318,6 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     // Compute the value of the energy
     double old_energy;
     double energy = compute_energy(Q);
-    int convex_rounds = 0;
     int outer_rounds = 0;
     do {
         // New value of the linearization point.
@@ -327,7 +326,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
 
         double convex_energy = energy + dotProduct(Q, diag_dom.cwiseProduct(2*Q_old - Q), temp_dot);
         double old_convex_energy;
-
+        int convex_rounds = 0;
 
         double optimal_step_size = 0;
 
@@ -367,6 +366,8 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
 
             if (optimal_step_size > 1) {
                 optimal_step_size = 1;
+            } else if( optimal_step_size < 0){
+                optimal_step_size = 0;
             }
 
             Q += optimal_step_size * sx;
@@ -390,8 +391,7 @@ MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
         // energy = compute_energy(Q);
         energy = dotProduct(Q, 0.5 * (grad + unary) - diag_dom.cwiseProduct(Q_old - Q), temp_dot);
         outer_rounds++;
-    } while ( (old_energy -energy) > 100 && outer_rounds<5);
-
+    } while ( (old_energy -energy) > 100 && outer_rounds < 20);
     return Q;
 }
 
