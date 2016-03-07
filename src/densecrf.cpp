@@ -297,8 +297,8 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
 }
 
 MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
-    MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
-        desc(M_, N_), sx(M_, N_), outer_grad(M_,N_);
+    MatrixXf Q(M_, N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
+        desc(M_, N_), sx(M_, N_), outer_grad(M_,N_), psis(M_, N_);
     MatrixP temp_dot(M_,N_);
     // Get parameters
     unary.fill(0);
@@ -311,25 +311,27 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
     double old_energy;
     double energy = compute_energy(Q);
     int outer_rounds = 0;
+    double identity_coefficient = 0;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        identity_coefficient += pairwise_[k]->parameters()(0);
+    }
     do {
         // New value of the linearization point.
         old_energy = energy;
-        Q_old = Q;
+
 
         double old_convex_energy;
         int convex_rounds = 0;
-
         double optimal_step_size = 0;
-
         psis.fill(0);
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp, Q_old);
+            pairwise_[k]->apply( tmp, Q);
             psis += tmp;
         }
         outer_grad = unary + 2 * psis;
-        double convex_energy = Q.squaredNorm() + dotProduct(Q, outer_grad, temp_dot);
+        double convex_energy = identity_coefficient * Q.squaredNorm() + dotProduct(Q, outer_grad, temp_dot);
         do {
-            grad = outer_grad+ 2*Q;
+            grad = outer_grad+ 2* identity_coefficient * Q;
             old_convex_energy = convex_energy;
 
             // Get a Descent direction by minimising < \nabla E, s >
@@ -340,13 +342,13 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
             // d (s-x)}{2 (s-x) (\psi+d) (s-x)}
             sx = desc - Q;
 
-            double num = dotProduct(sx, 2*Q + outer_grad, temp_dot);
+            double num = dotProduct(sx, 2*identity_coefficient * Q + outer_grad, temp_dot);
             assert(num<=0); // This is negative if desc is really the good minimizer
 
-            double denom = desc.squaredNorm();
+            double denom = identity_coefficient * desc.squaredNorm();
             assert(denom>0); // This is positive if we did our decomposition correctly
 
-            double cst = Q.squaredNorm() + dotProduct(Q, outer_grad, temp_dot);
+            // double cst = identity_coefficient * Q.squaredNorm() + dotProduct(Q, outer_grad, temp_dot);
 
             optimal_step_size = - num/ (2 *denom);
             if (optimal_step_size > 1) {
@@ -359,10 +361,10 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
             // Compute gradient of the convex problem at the new position
 
             // std::cout << "Coefficients: "<< denom << '\t' << num << '\t' << cst << '\n';
-            convex_energy = Q.squaredNorm() + dotProduct(Q, outer_grad, temp_dot);
-
+            convex_energy = identity_coefficient * Q.squaredNorm() + dotProduct(Q, outer_grad, temp_dot);
             // energy = compute_energy(Q);
             convex_rounds++;
+            std::cout << old_convex_energy - convex_energy << '\n';
         } while ( (old_convex_energy - convex_energy) > 100 && optimal_step_size != 0);
         // We are now (almost) at a minimum of the convexified problem, so we
         // stop solving the convex problem and get a new convex approximation.
@@ -370,7 +372,6 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
         // Compute our current value of the energy;
         energy = compute_energy(Q);
         outer_rounds++;
-        std::cout << "Energy: " << energy << '\n' << '\n';
     } while ( (old_energy -energy) > 100);
     return Q;
 }
