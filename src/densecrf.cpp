@@ -496,7 +496,7 @@ void get_limited_indices(MatrixXf const & Q, std::vector<int> & indices) {
 
     double represented = 0;
     int max_ind;
-    while(represented < 0.9 * Q.cols() && indices.size() < Q.rows()) {
+    while(represented < 0.99 * Q.cols() && indices.size() < Q.rows()) {
         int max_val = accum.maxCoeff(&max_ind);
         indices.push_back(max_ind);
         accum[max_ind] = 0;
@@ -527,9 +527,24 @@ MatrixXf get_extended_matrix(MatrixXf const & in, std::vector<int> const & indic
 }
 
 void renormalize(MatrixXf & Q) {
+    double sum;
+    double uniform = 1.0/Q.rows();
     for(int i=0; i<Q.cols(); i++) {
-        Q.col(i) /= Q.col(i).sum();
+        sum = Q.col(i).sum();
+        if(sum == 0) {
+            Q.col(i).fill(uniform);
+        } else {
+            Q.col(i) /= sum;
+        }
     }
+}
+
+VectorXs get_original_label(VectorXs const & restricted_labels, std::vector<int> const & indices) {
+    VectorXs extended_labels(restricted_labels.rows());
+    for(int i=0; i<restricted_labels.rows(); i++) {
+        extended_labels[i] = indices[restricted_labels[i]];
+    }
+    return extended_labels;
 }
 
 MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
@@ -569,7 +584,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     int i,j;
 
     best_Q = Q;
-    double best_int_energy = assignment_energy(currentMap(Q));
+    double best_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
 
     // Compute the value of the energy
     double old_energy;
@@ -625,14 +640,14 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
             float max = 1.0;
             double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
             int split = 0;
-            min_int_energy = assignment_energy(currentMap(Q));
-            max_int_energy = assignment_energy(currentMap(desc));
+            min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
+            max_int_energy = assignment_energy(get_original_label(currentMap(desc), indices));
             do {
                 split++;
                 double left_third = (2*min + max)/3.0;
                 double right_third = (min + 2*max)/3.0;
-                left_third_int_energy = assignment_energy(currentMap(Q+(desc-Q)*left_third));
-                right_third_int_energy = assignment_energy(currentMap(Q+(desc-Q)*right_third));
+                left_third_int_energy = assignment_energy(get_original_label(currentMap(Q+(desc-Q)*left_third), indices));
+                right_third_int_energy = assignment_energy(get_original_label(currentMap(Q+(desc-Q)*right_third), indices));
                 if(left_third_int_energy < right_third_int_energy) {
                     max = right_third;
                     max_int_energy = right_third_int_energy;
@@ -651,14 +666,14 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
             float max = 1e-3;
             double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
             int split = 0;
-            min_int_energy = assignment_energy(currentMap(Q));
-            max_int_energy = assignment_energy(currentMap(Q-max*grad));
+            min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
+            max_int_energy = assignment_energy(get_original_label(currentMap(Q-max*grad), indices));
             do {
                 split++;
                 double left_third = (2*min + max)/3.0;
                 double right_third = (min + 2*max)/3.0;
-                left_third_int_energy = assignment_energy(currentMap(Q-left_third*grad));
-                right_third_int_energy = assignment_energy(currentMap(Q-right_third*grad));
+                left_third_int_energy = assignment_energy(get_original_label(currentMap(Q-left_third*grad), indices));
+                right_third_int_energy = assignment_energy(get_original_label(currentMap(Q-right_third*grad), indices));
                 if(left_third_int_energy < right_third_int_energy) {
                     max = right_third;
                     max_int_energy = right_third_int_energy;
