@@ -308,6 +308,7 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     MatrixXf init = crf.unary_init();
     clock_t start, end;
     MatrixXf Q = crf.qp_inference(init);
+    Q = crf.concave_qp_cccp_inference(Q);
 
     double timing = -1;
     /*for(int it=0; it<20; it++) {
