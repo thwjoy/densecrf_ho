@@ -124,11 +124,19 @@ std::string get_output_path(const std::string & path_to_results_folder, const st
     return output_path;
 }
 
-unsigned char * load_image( const std::string & path_to_image, img_size size){
+unsigned char * load_image( const std::string & path_to_image, img_size & size){
     cv::Mat img = cv::imread(path_to_image);
 
     if(size.height != img.rows || size.width != img.cols) {
         std::cout << "Dimension doesn't correspond to unaries" << std::endl;
+        if (size.height == -1) {
+            size.height = img.rows;
+            std::cout << "Adjusting height because was undefined" << '\n';
+        }
+        if (size.width == -1) {
+            size.width = img.cols;
+            std::cout << "Adjusting width because was undefined" << '\n';
+        }
     }
 
     unsigned char * char_img = new unsigned char[size.width*size.height*3];
