@@ -54,6 +54,10 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
                 Q = crf.lp_inference(Q, true);
+            } else if (method == "unary"){
+                (void)0;
+            } else{
+                std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
             }
 
 
