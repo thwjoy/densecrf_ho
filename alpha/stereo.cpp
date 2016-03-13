@@ -4,6 +4,7 @@
 #include "inference.hpp"
 #include "densecrf.h"
 #include <iostream>
+#include <fstream>
 
 #define NUM_LABELS 16
 
@@ -14,9 +15,9 @@ MatrixXf get_unaries(const unsigned char * left_img, const unsigned char * right
             for (int i=0; i < size.width; i++) {
                 float diff = 0;
                 if (i + off < size.width) {// No penalty if we can't see the corresponding thing?
-                    diff += abs(left_img[(i+j*size.width)*3+0] - right_img[(i+off+j*size.width)*3+0]);
-                    diff += abs(left_img[(i+j*size.width)*3+1] - right_img[(i+off+j*size.width)*3+1]);
-                    diff += abs(left_img[(i+j*size.width)*3+2] - right_img[(i+off+j*size.width)*3+2]);
+                    diff += abs(right_img[(i+j*size.width)*3+0] - left_img[(i+off+j*size.width)*3+0]);
+                    diff += abs(right_img[(i+j*size.width)*3+1] - left_img[(i+off+j*size.width)*3+1]);
+                    diff += abs(right_img[(i+j*size.width)*3+2] - left_img[(i+off+j*size.width)*3+2]);
                 }
                 unaries(off, i + j* size.width) = diff;
             }
@@ -24,6 +25,15 @@ MatrixXf get_unaries(const unsigned char * left_img, const unsigned char * right
     }
 
     return unaries;
+}
+
+void write_down_perf2(double timing, double final_energy, double rounded_energy, std::string path_to_output){
+    std::string txt_output = path_to_output;
+    txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
+
+    std::ofstream txt_file(txt_output.c_str());
+    txt_file << timing << '\t' << final_energy << '\t' << rounded_energy << std::endl;
+    txt_file.close();
 }
 
 int main(int argc, char *argv[])
@@ -69,5 +79,6 @@ int main(int argc, char *argv[])
     std::cout << "Fractional Energy: " << final_energy << '\n';
     std::cout << "Integer Energy: " << discretized_energy << '\n';
 
+    write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
     save_map(Q, size, output_image_path, "Stereo");
 }
