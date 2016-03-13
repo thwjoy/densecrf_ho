@@ -234,8 +234,10 @@ void save_map(const MatrixXf & estimates, const img_size & size, const std::stri
     const unsigned char*  legend;
     if (dataset_name == "MSRC") {
         legend = MSRC_legend;
-    } else {
+    } else if (dataset_name == "PascalVOC2010") {
         legend = Pascal_legend;
+    } else {
+        legend = Stereo_legend;
     }
 
     // Make the image

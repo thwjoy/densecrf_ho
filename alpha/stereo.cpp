@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
     std::string stereo_folder = argv[1];
     std::string left_image_path = stereo_folder + "imL.png";
     std::string right_image_path = stereo_folder + "imR.png";
+    std::string output_image_path = stereo_folder + "out.bmp";
 
     Potts_weight_set parameters(5, 100, 5, 5, 100);
 
@@ -68,5 +69,5 @@ int main(int argc, char *argv[])
     std::cout << "Fractional Energy: " << final_energy << '\n';
     std::cout << "Integer Energy: " << discretized_energy << '\n';
 
-
+    save_map(Q, size, output_image_path, "Stereo");
 }
