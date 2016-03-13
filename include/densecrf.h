@@ -78,6 +78,7 @@ public:
 
 
 	MatrixXf unary_init() const;
+	MatrixXf uniform_init() const;
 	// Run inference and return the probabilities
 	MatrixXf inference(const MatrixXf & init,  int n_iterations ) const;
 	MatrixXf inference(const MatrixXf & init) const;

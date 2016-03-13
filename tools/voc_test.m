@@ -79,9 +79,9 @@ for j=1:num
    % which is equivalent to the following percentage:
    accuracies(j)=100*gtjresj/(gtj+resj-gtjresj);
 
-   %clname = 'background';
-   %if (j>1), clname = VOCopts.classes{j-1};end;
-   %fprintf('  %14s: %6.3f%%\n',clname,accuracies(j));
+   clname = 'background';
+   if (j>1), clname = VOCopts.classes{j-1};end;
+   fprintf('  %14s: %6.3f%%\n',clname,accuracies(j));
 end
 accuracies = accuracies(1:end);
 avacc = mean(accuracies);

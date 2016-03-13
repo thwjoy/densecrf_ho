@@ -109,6 +109,11 @@ MatrixXf DenseCRF::unary_init() const {
     return Q;
 }
 
+MatrixXf DenseCRF::uniform_init() const{
+    MatrixXf Q = (1.0 / M_) * MatrixXf::Ones(M_, N_);
+    return Q;
+}
+
 void normalize(MatrixXf & out, const MatrixXf & in){
     out.resize(in.rows(), in.cols());
     VectorXf norm_constants = in.colwise().sum();

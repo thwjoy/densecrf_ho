@@ -124,11 +124,19 @@ std::string get_output_path(const std::string & path_to_results_folder, const st
     return output_path;
 }
 
-unsigned char * load_image( const std::string & path_to_image, img_size size){
+unsigned char * load_image( const std::string & path_to_image, img_size & size){
     cv::Mat img = cv::imread(path_to_image);
 
     if(size.height != img.rows || size.width != img.cols) {
         std::cout << "Dimension doesn't correspond to unaries" << std::endl;
+        if (size.height == -1) {
+            size.height = img.rows;
+            std::cout << "Adjusting height because was undefined" << '\n';
+        }
+        if (size.width == -1) {
+            size.width = img.cols;
+            std::cout << "Adjusting width because was undefined" << '\n';
+        }
     }
 
     unsigned char * char_img = new unsigned char[size.width*size.height*3];
@@ -226,8 +234,10 @@ void save_map(const MatrixXf & estimates, const img_size & size, const std::stri
     const unsigned char*  legend;
     if (dataset_name == "MSRC") {
         legend = MSRC_legend;
-    } else {
+    } else if (dataset_name == "Pascal2010") {
         legend = Pascal_legend;
+    } else {
+        legend = Stereo_legend;
     }
 
     // Make the image
