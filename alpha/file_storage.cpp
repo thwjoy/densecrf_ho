@@ -231,26 +231,40 @@ void save_map(const MatrixXf & estimates, const img_size & size, const std::stri
         estimates.col(i).maxCoeff( &lbl);
         labeling[i] = lbl;
     }
-    const unsigned char*  legend;
-    if (dataset_name == "MSRC") {
-        legend = MSRC_legend;
-    } else if (dataset_name == "Pascal2010") {
-        legend = Pascal_legend;
-    } else {
-        legend = Stereo_legend;
-    }
-
-    // Make the image
     cv::Mat img(size.height, size.width, CV_8UC3);
     cv::Vec3b intensity;
-    for(int i=0; i<estimates.cols(); ++i) {
-        intensity[2] = legend[3*labeling[i]];
-        intensity[1] = legend[3*labeling[i] + 1];
-        intensity[0] = legend[3*labeling[i] + 2];
+    if(dataset_name == "Stereo_special") {
+        // Make the image
+        int max_label = *std::max_element(labeling.begin(), labeling.end());
+        for(int i=0; i<estimates.cols(); ++i) {
+            intensity[2] = 255.0*labeling[i]/max_label;
+            intensity[1] = 255.0*labeling[i]/max_label;
+            intensity[0] = 255.0*labeling[i]/max_label;
 
-        int col = i % size.width;
-        int row = (i - col)/size.width;
-        img.at<cv::Vec3b>(row, col) = intensity;
+            int col = i % size.width;
+            int row = (i - col)/size.width;
+            img.at<cv::Vec3b>(row, col) = intensity;
+        }
+    } else {
+        const unsigned char*  legend;
+        if (dataset_name == "MSRC") {
+            legend = MSRC_legend;
+        } else if (dataset_name == "Pascal2010") {
+            legend = Pascal_legend;
+        } else {
+            legend = Stereo_legend;
+        }
+
+        // Make the image
+        for(int i=0; i<estimates.cols(); ++i) {
+            intensity[2] = legend[3*labeling[i]];
+            intensity[1] = legend[3*labeling[i] + 1];
+            intensity[0] = legend[3*labeling[i] + 2];
+
+            int col = i % size.width;
+            int row = (i - col)/size.width;
+            img.at<cv::Vec3b>(row, col) = intensity;
+        }
     }
 
     cv::imwrite(path_to_output, img);

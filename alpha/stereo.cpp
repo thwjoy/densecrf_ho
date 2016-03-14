@@ -27,6 +27,31 @@ MatrixXf get_unaries(const unsigned char * left_img, const unsigned char * right
     return unaries;
 }
 
+MatrixXf get_unaries_from_file(std::string path, img_size & size) {
+    MatrixXf unaries(NUM_LABELS, size.height * size.width);
+    std::ifstream txt_file(path.c_str());
+    int nbr_var, nbr_label, M, m;
+    txt_file >> nbr_var >> nbr_label;
+    txt_file >> M;
+    txt_file >> m;
+    assert(nbr_label == NUM_LABELS);
+    assert(nbr_var == size.height * size.width);
+
+    float val;
+    for(int i=0; i<nbr_var; ++i) {
+        int col = i/size.height;
+        int row = i%size.height;
+        int index = row*size.width + col;
+        for(int l=0; l<nbr_label; ++l) {
+            txt_file >> val;
+            unaries(l, index) = val;
+        }
+    }
+
+    txt_file.close();
+    return unaries;
+}
+
 void write_down_perf2(double timing, double final_energy, double rounded_energy, std::string path_to_output){
     std::string txt_output = path_to_output;
     txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
@@ -48,8 +73,9 @@ int main(int argc, char *argv[])
     std::string left_image_path = stereo_folder + "imL.png";
     std::string right_image_path = stereo_folder + "imR.png";
     std::string output_image_path = stereo_folder + "out.bmp";
+    std::string unary_path = stereo_folder + "unary.txt";
 
-    Potts_weight_set parameters(5, 100, 5, 5, 100);
+    Potts_weight_set parameters(5, 50, 2, 15, 50);
 
     img_size size = {-1, -1};
 
@@ -57,7 +83,8 @@ int main(int argc, char *argv[])
     unsigned char * right_img = load_image(right_image_path, size);
 
 
-    MatrixXf unaries = get_unaries(left_img, right_img, size);
+    // MatrixXf unaries = get_unaries(left_img, right_img, size);
+    MatrixXf unaries = get_unaries_from_file(unary_path, size);
 
     DenseCRF2D crf(size.width, size.height, unaries.rows());
     crf.setUnaryEnergy(unaries);
@@ -71,7 +98,8 @@ int main(int argc, char *argv[])
     MatrixXf Q = crf.unary_init();
     start = clock();
     Q = crf.qp_inference(Q);
-    Q = crf.concave_qp_cccp_inference(Q);
+    Q = crf.qp_cccp_inference(Q);
+    Q = crf.lp_inference(Q,false);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
@@ -80,5 +108,5 @@ int main(int argc, char *argv[])
     std::cout << "Integer Energy: " << discretized_energy << '\n';
 
     write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
-    save_map(Q, size, output_image_path, "Stereo");
+    save_map(Q, size, output_image_path, "Stereo_special");
 }
