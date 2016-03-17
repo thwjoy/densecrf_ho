@@ -90,8 +90,7 @@ public:
     MatrixXf qp_cccp_inference(const MatrixXf & init) const;
 	// Third one the QP-cccp defined in the Krahenbuhl paper, restricted to concave label compatibility function.
 	MatrixXf concave_qp_cccp_inference(const MatrixXf & init) const;
-	void solve_small_convex_qp(const VectorXf & lin_part, const MatrixXf & inv_KKT, VectorXf & out) const;
-    // Run the energy minimisation on the LP
+	// Run the energy minimisation on the LP
     MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad) const;
 
 	// Perform the rounding based on argmaxes
