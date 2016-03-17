@@ -14,16 +14,16 @@
         names of its contributors may be used to endorse or promote products
         derived from this software without specific prior written permission.
 
-    THIS SOFTWARE IS PROVIDED BY Philipp Krähenbühl ''AS IS'' AND ANY
-    EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-    DISCLAIMED. IN NO EVENT SHALL Philipp Krähenbühl BE LIABLE FOR ANY
-    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+        THIS SOFTWARE IS PROVIDED BY Philipp Krähenbühl ''AS IS'' AND ANY
+        EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+        WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+        DISCLAIMED. IN NO EVENT SHALL Philipp Krähenbühl BE LIABLE FOR ANY
+        DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+        (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+        LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+        ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+        (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+        SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "densecrf.h"
 #include "eigen_utils.hpp"
@@ -352,15 +352,10 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
             psis += tmp;
         }
         outer_grad = unary + 2 * psis;
-        VectorXf state(M_ + 1);
-        VectorXf target(M_ + 1);
+
         VectorXf new_Q(M_);
         for (int var = 0; var < N_; ++var) {
-            target.head(M_) = -outer_grad.col(var);
-            target(M_) = 1;
-            state = inv_KKT * target;
-            new_Q = state.head(M_);
-            clamp_and_normalize(new_Q);
+            solve_small_convex_qp(outer_grad.col(var), inv_KKT, new_Q);
             Q.col(var) = new_Q;
         }
 
@@ -372,6 +367,17 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
     } while ( (old_energy -energy) > 100 && outer_rounds < 100);
     return Q;
 }
+
+void DenseCRF::solve_small_convex_qp(const VectorXf & lin_part, const MatrixXf & inv_KKT, VectorXf & out) const{
+    VectorXf state(M_ + 1);
+    VectorXf target(M_ + 1);
+    target.head(M_) = -lin_part;
+    target(M_) = 1;
+    state = inv_KKT * target;
+    out = state.head(M_);
+    clamp_and_normalize(out);
+}
+
 
 MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
@@ -954,152 +960,152 @@ MatrixXf DenseCRF::startInference() const{
 
     // Initialize using the unary energies
     if( unary_ )
-        expAndNormalize( Q, -unary_->get() );
-    return Q;
-}
-void DenseCRF::stepInference( MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2 ) const{
-    tmp1.resize( Q.rows(), Q.cols() );
-    tmp1.fill(0);
-    if( unary_ )
-        tmp1 -= unary_->get();
-
-    // Add up all pairwise potentials
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp2, Q );
-        tmp1 -= tmp2;
+            expAndNormalize( Q, -unary_->get() );
+        return Q;
     }
+    void DenseCRF::stepInference( MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2 ) const{
+        tmp1.resize( Q.rows(), Q.cols() );
+        tmp1.fill(0);
+        if( unary_ )
+            tmp1 -= unary_->get();
 
-    // Exponentiate and normalize
-    expAndNormalize( Q, tmp1 );
-}
-VectorXs DenseCRF::currentMap( const MatrixXf & Q ) const{
-    VectorXs r(Q.cols());
-    // Find the map
-    for( int i=0; i<N_; i++ ){
-        int m;
-        Q.col(i).maxCoeff( &m );
-        r[i] = m;
-    }
-    return r;
-}
-
-double DenseCRF::klDivergence( const MatrixXf & Q ) const {
-    // Compute the KL-divergence of a set of marginals
-    double kl = 0;
-    // Add the entropy term
-    for( int i=0; i<Q.cols(); i++ )
-        for( int l=0; l<Q.rows(); l++ )
-            kl += Q(l,i)*log(std::max( Q(l,i), 1e-20f) );
-    // Add the unary term
-    if( unary_ ) {
-        MatrixXf unary = unary_->get();
-        for( int i=0; i<Q.cols(); i++ )
-            for( int l=0; l<Q.rows(); l++ )
-                kl += unary(l,i)*Q(l,i);
-    }
-
-    // Add all pairwise terms
-    MatrixXf tmp;
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, Q );
-        kl += (Q.array()*tmp.array()).sum();
-    }
-    return kl;
-}
-
-double DenseCRF::compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const{
-    double energy = 0;
-    // Add the unary term
-    MatrixXf unary = unary_->get();
-    MatrixP dot_tmp;
-
-    energy += dotProduct(unary, Q, dot_tmp);
-    energy -= dotProduct(diag_dom, Q, dot_tmp);
-
-    // Add all pairwise terms
-    MatrixXf tmp;
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, Q );
-        energy += dotProduct(Q, tmp, dot_tmp);
-    }
-    energy += dotProduct(Q, diag_dom.cwiseProduct(Q), dot_tmp);
-    return energy;
-}
-
-
-double DenseCRF::compute_energy(const MatrixXf & Q) const {
-    double energy = 0;
-    MatrixP dot_tmp;
-    // Add the unary term
-    if( unary_ ) {
-        MatrixXf unary = unary_->get();
-        energy += dotProduct(unary, Q, dot_tmp);
-    }
-    // Add all pairwise terms
-    MatrixXf tmp;
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, Q );
-        energy += dotProduct(Q, tmp, dot_tmp);
-    }
-    return energy;
-}
-
-double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const {
-    double energy = 0;
-    MatrixP dot_tmp;
-    MatrixXi ind(M_, N_);
-    // Add the unary term
-    if( unary_ ) {
-        MatrixXf unary = unary_->get();
-        energy += dotProduct(unary, Q, dot_tmp);
-    }
-    // Add all pairwise terms
-    sortRows(Q, ind);
-    MatrixXf tmp(Q.rows(), Q.cols());
-    for( unsigned int k=0; k<nb_pairwise; k++ ) {
-        // Add the upper minus the lower
-        no_norm_pairwise[k]->apply_upper_minus_lower(tmp, ind);
-        assert(tmp.maxCoeff()<1e-3);
-        energy -= dotProduct(Q, tmp, dot_tmp);
-    }
-
-    return energy;
-}
-
-double DenseCRF::gradient( int n_iterations, const ObjectiveFunction & objective, VectorXf * unary_grad, VectorXf * lbl_cmp_grad, VectorXf * kernel_grad) const {
-    // Gradient computations
-    // Run inference
-    std::vector< MatrixXf > Q(n_iterations+1);
-    MatrixXf tmp1, unary( M_, N_ ), tmp2;
-    unary.fill(0);
-    if( unary_ )
-        unary = unary_->get();
-    expAndNormalize( Q[0], -unary );
-    for( int it=0; it<n_iterations; it++ ) {
-        tmp1 = -unary;
+        // Add up all pairwise potentials
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp2, Q[it] );
+            pairwise_[k]->apply( tmp2, Q );
             tmp1 -= tmp2;
         }
-        expAndNormalize( Q[it+1], tmp1 );
+
+        // Exponentiate and normalize
+        expAndNormalize( Q, tmp1 );
+    }
+    VectorXs DenseCRF::currentMap( const MatrixXf & Q ) const{
+        VectorXs r(Q.cols());
+        // Find the map
+        for( int i=0; i<N_; i++ ){
+            int m;
+            Q.col(i).maxCoeff( &m );
+            r[i] = m;
+        }
+        return r;
     }
 
-    // Compute the objective value
-    MatrixXf b( M_, N_ );
-    double r = objective.evaluate( b, Q[n_iterations] );
-    sumAndNormalize( b, b, Q[n_iterations] );
+    double DenseCRF::klDivergence( const MatrixXf & Q ) const {
+        // Compute the KL-divergence of a set of marginals
+        double kl = 0;
+        // Add the entropy term
+        for( int i=0; i<Q.cols(); i++ )
+            for( int l=0; l<Q.rows(); l++ )
+                kl += Q(l,i)*log(std::max( Q(l,i), 1e-20f) );
+        // Add the unary term
+        if( unary_ ) {
+            MatrixXf unary = unary_->get();
+            for( int i=0; i<Q.cols(); i++ )
+                for( int l=0; l<Q.rows(); l++ )
+                    kl += unary(l,i)*Q(l,i);
+        }
 
-    // Compute the gradient
-    if(unary_grad && unary_)
-        *unary_grad = unary_->gradient( b );
-    if( lbl_cmp_grad )
-        *lbl_cmp_grad = 0*labelCompatibilityParameters();
-    if( kernel_grad )
-        *kernel_grad = 0*kernelParameters();
+        // Add all pairwise terms
+        MatrixXf tmp;
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, Q );
+            kl += (Q.array()*tmp.array()).sum();
+        }
+        return kl;
+    }
 
-    for( int it=n_iterations-1; it>=0; it-- ) {
-        // Do the inverse message passing
-        tmp1.fill(0);
+    double DenseCRF::compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const{
+        double energy = 0;
+        // Add the unary term
+        MatrixXf unary = unary_->get();
+        MatrixP dot_tmp;
+
+        energy += dotProduct(unary, Q, dot_tmp);
+        energy -= dotProduct(diag_dom, Q, dot_tmp);
+
+        // Add all pairwise terms
+        MatrixXf tmp;
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, Q );
+            energy += dotProduct(Q, tmp, dot_tmp);
+        }
+        energy += dotProduct(Q, diag_dom.cwiseProduct(Q), dot_tmp);
+        return energy;
+    }
+
+
+    double DenseCRF::compute_energy(const MatrixXf & Q) const {
+        double energy = 0;
+        MatrixP dot_tmp;
+        // Add the unary term
+        if( unary_ ) {
+            MatrixXf unary = unary_->get();
+            energy += dotProduct(unary, Q, dot_tmp);
+        }
+        // Add all pairwise terms
+        MatrixXf tmp;
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, Q );
+            energy += dotProduct(Q, tmp, dot_tmp);
+        }
+        return energy;
+    }
+
+    double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const {
+        double energy = 0;
+        MatrixP dot_tmp;
+        MatrixXi ind(M_, N_);
+        // Add the unary term
+        if( unary_ ) {
+            MatrixXf unary = unary_->get();
+            energy += dotProduct(unary, Q, dot_tmp);
+        }
+        // Add all pairwise terms
+        sortRows(Q, ind);
+        MatrixXf tmp(Q.rows(), Q.cols());
+        for( unsigned int k=0; k<nb_pairwise; k++ ) {
+            // Add the upper minus the lower
+            no_norm_pairwise[k]->apply_upper_minus_lower(tmp, ind);
+            assert(tmp.maxCoeff()<1e-3);
+            energy -= dotProduct(Q, tmp, dot_tmp);
+        }
+
+        return energy;
+    }
+
+    double DenseCRF::gradient( int n_iterations, const ObjectiveFunction & objective, VectorXf * unary_grad, VectorXf * lbl_cmp_grad, VectorXf * kernel_grad) const {
+        // Gradient computations
+        // Run inference
+        std::vector< MatrixXf > Q(n_iterations+1);
+        MatrixXf tmp1, unary( M_, N_ ), tmp2;
+        unary.fill(0);
+        if( unary_ )
+            unary = unary_->get();
+        expAndNormalize( Q[0], -unary );
+        for( int it=0; it<n_iterations; it++ ) {
+            tmp1 = -unary;
+            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+                pairwise_[k]->apply( tmp2, Q[it] );
+                tmp1 -= tmp2;
+            }
+            expAndNormalize( Q[it+1], tmp1 );
+        }
+
+        // Compute the objective value
+        MatrixXf b( M_, N_ );
+        double r = objective.evaluate( b, Q[n_iterations] );
+        sumAndNormalize( b, b, Q[n_iterations] );
+
+        // Compute the gradient
+        if(unary_grad && unary_)
+            *unary_grad = unary_->gradient( b );
+        if( lbl_cmp_grad )
+            *lbl_cmp_grad = 0*labelCompatibilityParameters();
+        if( kernel_grad )
+            *kernel_grad = 0*kernelParameters();
+
+        for( int it=n_iterations-1; it>=0; it-- ) {
+            // Do the inverse message passing
+            tmp1.fill(0);
         int ip = 0, ik = 0;
         // Add up all pairwise potentials
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
