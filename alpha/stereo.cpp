@@ -64,15 +64,15 @@ void write_down_perf2(double timing, double final_energy, double rounded_energy,
 int main(int argc, char *argv[])
 {
     if(argc < 2){
-        std::cout << "./stereo path_to_stereo_folder" << '\n';
-        std::cout << "Example: ./stereo /data/Stereo/tsukuba/" << '\n';
+        std::cout << "./stereo path_to_stereo_folder method" << '\n';
+        std::cout << "Example: ./stereo /data/Stereo/tsukuba/ qpcccp" << '\n';
         return 1;
     }
 
     std::string stereo_folder = argv[1];
     std::string left_image_path = stereo_folder + "imL.png";
     std::string right_image_path = stereo_folder + "imR.png";
-    std::string output_image_path = stereo_folder + "out.bmp";
+    std::string output_image_path = stereo_folder + "out_" + method + ".bmp";
     std::string unary_path = stereo_folder + "unary.txt";
 
     Potts_weight_set parameters(5, 50, 2, 15, 50);
@@ -95,11 +95,34 @@ int main(int argc, char *argv[])
                              left_img, new PottsCompatibility(parameters.bilat_potts_weight));
 
     clock_t start, end;
-    MatrixXf Q = crf.unary_init();
     start = clock();
-    Q = crf.qp_inference(Q);
-    Q = crf.qp_cccp_inference(Q);
-    Q = crf.lp_inference(Q,false);
+    Q = crf.unary_init();
+    if (method == "mf5") {
+        Q = crf.inference(Q, 5);
+    } else if (method == "mf") {
+        Q = crf.inference(Q);
+    } else if (method == "lrqp") {
+        Q = crf.qp_inference(Q);
+    } else if (method == "qpcccp") {
+        Q = crf.qp_inference(Q);
+        Q = crf.qp_cccp_inference(Q);
+    } else if (method == "proper_qpcccp_ccv"){
+        Q = crf.qp_inference(Q);
+        Q = crf.concave_qp_cccp_inference(Q);
+    } else if (method == "sg_lp"){
+        Q = crf.qp_inference(Q);
+        Q = crf.concave_qp_cccp_inference(Q);
+        Q = crf.lp_inference(Q, false);
+    } else if (method == "cg_lp"){
+        Q = crf.qp_inference(Q);
+        Q = crf.concave_qp_cccp_inference(Q);
+        Q = crf.lp_inference(Q, true);
+    } else if (method == "unary"){
+        (void)0;
+    } else{
+        std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
+    }
+
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
