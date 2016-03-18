@@ -378,58 +378,59 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
         outer_grad = unary + 2 * psis;
         cond_grad.fill(0);
         for (int var = 0; var < N_; ++var) {
-            if (DCNEG_FASTAPPROX) {
-                kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
+#if DCNEG_FASTAPPROX
+            kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
+            clamp_and_normalize(new_Q);
+#else
+            kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
+            score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+            if(not all_positive(new_Q)){
+                // Our KKT conditions didn't get us the correct results.
+                // Let's Frank-wolfe it
                 clamp_and_normalize(new_Q);
-            } else {
-                kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
+                // Get an initial valid point.
                 score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
-                if(not all_positive(new_Q)){
-                    // Our KKT conditions didn't get us the correct results.
-                    // Let's Frank-wolfe it
-                    clamp_and_normalize(new_Q);
-                    // Get an initial valid point.
-                    score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
-                    // Get a valid score.
+                // Get a valid score.
+                cond_grad.fill(0);
+                has_converged = false;
+                nb_iter = 0;
+                do{
+                    old_score = score;
                     cond_grad.fill(0);
-                    has_converged = false;
-                    nb_iter = 0;
-                    do{
-                        old_score = score;
-                        cond_grad.fill(0);
-                        grad = outer_grad.col(var) - 2 * identity_coefficient * new_Q;
-                        grad.minCoeff(&best_coord);
-                        cond_grad(best_coord) = 1;
-                        desc = cond_grad - new_Q;
-                        if (desc.squaredNorm()==0) {
-                            break;
+                    grad = outer_grad.col(var) - 2 * identity_coefficient * new_Q;
+                    grad.minCoeff(&best_coord);
+                    cond_grad(best_coord) = 1;
+                    desc = cond_grad - new_Q;
+                    if (desc.squaredNorm()==0) {
+                        break;
+                    }
+                    num = grad.dot(desc);
+                    if (num > 0) {
+                        // Commented out code to identify bugs with this computation
+                        if (num > 1e-6) {
+                            std::cout << "Shouldn't happen." << '\n';
+                            std::cout << "Cond score: " << grad.dot(cond_grad) << '\n';
+                            std::cout << "Point score: " << grad.dot(new_Q) << '\n';
+                            std::cout << num << '\n';
+                            std::cout  << '\n';
                         }
-                        num = grad.dot(desc);
-                        if (num > 0) {
-                            // Commented out code to identify bugs with this computation
-                            // if (num > 1e-6) {
-                            //     std::cout << "Shouldn't happen." << '\n';
-                            //     std::cout << "Cond score: " << grad.dot(cond_grad) << '\n';
-                            //     std::cout << "Point score: " << grad.dot(new_Q) << '\n';
-                            //     std::cout << num << '\n';
-                            //     std::cout  << '\n';
-                            // }
-                            num = 0;
-                        }
-                        denom = -identity_coefficient * desc.squaredNorm();
-                        optimal_step_size = - num / (2 * denom);
-                        if(optimal_step_size > 1){
-                            optimal_step_size = 1; // Would get outta bounds
-                        }
-                        new_Q += optimal_step_size*desc;
-                        score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
-                        if (old_score - score < 1e-2) {
-                            has_converged = true;
-                        }
-                        nb_iter++;
-                    } while(not has_converged);
-                }
+                        num = 0;
+                    }
+                    denom = -identity_coefficient * desc.squaredNorm();
+                    optimal_step_size = - num / (2 * denom);
+                    if(optimal_step_size > 1){
+                        optimal_step_size = 1; // Would get outta bounds
+                    }
+                    new_Q += optimal_step_size*desc;
+                    score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+                    if (old_score - score < 1e-2) {
+                        has_converged = true;
+                    }
+                    nb_iter++;
+                } while(not has_converged);
+#endif
             }
+
             Q.col(var) = new_Q;
         }
         //valid_probability_debug(Q);
