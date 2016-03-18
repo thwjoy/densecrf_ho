@@ -14,16 +14,16 @@
         names of its contributors may be used to endorse or promote products
         derived from this software without specific prior written permission.
 
-    THIS SOFTWARE IS PROVIDED BY Philipp Krähenbühl ''AS IS'' AND ANY
-    EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-    DISCLAIMED. IN NO EVENT SHALL Philipp Krähenbühl BE LIABLE FOR ANY
-    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+        THIS SOFTWARE IS PROVIDED BY Philipp Krähenbühl ''AS IS'' AND ANY
+        EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+        WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+        DISCLAIMED. IN NO EVENT SHALL Philipp Krähenbühl BE LIABLE FOR ANY
+        DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+        (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+        LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+        ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+        (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+        SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "densecrf.h"
 #include "eigen_utils.hpp"
@@ -37,6 +37,9 @@
 #include <iostream>
 #include <set>
 
+
+
+#define DCNEG_FASTAPPROX false
 /////////////////////////////
 /////  Alloc / Dealloc  /////
 /////////////////////////////
@@ -301,10 +304,22 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
     return Q;
 }
 
+
+void kkt_solver(const VectorXf & lin_part, const MatrixXf & inv_KKT, VectorXf & out){
+    int M = lin_part.size();
+    VectorXf state(M + 1);
+    VectorXf target(M + 1);
+    target.head(M) = -lin_part;
+    target(M) = 1;
+    state = inv_KKT * target;
+    out = state.head(M);
+}
+
+
+
 MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
-    MatrixXf Q(M_, N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
-        desc(M_, N_), sx(M_, N_), outer_grad(M_,N_), psis(M_, N_);
-    MatrixP temp_dot(M_,N_);
+    MatrixXf Q(M_, N_), unary(M_, N_), tmp(M_, N_),
+        outer_grad(M_,N_), psis(M_, N_);
     // Get parameters
     unary.fill(0);
     if(unary_){
@@ -318,31 +333,40 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
     int outer_rounds = 0;
     double identity_coefficient = 0;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        identity_coefficient += pairwise_[k]->parameters()(0);
+        identity_coefficient -= pairwise_[k]->parameters()(0);
     }
 
     MatrixXf inv_KKT(M_+1, M_+1);
     for (int i=0; i < M_; i++) {
         for (int j=0; j < M_; j++) {
-            inv_KKT(i,j) = -1 / (M_ * 2*identity_coefficient);
+            inv_KKT(i,j) = 1 / (M_ * 2*identity_coefficient);
             if (i==j) {
-                inv_KKT(i,j) += 1/ (2*identity_coefficient);
+                inv_KKT(i,j) -= 1/ (2*identity_coefficient);
             }
         }
         inv_KKT(M_, i) = 1.0/M_;
         inv_KKT(i, M_) = 1.0/M_;
     }
-    inv_KKT(M_,M_) = -2*identity_coefficient / M_;
+    inv_KKT(M_,M_) = 2*identity_coefficient / M_;
 
-    // MatrixXf KKT(M_+1, M_+1);
-    // KKT.fill(0);
-    // for (int i=0; i < M_; i++) {
-    //     KKT(i,i) = 2 * identity_coefficient;
-    //     KKT(M_, i) = 1;
-    //     KKT(i, M_) = 1;
-    // }
-    // std::cout << inv_KKT*KKT << '\n';
 
+// MatrixXf KKT(M_+1, M_+1);
+// KKT.fill(0);
+// for (int i=0; i < M_; i++) {
+//     KKT(i,i) = 2 * identity_coefficient;
+//     KKT(M_, i) = 1;
+//     KKT(i, M_) = 1;
+// }
+// std::cout << inv_KKT*KKT << '\n';
+
+
+    VectorXf new_Q(M_);
+    float old_score, score;
+    VectorXf grad(M_), cond_grad(M_), desc(M_);
+    int best_coord;
+    float num, denom, optimal_step_size;
+    bool has_converged;
+    int nb_iter;
     do {
         // New value of the linearization point.
         old_energy = energy;
@@ -352,26 +376,71 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
             psis += tmp;
         }
         outer_grad = unary + 2 * psis;
-        VectorXf state(M_ + 1);
-        VectorXf target(M_ + 1);
-        VectorXf new_Q(M_);
+        cond_grad.fill(0);
         for (int var = 0; var < N_; ++var) {
-            target.head(M_) = -outer_grad.col(var);
-            target(M_) = 1;
-            state = inv_KKT * target;
-            new_Q = state.head(M_);
+#if DCNEG_FASTAPPROX
+            kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
             clamp_and_normalize(new_Q);
+#else
+            kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
+            score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+            if(not all_positive(new_Q)){
+                // Our KKT conditions didn't get us the correct results.
+                // Let's Frank-wolfe it
+                clamp_and_normalize(new_Q);
+                // Get an initial valid point.
+                score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+                // Get a valid score.
+                cond_grad.fill(0);
+                has_converged = false;
+                nb_iter = 0;
+                do{
+                    old_score = score;
+                    cond_grad.fill(0);
+                    grad = outer_grad.col(var) - 2 * identity_coefficient * new_Q;
+                    grad.minCoeff(&best_coord);
+                    cond_grad(best_coord) = 1;
+                    desc = cond_grad - new_Q;
+                    if (desc.squaredNorm()==0) {
+                        break;
+                    }
+                    num = grad.dot(desc);
+                    if (num > 0) {
+                        // Commented out code to identify bugs with this computation
+                        if (num > 1e-6) {
+                            std::cout << "Shouldn't happen." << '\n';
+                            std::cout << "Cond score: " << grad.dot(cond_grad) << '\n';
+                            std::cout << "Point score: " << grad.dot(new_Q) << '\n';
+                            std::cout << num << '\n';
+                            std::cout  << '\n';
+                        }
+                        num = 0;
+                    }
+                    denom = -identity_coefficient * desc.squaredNorm();
+                    optimal_step_size = - num / (2 * denom);
+                    if(optimal_step_size > 1){
+                        optimal_step_size = 1; // Would get outta bounds
+                    }
+                    new_Q += optimal_step_size*desc;
+                    score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+                    if (old_score - score < 1e-2) {
+                        has_converged = true;
+                    }
+                    nb_iter++;
+                } while(not has_converged);
+#endif
+            }
+
             Q.col(var) = new_Q;
         }
-
         //valid_probability_debug(Q);
-
         // Compute our current value of the energy;
         energy = compute_energy(Q);
         outer_rounds++;
     } while ( (old_energy -energy) > 100 && outer_rounds < 100);
     return Q;
 }
+
 
 MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
     MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
