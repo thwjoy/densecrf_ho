@@ -28,13 +28,12 @@ MatrixXf get_unaries(const unsigned char * left_img, const unsigned char * right
 }
 
 MatrixXf get_unaries_from_file(std::string path, img_size & size) {
-    MatrixXf unaries(NUM_LABELS, size.height * size.width);
     std::ifstream txt_file(path.c_str());
     int nbr_var, nbr_label, M, m;
     txt_file >> nbr_var >> nbr_label;
     txt_file >> M;
     txt_file >> m;
-    assert(nbr_label == NUM_LABELS);
+    MatrixXf unaries(nbr_label, size.height * size.width);
     assert(nbr_var == size.height * size.width);
 
     float val;
@@ -63,13 +62,14 @@ void write_down_perf2(double timing, double final_energy, double rounded_energy,
 
 int main(int argc, char *argv[])
 {
-    if(argc < 2){
+    if(argc < 3){
         std::cout << "./stereo path_to_stereo_folder method" << '\n';
         std::cout << "Example: ./stereo /data/Stereo/tsukuba/ qpcccp" << '\n';
         return 1;
     }
 
     std::string stereo_folder = argv[1];
+    std::string method = argv[2];
     std::string left_image_path = stereo_folder + "imL.png";
     std::string right_image_path = stereo_folder + "imR.png";
     std::string output_image_path = stereo_folder + "out_" + method + ".bmp";
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
 
     clock_t start, end;
     start = clock();
-    Q = crf.unary_init();
+    MatrixXf Q = crf.unary_init();
     if (method == "mf5") {
         Q = crf.inference(Q, 5);
     } else if (method == "mf") {
