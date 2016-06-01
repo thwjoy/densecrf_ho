@@ -135,13 +135,14 @@ int main(int argc, char *argv[])
         traced_perfs = crf.tracing_qp_inference(Q);
         new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
         traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end() );
-    } else if (method == "tracing-sg_lg"){
+    } else if (method == "tracing-sg_lp"){
         traced_perfs = crf.tracing_qp_inference(Q);
         new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
         traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
         new_perfs = crf.tracing_lp_inference(Q, false);
         traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
     } else{
+        std::cout << method << '\n';
         std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
     }
 
