@@ -685,13 +685,13 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
             clamp_and_normalize(new_Q);
 #else
             kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
-            score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+            score = outer_grad.col(var).dot(new_Q) + identity_coefficient * new_Q.squaredNorm();
             if(not all_positive(new_Q)){
                 // Our KKT conditions didn't get us the correct results.
                 // Let's Frank-wolfe it
                 clamp_and_normalize(new_Q);
                 // Get an initial valid point.
-                score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+                score = outer_grad.col(var).dot(new_Q) + identity_coefficient * new_Q.squaredNorm();
                 // Get a valid score.
                 cond_grad.fill(0);
                 has_converged = false;
@@ -699,7 +699,7 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
                 do{
                     old_score = score;
                     cond_grad.fill(0);
-                    grad = outer_grad.col(var) - 2 * identity_coefficient * new_Q;
+                    grad = outer_grad.col(var) + 2 * identity_coefficient * new_Q;
                     grad.minCoeff(&best_coord);
                     cond_grad(best_coord) = 1;
                     desc = cond_grad - new_Q;
@@ -724,15 +724,14 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
                         optimal_step_size = 1; // Would get outta bounds
                     }
                     new_Q += optimal_step_size*desc;
-                    score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+                    score = outer_grad.col(var).dot(new_Q) + identity_coefficient * new_Q.squaredNorm();
                     if (old_score - score < 1e-2) {
                         has_converged = true;
                     }
                     nb_iter++;
                 } while(not has_converged);
-#endif
             }
-
+#endif
             Q.col(var) = new_Q;
         }
         //valid_probability_debug(Q);
@@ -818,13 +817,13 @@ std::vector<perf_measure> DenseCRF::tracing_concave_qp_cccp_inference(MatrixXf &
             clamp_and_normalize(new_Q);
 #else
             kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
-            score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+            score = outer_grad.col(var).dot(new_Q) + identity_coefficient * new_Q.squaredNorm();
             if(not all_positive(new_Q)){
                 // Our KKT conditions didn't get us the correct results.
                 // Let's Frank-wolfe it
                 clamp_and_normalize(new_Q);
                 // Get an initial valid point.
-                score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+                score = outer_grad.col(var).dot(new_Q) + identity_coefficient * new_Q.squaredNorm();
                 // Get a valid score.
                 cond_grad.fill(0);
                 has_converged = false;
@@ -832,7 +831,7 @@ std::vector<perf_measure> DenseCRF::tracing_concave_qp_cccp_inference(MatrixXf &
                 do{
                     old_score = score;
                     cond_grad.fill(0);
-                    grad = outer_grad.col(var) - 2 * identity_coefficient * new_Q;
+                    grad = outer_grad.col(var) + 2 * identity_coefficient * new_Q;
                     grad.minCoeff(&best_coord);
                     cond_grad(best_coord) = 1;
                     desc = cond_grad - new_Q;
@@ -857,15 +856,14 @@ std::vector<perf_measure> DenseCRF::tracing_concave_qp_cccp_inference(MatrixXf &
                         optimal_step_size = 1; // Would get outta bounds
                     }
                     new_Q += optimal_step_size*desc;
-                    score = outer_grad.col(var).dot(new_Q) - identity_coefficient * new_Q.squaredNorm();
+                    score = outer_grad.col(var).dot(new_Q) + identity_coefficient * new_Q.squaredNorm();
                     if (old_score - score < 1e-2) {
                         has_converged = true;
                     }
                     nb_iter++;
                 } while(not has_converged);
-#endif
             }
-
+#endif
             Q.col(var) = new_Q;
         }
         //valid_probability_debug(Q);
@@ -879,6 +877,7 @@ std::vector<perf_measure> DenseCRF::tracing_concave_qp_cccp_inference(MatrixXf &
         if (time_limit != 0 and total_time>time_limit) {
             break;
         }
+
 
         energy = compute_energy(Q);
         outer_rounds++;
