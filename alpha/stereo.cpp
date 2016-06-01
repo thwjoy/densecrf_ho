@@ -99,6 +99,7 @@ int main(int argc, char *argv[])
     MatrixXf Q = crf.unary_init();
     std::vector<perf_measure> traced_perfs;
     std::vector<perf_measure> new_perfs;
+    double time_budget = 200;
     if (method == "mf5") {
         Q = crf.inference(Q, 5);
     } else if (method == "mf") {
@@ -124,22 +125,31 @@ int main(int argc, char *argv[])
     } else if (method == "qp5"){
         Q = crf.qp_inference(Q, 5);
     } else if (method == "tracing-qp"){
-        traced_perfs = crf.tracing_qp_inference(Q);
+        traced_perfs = crf.tracing_qp_inference(Q, time_budget);
     } else if (method == "tracing-mf"){
-        traced_perfs = crf.tracing_inference(Q);
+        traced_perfs = crf.tracing_inference(Q, time_budget);
     } else if (method == "tracing-qpcccp") {
         traced_perfs = crf.tracing_qp_inference(Q);
-        new_perfs = crf.tracing_qp_cccp_inference(Q);
+        for (int i = 0; i < traced_perfs.size(); i++) {
+            time_budget -= traced_perfs[i].first;
+        }
+        new_perfs = crf.tracing_qp_cccp_inference(Q, time_budget);
         traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end() );
     } else if (method == "tracing-proper_qpcccp_cv"){
         traced_perfs = crf.tracing_qp_inference(Q);
-        new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+        for (int i = 0; i < traced_perfs.size(); i++) {
+            time_budget -= traced_perfs[i].first;
+        }
+        new_perfs = crf.tracing_concave_qp_cccp_inference(Q, time_budget);
         traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end() );
     } else if (method == "tracing-sg_lp"){
         traced_perfs = crf.tracing_qp_inference(Q);
         new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
         traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
-        new_perfs = crf.tracing_lp_inference(Q, false);
+        for (int i = 0; i < traced_perfs.size(); i++) {
+            time_budget -= traced_perfs[i].first;
+        }
+        new_perfs = crf.tracing_lp_inference(Q, false, time_budget);
         traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
     } else{
         std::cout << method << '\n';
