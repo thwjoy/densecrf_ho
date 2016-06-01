@@ -1537,7 +1537,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
 
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = assignment_energy(currentMap(best_Q));
+        perf_energy = assignment_energy(currentMap(get_extended_matrix(best_Q, indices, M_)));
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
 

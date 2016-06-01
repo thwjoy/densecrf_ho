@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import os
+from itertools import accumulate
 import matplotlib.pyplot as plt
 import sys
 
@@ -10,7 +11,12 @@ def load_trace(path_to_file):
             elements = map(float, row.split())
             properties.append(elements)
 
-    return list(zip(*properties))
+    tss = [list(a) for a in zip(*properties)]
+
+    tss[1] = list(accumulate(tss[1]))
+
+    # We don't care about the iterations.
+    return tss[1:]
 
 
 if len(sys.argv) < 2:
@@ -33,19 +39,13 @@ qpcccp_trace = load_trace(path_to_qpcccp_trace)
 lp_trace = load_trace(path_to_lp_trace)
 
 plt.figure(1)
-plt.subplot(211)
-plt.title("Partial energy")
+plt.title("Assignment Energy as a function of time")
 plt.plot(qp_trace[0], qp_trace[1], 'ro', label="QP")
 plt.plot(mf_trace[0], mf_trace[1], 'bo', label="MF")
 plt.plot(qpcccp_cv_trace[0], qpcccp_cv_trace[1], 'go', label="CCV")
-plt.plot(qpcccp_trace[0], qpcccp_trace[1], 'yo', label="CCCP")
-plt.plot(lp_trace[0], lp_trace[1], 'po', label="lp")
+plt.plot(qpcccp_trace[0], qpcccp_trace[1], 'mo', label="CCCP")
+plt.plot(lp_trace[0], lp_trace[1], 'yo', label="lp")
 plt.legend()
 
-plt.subplot(212)
-plt.title("Rounded energy")
-plt.plot(qp_trace[0], qp_trace[2], 'ro', label="QP")
-plt.plot(mf_trace[0], mf_trace[2], 'bo', label="MF")
-plt.legend()
 
 plt.show()
