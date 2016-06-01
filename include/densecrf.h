@@ -31,6 +31,9 @@
 #include "objective.h"
 #include "pairwise.h"
 #include <vector>
+#include <utility>
+
+typedef std::pair<double, double> perf_measure;
 
 void expAndNormalize( MatrixXf & out, const MatrixXf & in);
 void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q);
@@ -82,13 +85,13 @@ public:
 	// Run inference and return the probabilities
 	MatrixXf inference(const MatrixXf & init,  int n_iterations ) const;
 	MatrixXf inference(const MatrixXf & init) const;
-	std::vector<MatrixXf> tracing_inference( const MatrixXf & init ) const;
+	std::vector<perf_measure> tracing_inference( const MatrixXf & init ) const;
 
 	// Run the energy minimisation on the QP
 	// First one is the Lafferty-Ravikumar version of the QP
 	MatrixXf qp_inference(const MatrixXf & init) const;
 	MatrixXf qp_inference(const MatrixXf & init, int nb_iterations) const;
-	std::vector<MatrixXf> tracing_qp_inference(const MatrixXf & init ) const;
+	std::vector<perf_measure> tracing_qp_inference(const MatrixXf & init ) const;
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
     MatrixXf qp_cccp_inference(const MatrixXf & init) const;
 	std::vector<MatrixXf> tracing_qp_cccp_inference(const MatrixXf & init) const;

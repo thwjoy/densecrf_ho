@@ -97,8 +97,8 @@ int main(int argc, char *argv[])
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.unary_init();
-    std::vector<MatrixXf> tracedQs;
-    std::vector<MatrixXf> newQs;
+    std::vector<perf_measure> traced_perfs;
+    std::vector<perf_measure> new_perfs;
     if (method == "mf5") {
         Q = crf.inference(Q, 5);
     } else if (method == "mf") {
@@ -124,23 +124,23 @@ int main(int argc, char *argv[])
     } else if (method == "qp5"){
         Q = crf.qp_inference(Q, 5);
     } else if (method == "tracing-qp"){
-        tracedQs = crf.tracing_qp_inference(Q);
+        traced_perfs = crf.tracing_qp_inference(Q);
     } else if (method == "tracing-mf"){
-        tracedQs = crf.tracing_inference(Q);
-    } else if (method == "tracing-qpcccp") {
-        tracedQs = crf.tracing_qp_inference(Q);
-        newQs = crf.tracing_qp_cccp_inference(tracedQs.back());
-        tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end() );
-    } else if (method == "tracing-proper_qpcccp_cv"){
-        tracedQs = crf.tracing_qp_inference(Q);
-        newQs = crf.tracing_concave_qp_cccp_inference(tracedQs.back());
-        tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end() );
-    } else if (method == "tracing-sg_lg"){
-        tracedQs = crf.tracing_qp_inference(Q);
-        newQs = crf.tracing_concave_qp_cccp_inference(tracedQs.back());
-        tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end());
-        newQs = crf.tracing_lp_inference(tracedQs.back(), false);
-        tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end());
+        traced_perfs = crf.tracing_inference(Q);
+        // } else if (method == "tracing-qpcccp") {
+        //     tracedQs = crf.tracing_qp_inference(Q);
+        //     newQs = crf.tracing_qp_cccp_inference(tracedQs.back());
+        //     tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end() );
+        // } else if (method == "tracing-proper_qpcccp_cv"){
+        //     tracedQs = crf.tracing_qp_inference(Q);
+        //     newQs = crf.tracing_concave_qp_cccp_inference(tracedQs.back());
+        //     tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end() );
+        // } else if (method == "tracing-sg_lg"){
+        //     tracedQs = crf.tracing_qp_inference(Q);
+        //     newQs = crf.tracing_concave_qp_cccp_inference(tracedQs.back());
+        //     tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end());
+        //     newQs = crf.tracing_lp_inference(tracedQs.back(), false);
+        //     tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end());
     } else{
         std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
     }
@@ -151,10 +151,8 @@ int main(int argc, char *argv[])
         std::string txt_output = output_image_path;
         txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
         std::ofstream txt_file(txt_output);
-        for (int it=0; it<tracedQs.size(); it++) {
-            double final_energy = crf.compute_energy(tracedQs[it]);
-            double discretized_energy = crf.assignment_energy(crf.currentMap(tracedQs[it]));
-            txt_file << it << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+        for (int it=0; it<traced_perfs.size(); it++) {
+            txt_file << it << '\t' << traced_perfs[it].first << '\t' << traced_perfs[it].second << std::endl;
         }
         txt_file.close();
     } else {

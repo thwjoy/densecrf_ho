@@ -160,10 +160,15 @@ MatrixXf DenseCRF::inference ( const MatrixXf & init, int n_iterations ) const {
     return Q;
 }
 
-std::vector<MatrixXf> DenseCRF::tracing_inference( const MatrixXf & init) const {
+std::vector<perf_measure> DenseCRF::tracing_inference( const MatrixXf & init) const {
     MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_);
     float old_kl, kl;
-    std::vector<MatrixXf> allQs;
+
+    clock_t start, end;
+    double perf_energy, perf_timing;
+    perf_measure latest_perf;
+    std::vector<perf_measure> perfs;
+
     unary.fill(0);
     if( unary_ ){
         unary = unary_->get();
@@ -180,6 +185,7 @@ std::vector<MatrixXf> DenseCRF::tracing_inference( const MatrixXf & init) const 
     old_Q = Q;
     int count = 0;
     while(keep_inferring) {
+        start = clock();
         old_kl = kl;
         tmp1 = -unary;
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -199,10 +205,17 @@ std::vector<MatrixXf> DenseCRF::tracing_inference( const MatrixXf & init) const 
             keep_inferring = (Q_change > 0.001);
         }
         old_Q = Q;
-        allQs.push_back(Q);
+
+        end = clock();
+        perf_timing = (double(end-start)/CLOCKS_PER_SEC);
+        perf_energy = assignment_energy(currentMap(Q));
+        latest_perf = std::make_pair(perf_timing, perf_energy);
+        perfs.push_back(latest_perf);
+
+
         count++;
     }
-    return allQs;
+    return perfs;
 }
 
 MatrixXf DenseCRF::inference (const MatrixXf & init) const {
@@ -450,11 +463,17 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init, int nb_iterations) const 
 }
 
 
-std::vector<MatrixXf> DenseCRF::tracing_qp_inference(const MatrixXf & init) const {
+std::vector<perf_measure> DenseCRF::tracing_qp_inference(const MatrixXf & init) const {
     MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_), tmp(M_,N_), grad(M_, N_),
         desc(M_,N_), sx(M_,N_), psisx(M_, N_);
     MatrixP temp_dot(M_,N_);
-    std::vector<MatrixXf> allQs;
+    double energy, old_energy;
+
+    clock_t start, end;
+    double perf_energy, perf_timing;
+    perf_measure latest_perf;
+    std::vector<perf_measure> perfs;
+
     double optimal_step_size = 0;
     // Get parameters
     unary.fill(0);
@@ -469,39 +488,51 @@ std::vector<MatrixXf> DenseCRF::tracing_qp_inference(const MatrixXf & init) cons
     // Build proxy unaries for the added terms
     // Compute the dominant diagonal
 
-    // Note: All the terms in the pairwise matrix are negatives
-    // so to get the sum of the abs value, you need to get the
-    // product with the matrix full of -1.
-    diag_dom.fill(0);
-    MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, full_ones);
-        diag_dom += tmp;
-    }
-    diag_dom += 0.0001 * MatrixXf::Ones(M_, N_);
-    // This is a caution to make sure that the matrix is well
-    // diagonally dominant and therefore convex. Otherwise, due to
-    // floating point errors, we can have issues.
-    // This is triggered easily when we initialise with the uniform distribution,
-    // then the results of the matrix multiplication is exactly the sum along the columns.
+    start = clock();
 
-    // Update the proxy_unaries
-    unary = unary - diag_dom;
+    {
+        // Note: All the terms in the pairwise matrix are negatives
+        // so to get the sum of the abs value, you need to get the
+        // product with the matrix full of -1.
+        diag_dom.fill(0);
+        MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, full_ones);
+            diag_dom += tmp;
+        }
+        diag_dom += 0.0001 * MatrixXf::Ones(M_, N_);
+        // This is a caution to make sure that the matrix is well
+        // diagonally dominant and therefore convex. Otherwise, due to
+        // floating point errors, we can have issues.
+        // This is triggered easily when we initialise with the uniform distribution,
+        // then the results of the matrix multiplication is exactly the sum along the columns.
 
-    // Compute the value of the energy
-    double old_energy = std::numeric_limits<double>::max();
-    double energy;
+        // Update the proxy_unaries
+        unary = unary - diag_dom;
 
-    grad = unary;
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, Q);
-        grad += 2 *tmp;
-    }
-    grad += 2 * diag_dom.cwiseProduct(Q);
+        // Compute the value of the energy
+        old_energy = std::numeric_limits<double>::max();
+
+        grad = unary;
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, Q);
+            grad += 2 *tmp;
+        }
+        grad += 2 * diag_dom.cwiseProduct(Q);
 
 
-    energy = compute_LR_QP_value(Q, diag_dom);
+        energy = compute_LR_QP_value(Q, diag_dom);
+    } // This is some necessary setup for the QP inference so this need to be accounted.
+
+    end = clock();
+    perf_timing = (double(end-start)/CLOCKS_PER_SEC);
+    perf_energy = assignment_energy(currentMap(Q));
+    latest_perf = std::make_pair(perf_timing, perf_energy);
+    perfs.push_back(latest_perf);
+
+
     while( (old_energy - energy) > 100){
+        start = clock();
         old_energy = energy;
 
         // Get a Descent direction by minimising < \nabla E, s >
@@ -540,7 +571,7 @@ std::vector<MatrixXf> DenseCRF::tracing_qp_inference(const MatrixXf & init) cons
         }
         // Take a step
         Q += optimal_step_size * sx;
-        allQs.push_back(Q);
+
         if (not valid_probability(Q)) {
             std::cout << "Bad proba" << '\n';
         }
@@ -549,8 +580,15 @@ std::vector<MatrixXf> DenseCRF::tracing_qp_inference(const MatrixXf & init) cons
         //energy = compute_LR_QP_value(Q, diag_dom);
         //alt_energy = dotProduct(Q, unary, temp_dot) + 0.5*dotProduct(Q, grad - unary, temp_dot);
         energy = 0.5 * dotProduct(Q, grad + unary, temp_dot);
+
+        // performance measurement
+        end = clock();
+        perf_timing = (double(end-start)/CLOCKS_PER_SEC);
+        perf_energy = assignment_energy(currentMap(Q));
+        latest_perf = std::make_pair(perf_timing, perf_energy);
+        perfs.push_back(latest_perf);
     }
-    return allQs;
+    return perfs;
 }
 
 
