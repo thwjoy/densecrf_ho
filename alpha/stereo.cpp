@@ -97,6 +97,8 @@ int main(int argc, char *argv[])
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.unary_init();
+    std::vector<MatrixXf> tracedQs;
+    std::vector<MatrixXf> newQs;
     if (method == "mf5") {
         Q = crf.inference(Q, 5);
     } else if (method == "mf") {
@@ -119,17 +121,50 @@ int main(int argc, char *argv[])
         Q = crf.lp_inference(Q, true);
     } else if (method == "unary"){
         (void)0;
+    } else if (method == "qp5"){
+        Q = crf.qp_inference(Q, 5);
+    } else if (method == "tracing-qp"){
+        tracedQs = crf.tracing_qp_inference(Q);
+    } else if (method == "tracing-mf"){
+        tracedQs = crf.tracing_inference(Q);
+    } else if (method == "tracing-qpcccp") {
+        tracedQs = crf.tracing_qp_inference(Q);
+        newQs = crf.tracing_qp_cccp_inference(tracedQs.back());
+        tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end() );
+    } else if (method == "tracing-proper_qpcccp_cv"){
+        tracedQs = crf.tracing_qp_inference(Q);
+        newQs = crf.tracing_concave_qp_cccp_inference(tracedQs.back());
+        tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end() );
+    } else if (method == "tracing-sg_lg"){
+        tracedQs = crf.tracing_qp_inference(Q);
+        newQs = crf.tracing_concave_qp_cccp_inference(tracedQs.back());
+        tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end());
+        newQs = crf.tracing_lp_inference(tracedQs.back(), false);
+        tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end());
     } else{
         std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
     }
 
     end = clock();
-    double timing = (double(end-start)/CLOCKS_PER_SEC);
-    double final_energy = crf.compute_energy(Q);
-    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
-    std::cout << "Fractional Energy: " << final_energy << '\n';
-    std::cout << "Integer Energy: " << discretized_energy << '\n';
 
-    write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
-    save_map(Q, size, output_image_path, "Stereo_special");
+    if(method.find("tracing")!=std::string::npos){
+        std::string txt_output = output_image_path;
+        txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
+        std::ofstream txt_file(txt_output);
+        for (int it=0; it<tracedQs.size(); it++) {
+            double final_energy = crf.compute_energy(tracedQs[it]);
+            double discretized_energy = crf.assignment_energy(crf.currentMap(tracedQs[it]));
+            txt_file << it << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+        }
+        txt_file.close();
+    } else {
+        double timing = (double(end-start)/CLOCKS_PER_SEC);
+        double final_energy = crf.compute_energy(Q);
+        double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        std::cout << "Fractional Energy: " << final_energy << '\n';
+        std::cout << "Integer Energy: " << discretized_energy << '\n';
+
+        write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
+        save_map(Q, size, output_image_path, "Stereo_special");
+    }
 }

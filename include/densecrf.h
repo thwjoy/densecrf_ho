@@ -82,16 +82,22 @@ public:
 	// Run inference and return the probabilities
 	MatrixXf inference(const MatrixXf & init,  int n_iterations ) const;
 	MatrixXf inference(const MatrixXf & init) const;
+	std::vector<MatrixXf> tracing_inference( const MatrixXf & init ) const;
 
 	// Run the energy minimisation on the QP
 	// First one is the Lafferty-Ravikumar version of the QP
 	MatrixXf qp_inference(const MatrixXf & init) const;
+	MatrixXf qp_inference(const MatrixXf & init, int nb_iterations) const;
+	std::vector<MatrixXf> tracing_qp_inference(const MatrixXf & init ) const;
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
     MatrixXf qp_cccp_inference(const MatrixXf & init) const;
+	std::vector<MatrixXf> tracing_qp_cccp_inference(const MatrixXf & init) const;
 	// Third one the QP-cccp defined in the Krahenbuhl paper, restricted to concave label compatibility function.
 	MatrixXf concave_qp_cccp_inference(const MatrixXf & init) const;
+	std::vector<MatrixXf> tracing_concave_qp_cccp_inference(const MatrixXf & init) const;
 	// Run the energy minimisation on the LP
     MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad) const;
+	std::vector<MatrixXf> tracing_lp_inference(MatrixXf & init, bool use_cond_grad) const;
 
 	// Perform the rounding based on argmaxes
 	MatrixXf max_rounding(const MatrixXf & estimates) const;
