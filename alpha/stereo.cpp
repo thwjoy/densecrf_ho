@@ -127,20 +127,20 @@ int main(int argc, char *argv[])
         traced_perfs = crf.tracing_qp_inference(Q);
     } else if (method == "tracing-mf"){
         traced_perfs = crf.tracing_inference(Q);
-        // } else if (method == "tracing-qpcccp") {
-        //     tracedQs = crf.tracing_qp_inference(Q);
-        //     newQs = crf.tracing_qp_cccp_inference(tracedQs.back());
-        //     tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end() );
-        // } else if (method == "tracing-proper_qpcccp_cv"){
-        //     tracedQs = crf.tracing_qp_inference(Q);
-        //     newQs = crf.tracing_concave_qp_cccp_inference(tracedQs.back());
-        //     tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end() );
-        // } else if (method == "tracing-sg_lg"){
-        //     tracedQs = crf.tracing_qp_inference(Q);
-        //     newQs = crf.tracing_concave_qp_cccp_inference(tracedQs.back());
-        //     tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end());
-        //     newQs = crf.tracing_lp_inference(tracedQs.back(), false);
-        //     tracedQs.insert( tracedQs.end(), newQs.begin(), newQs.end());
+    } else if (method == "tracing-qpcccp") {
+        traced_perfs = crf.tracing_qp_inference(Q);
+        new_perfs = crf.tracing_qp_cccp_inference(Q);
+        traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end() );
+    } else if (method == "tracing-proper_qpcccp_cv"){
+        traced_perfs = crf.tracing_qp_inference(Q);
+        new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+        traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end() );
+    } else if (method == "tracing-sg_lg"){
+        traced_perfs = crf.tracing_qp_inference(Q);
+        new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+        traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+        new_perfs = crf.tracing_lp_inference(Q, false);
+        traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
     } else{
         std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
     }
