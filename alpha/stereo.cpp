@@ -97,6 +97,9 @@ int main(int argc, char *argv[])
     clock_t start, end;
     start = clock();
     MatrixXf Q = crf.unary_init();
+    std::vector<perf_measure> traced_perfs;
+    std::vector<perf_measure> new_perfs;
+    double time_budget = 200;
     if (method == "mf5") {
         Q = crf.inference(Q, 5);
     } else if (method == "mf") {
@@ -109,6 +112,8 @@ int main(int argc, char *argv[])
     } else if (method == "proper_qpcccp_ccv"){
         Q = crf.qp_inference(Q);
         Q = crf.concave_qp_cccp_inference(Q);
+    } else if (method == "ccv"){
+        Q = crf.concave_qp_cccp_inference(Q);
     } else if (method == "sg_lp"){
         Q = crf.qp_inference(Q);
         Q = crf.concave_qp_cccp_inference(Q);
@@ -119,17 +124,60 @@ int main(int argc, char *argv[])
         Q = crf.lp_inference(Q, true);
     } else if (method == "unary"){
         (void)0;
+    } else if (method == "qp5"){
+        Q = crf.qp_inference(Q, 5);
+    } else if (method == "tracing-qp"){
+        traced_perfs = crf.tracing_qp_inference(Q, time_budget);
+    } else if (method == "tracing-only-ccv") {
+        traced_perfs = crf.tracing_concave_qp_cccp_inference(Q, time_budget);
+    } else if (method == "tracing-mf"){
+        traced_perfs = crf.tracing_inference(Q, time_budget);
+    } else if (method == "tracing-qpcccp") {
+        traced_perfs = crf.tracing_qp_inference(Q);
+        for (int i = 0; i < traced_perfs.size(); i++) {
+            time_budget -= traced_perfs[i].first;
+        }
+        new_perfs = crf.tracing_qp_cccp_inference(Q, time_budget);
+        traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end() );
+    } else if (method == "tracing-proper_qpcccp_cv"){
+        traced_perfs = crf.tracing_qp_inference(Q);
+        for (int i = 0; i < traced_perfs.size(); i++) {
+            time_budget -= traced_perfs[i].first;
+        }
+        new_perfs = crf.tracing_concave_qp_cccp_inference(Q, time_budget);
+        traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end() );
+    } else if (method == "tracing-sg_lp"){
+        traced_perfs = crf.tracing_qp_inference(Q);
+        new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+        traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+        for (int i = 0; i < traced_perfs.size(); i++) {
+            time_budget -= traced_perfs[i].first;
+        }
+        new_perfs = crf.tracing_lp_inference(Q, false, time_budget);
+        traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
     } else{
+        std::cout << method << '\n';
         std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
     }
 
     end = clock();
-    double timing = (double(end-start)/CLOCKS_PER_SEC);
-    double final_energy = crf.compute_energy(Q);
-    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
-    std::cout << "Fractional Energy: " << final_energy << '\n';
-    std::cout << "Integer Energy: " << discretized_energy << '\n';
 
-    write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
-    save_map(Q, size, output_image_path, "Stereo_special");
+    if(method.find("tracing")!=std::string::npos){
+        std::string txt_output = output_image_path;
+        txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
+        std::ofstream txt_file(txt_output);
+        for (int it=0; it<traced_perfs.size(); it++) {
+            txt_file << it << '\t' << traced_perfs[it].first << '\t' << traced_perfs[it].second << std::endl;
+        }
+        txt_file.close();
+    } else {
+        double timing = (double(end-start)/CLOCKS_PER_SEC);
+        double final_energy = crf.compute_energy(Q);
+        double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        std::cout << "Fractional Energy: " << final_energy << '\n';
+        std::cout << "Integer Energy: " << discretized_energy << '\n';
+
+        write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
+        save_map(Q, size, output_image_path, "Stereo_special");
+    }
 }
