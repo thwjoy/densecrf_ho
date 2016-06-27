@@ -112,6 +112,8 @@ int main(int argc, char *argv[])
     } else if (method == "proper_qpcccp_ccv"){
         Q = crf.qp_inference(Q);
         Q = crf.concave_qp_cccp_inference(Q);
+    } else if (method == "ccv"){
+        Q = crf.concave_qp_cccp_inference(Q);
     } else if (method == "sg_lp"){
         Q = crf.qp_inference(Q);
         Q = crf.concave_qp_cccp_inference(Q);
@@ -126,6 +128,8 @@ int main(int argc, char *argv[])
         Q = crf.qp_inference(Q, 5);
     } else if (method == "tracing-qp"){
         traced_perfs = crf.tracing_qp_inference(Q, time_budget);
+    } else if (method == "tracing-only-ccv") {
+        traced_perfs = crf.tracing_concave_qp_cccp_inference(Q, time_budget);
     } else if (method == "tracing-mf"){
         traced_perfs = crf.tracing_inference(Q, time_budget);
     } else if (method == "tracing-qpcccp") {
