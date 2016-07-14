@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
     MatrixXf Q = crf.unary_init();
     std::vector<perf_measure> traced_perfs;
     std::vector<perf_measure> new_perfs;
-    double time_budget = 200;
+    double time_budget = 300;
     if (method == "mf5") {
         Q = crf.inference(Q, 5);
     } else if (method == "mf") {
