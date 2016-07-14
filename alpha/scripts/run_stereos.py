@@ -25,7 +25,8 @@ def main():
 
     for trace in trace_to_collect:
         for exp in stereo_experiments:
-            stereo_command(exp, trace)
+            stereo_command(exp + os.sep, trace)
+
 
 if __name__ == "__main__":
     main()

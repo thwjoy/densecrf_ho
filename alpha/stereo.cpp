@@ -180,4 +180,6 @@ int main(int argc, char *argv[])
         write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
         save_map(Q, size, output_image_path, "Stereo_special");
     }
+
+    return 0;
 }
