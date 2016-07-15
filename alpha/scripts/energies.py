@@ -81,9 +81,9 @@ def main():
         total_int_energy_1 += prop1.int_energy
         total_int_energy_2 += prop2.int_energy
 
-    print "First method is faster in %s%% and similar in %s%% of the cases" % ((faster_1 *100) / (faster_1 + faster_2 + faster_same), (faster_same*100) / (faster_1 + faster_2 + faster_same))
-    print "First method reach lower fractional energy in %s%% and same in %s%% of the cases" % ((frac_better_1 *100) / (frac_better_1 + frac_better_2 + frac_better_same), (frac_better_same *100) / (frac_better_1 + frac_better_2 + frac_better_same))
-    print "First method reach lower integer energy in %s%% and same in %s%% of the cases" % ((int_better_1 *100) / (int_better_1 + int_better_2 + int_better_same), (int_better_same *100) / (int_better_1 + int_better_2 + int_better_same))
+    print "First method is faster in %s%% and similar in %s%% of the cases" % ((faster_1 *100) / float(faster_1 + faster_2 + faster_same), (faster_same*100) / float(faster_1 + faster_2 + faster_same))
+    print "First method reach lower fractional energy in %s%% and same in %s%% of the cases" % ((frac_better_1 *100) / float(frac_better_1 + frac_better_2 + frac_better_same), (frac_better_same *100) / float(frac_better_1 + frac_better_2 + frac_better_same))
+    print "First method reach lower integer energy in %s%% and same in %s%% of the cases" % ((int_better_1 *100) / float(int_better_1 + int_better_2 + int_better_same), (int_better_same *100) / float(int_better_1 + int_better_2 + int_better_same))
 
     print "Average timings: %s vs %s" % (total_timing_1/float(len(first)), total_timing_2/float(len(second)))
     print "Average fractional energy: %s vs %s" % (total_frac_energy_1/float(len(first)), total_frac_energy_2/float(len(second)))

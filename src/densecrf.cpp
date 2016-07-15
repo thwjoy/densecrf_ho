@@ -781,17 +781,6 @@ std::vector<perf_measure> DenseCRF::tracing_concave_qp_cccp_inference(MatrixXf &
     }
     inv_KKT(M_,M_) = 2*identity_coefficient / M_;
 
-
-// MatrixXf KKT(M_+1, M_+1);
-// KKT.fill(0);
-// for (int i=0; i < M_; i++) {
-//     KKT(i,i) = 2 * identity_coefficient;
-//     KKT(M_, i) = 1;
-//     KKT(i, M_) = 1;
-// }
-// std::cout << inv_KKT*KKT << '\n';
-
-
     VectorXf new_Q(M_);
     float old_score, score;
     VectorXf grad(M_), cond_grad(M_), desc(M_);
@@ -1000,6 +989,7 @@ std::vector<perf_measure> DenseCRF::tracing_qp_cccp_inference(MatrixXf & init, d
     perf_measure latest_perf;
     std::vector<perf_measure> perfs;
 
+    Q = init;
     start = clock();
     {
         // Compute the smallest eigenvalues, that we need to make bigger
@@ -1024,7 +1014,6 @@ std::vector<perf_measure> DenseCRF::tracing_qp_cccp_inference(MatrixXf & init, d
         unary = unary_->get();
     }
 
-    Q = init;
     // Compute the value of the energy
     double old_energy;
     double energy = compute_energy(Q);
