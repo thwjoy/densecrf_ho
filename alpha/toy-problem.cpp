@@ -26,7 +26,7 @@ MatrixXf get_unaries(int nb_variables, int nb_labels){
     MatrixXf unaries(nb_labels, nb_variables);
     for (int j=0; j<nb_labels; j++) {
         for (int i = 0; i < nb_variables; i++) {
-            unaries(j,i) = randint(5) - 2;
+            unaries(j,i) = randint(10);
         }
     }
     return unaries;
@@ -35,8 +35,8 @@ MatrixXf get_unaries(int nb_variables, int nb_labels){
 int main(int argc, char *argv[])
 {
     std::srand(1337); // Set the seed
-    int nb_variables = 5;
-    int nb_labels = 9;
+    int nb_variables = 8;
+    int nb_labels = 3;
     int nb_features = 5;
     float alpha = 10;
 
@@ -49,12 +49,13 @@ int main(int argc, char *argv[])
 
     crf.setUnaryEnergy(unaries);
     for (int filter = 0; filter < all_pairwise.size() ; filter++) {
-        crf.addPairwiseEnergy(*(all_pairwise[filter]), new PottsCompatibility(1));
+        // crf.addPairwiseEnergy(*(all_pairwise[filter]), new PottsCompatibility(1));
+        crf.addPairwiseGaussian(5, 5, new PottsCompatibility(1));
     }
 
 
     //crf.damp_updates(0.5);
-    crf.inference();
+    crf.lp_inference(unaries, false);
     //crf.sequential_inference();
 
     return 0;
