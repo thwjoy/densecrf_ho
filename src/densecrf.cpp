@@ -1282,9 +1282,16 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 printf("diff: mean %f, max %f, min %f\n", diff.mean(), diff.maxCoeff(), diff.minCoeff());
 
                 std::cout << Q << std::endl << std::endl;
-                std::cout << tmp2.block(0,0,3,7) << std::endl << std::endl;
-                std::cout << tmp.block(0,0,3,7) << std::endl << std::endl;
-                std::cout << diff.block(0,0,3,7) << std::endl << std::endl;
+                std::cout << tmp2 << std::endl << std::endl;
+                std::cout << tmp << std::endl << std::endl;
+                std::cout << diff << std::endl << std::endl;
+                for (int i=0; i<tmp.rows(); ++i) {
+                    tmp.row(i) /= tmp.row(i).norm();
+                    tmp2.row(i) /= tmp2.row(i).norm();
+                }
+                tmp = tmp*tmp2.transpose();
+                std::cout << tmp << std::endl;
+
             }
                 
             energy -= dotProduct(Q, tmp2, dot_tmp);
