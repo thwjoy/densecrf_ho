@@ -242,7 +242,13 @@ void PairwisePotential::apply_upper_minus_lower_sorted_slice(MatrixXf & out, int
 		for(int c=min; c<max; ++c) {
             for(int b=min; b<c; ++b) {
                 VectorXf featDiff = (features.col(c) - features.col(b));
-                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
+                //out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
+            }
+        }
+		for(int c=min; c<max; ++c) {
+            for(int b=c; b<max; ++b) {
+                VectorXf featDiff = (features.col(c) - features.col(b));
+                out(0, c) -= exp(-featDiff.squaredNorm()) * alpha;
             }
         }
 	} else {
