@@ -1134,10 +1134,10 @@ void get_limited_indices(MatrixXf const & Q, std::vector<int> & indices) {
 
     double represented = 0;
     int max_ind;
-    while(represented < 0.99 * Q.cols() && indices.size() < Q.rows()) {
+    while(represented < 2 * Q.cols() && indices.size() < Q.rows()) {
         int max_val = accum.maxCoeff(&max_ind);
         indices.push_back(max_ind);
-        accum[max_ind] = 0;
+        accum[max_ind] = -1e9;
         represented += max_val;
     }
 }
@@ -1188,6 +1188,7 @@ VectorXs get_original_label(VectorXs const & restricted_labels, std::vector<int>
 MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     // Restrict number of labels in the computation
     std::vector<int> indices;
+    renormalize(init);
     get_limited_indices(init, indices);
     int restricted_M = indices.size();
     MatrixXf unary = get_restricted_matrix(unary_->get(), indices);
@@ -1229,6 +1230,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     assert(valid_probability(Q));
     double energy = 0;
 
+    clock_t start, end;
+
     int it=0;
     do {
         ++it;
@@ -1243,9 +1246,9 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
         sortRows(Q, ind);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
             // Special case for 2 labels (used mainly for alpha expansion)
-            if(Q.rows()==2) {
+            if(false && Q.rows()==2) {
                 // Compute only for one label
-                no_norm_pairwise[k]->apply_upper_minus_lower(tmp_single_line, ind.row(0));
+                no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp_single_line, ind.row(0));
                 tmp2.fill(0);
                 for(i=0; i<tmp.cols(); ++i) {
                     tmp2(0, ind(0, i)) = tmp_single_line(i);
@@ -1254,13 +1257,34 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 tmp2.row(1) = - tmp2.row(0);
             } else {
                 // Add upper minus lower
-                no_norm_pairwise[k]->apply_upper_minus_lower(tmp, ind);
+                start = clock();
+                sortRows(Q, ind);
+                no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
                 tmp2.fill(0);
                 for(i=0; i<tmp.cols(); ++i) {
                     for(j=0; j<tmp.rows(); ++j) {
                         tmp2(j, ind(j, i)) = tmp(j, i);
                     }
                 }
+                end = clock();
+                float perf_timing = (double(end-start)/CLOCKS_PER_SEC);
+                printf("DC: It: %d | id: %d | time: %f\n", it, k, perf_timing);
+
+                start = clock();
+                pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
+                end = clock();
+                perf_timing = (double(end-start)/CLOCKS_PER_SEC);
+                printf("ORD: It: %d | id: %d | time: %f\n", it, k, perf_timing);
+
+                MatrixXf diff = tmp2 - tmp;
+                printf("GT:   mean %f, max %f, min %f\n", tmp2.mean(), tmp2.maxCoeff(), tmp2.minCoeff());
+                printf("new:  mean %f, max %f, min %f\n", tmp.mean(), tmp.maxCoeff(), tmp.minCoeff());
+                printf("diff: mean %f, max %f, min %f\n", diff.mean(), diff.maxCoeff(), diff.minCoeff());
+
+                std::cout << Q << std::endl << std::endl;
+                std::cout << tmp2.block(0,0,3,7) << std::endl << std::endl;
+                std::cout << tmp.block(0,0,3,7) << std::endl << std::endl;
+                std::cout << diff.block(0,0,3,7) << std::endl << std::endl;
             }
                 
             energy -= dotProduct(Q, tmp2, dot_tmp);
@@ -1356,7 +1380,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
         }
 
         assert(valid_probability(Q));
-    } while(it<5);
+    } while(it<1);
     // std::cout <<"final projected energy: " << best_int_energy << "\n";
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         delete no_norm_pairwise[k];
@@ -1436,7 +1460,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
             // Special case for 2 labels (used mainly for alpha expansion)
             if(Q.rows()==2) {
                 // Compute only for one label
-                no_norm_pairwise[k]->apply_upper_minus_lower(tmp_single_line, ind.row(0));
+                no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp_single_line, ind.row(0));
                 tmp2.fill(0);
                 for(i=0; i<tmp.cols(); ++i) {
                     tmp2(0, ind(0, i)) = tmp_single_line(i);
@@ -1445,7 +1469,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
                 tmp2.row(1) = - tmp2.row(0);
             } else {
                 // Add upper minus lower
-                no_norm_pairwise[k]->apply_upper_minus_lower(tmp, ind);
+                no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
                 tmp2.fill(0);
                 for(i=0; i<tmp.cols(); ++i) {
                     for(j=0; j<tmp.rows(); ++j) {
@@ -1892,7 +1916,7 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_no
     MatrixXf tmp(Q.rows(), Q.cols());
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         // Add the upper minus the lower
-        no_norm_pairwise[k]->apply_upper_minus_lower(tmp, ind);
+        no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
         assert(tmp.maxCoeff()<1e-3);
         energy -= dotProduct(Q, tmp, dot_tmp);
     }

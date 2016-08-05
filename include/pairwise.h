@@ -48,7 +48,8 @@ public:
 	virtual ~Kernel();
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const = 0;
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const = 0;
-    virtual void apply_upper_minus_lower( MatrixXf & out, int low, int middle_low, int middle_high, int high) const = 0;
+    virtual void apply_upper_minus_lower_dc( MatrixXf & out, int low, int middle_low, int middle_high, int high) const = 0;
+    virtual void apply_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) const = 0;
 	virtual VectorXf parameters() const = 0;
 	virtual void setParameters( const VectorXf & p ) = 0;
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const = 0;
@@ -67,7 +68,8 @@ public:
 	virtual ~PairwisePotential();
 	PairwisePotential(const MatrixXf & features, LabelCompatibility * compatibility, KernelType ktype=CONST_KERNEL, NormalizationType ntype=NORMALIZE_SYMMETRIC);
     void apply(MatrixXf & out, const MatrixXf & Q) const;
-    void apply_upper_minus_lower(MatrixXf & out, const MatrixXi & ind) const;
+    void apply_upper_minus_lower_ord(MatrixXf & out, const MatrixXf & Q) const;
+    void apply_upper_minus_lower_dc(MatrixXf & out, const MatrixXi & ind) const;
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
     void apply_upper_minus_lower_sorted_slice(MatrixXf & out, int min, int max) const;
 	

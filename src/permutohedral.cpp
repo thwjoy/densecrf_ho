@@ -525,7 +525,97 @@ void Permutohedral::seqCompute ( float* out, const float* in, int value_size, bo
 	delete[] values;
 	delete[] new_values;
 }
-void Permutohedral::seqCompute_upper_minus_lower ( float* out, int low, int middle_low, int middle_high, int high ) const
+void addSplitArray(split_array *out, float alpha, float up_to) {
+	float *out_f = (float *)out;
+	int coeff = std::min(int(ceil(up_to*RESOLUTION)), RESOLUTION-1);
+	for(int i=0; i<coeff; ++i) {
+		out_f[i] += alpha;
+	}
+}
+void weightedAddSplitArray(split_array *out, split_array *in1, float alpha, split_array *in2, split_array *in3) {
+	float *out_f = (float *)out;
+	float *in1_f = (float *)in1;
+	float *in2_f = (float *)in2;
+	float *in3_f = (float *)in3;
+	for(int i=0; i<RESOLUTION; ++i) {
+		out_f[i] = in1_f[i] + alpha * (in2_f[i] + in3_f[i]);
+	}
+}
+void sliceSplitArray(float *out, float alpha, float up_to, split_array *in) {
+	float *in_f = (float *)in;
+	*out += in_f[int(floor(up_to*RESOLUTION))] * alpha;
+}
+void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* in, int value_size) const {
+	// Shift all values by 1 such that -1 -> 0 (used for blurring)
+	split_array * values = new split_array[ (M_+2)*value_size ];
+	split_array * new_values = new split_array[ (M_+2)*value_size ];
+	split_array * values_low = new split_array[ (M_+2)*value_size ];
+	split_array * new_values_low = new split_array[ (M_+2)*value_size ];
+	
+	memset(values, 0, (M_+2)*sizeof(split_array));
+	memset(new_values, 0, (M_+2)*sizeof(split_array));
+	memset(values_low, 0, (M_+2)*sizeof(split_array));
+	memset(new_values_low, 0, (M_+2)*sizeof(split_array));
+	
+	// Splatting
+	for( int i=0;  i<N_; i++ ){
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j]+1;
+			float w = barycentric_[i*(d_+1)+j];
+			for( int k=0; k<value_size; k++ ) {
+				addSplitArray(&values[ o*value_size+k ], w, in[ i*value_size+k ]);
+				addSplitArray(&values_low[ o*value_size+k ], w, 1-in[ i*value_size+k ]);
+				// values[ o*value_size+k ] += w * in[ i*value_size+k ];
+			}
+		}
+	}
+
+	// Blurring
+	for( int j=0; j<=d_; ++j ){
+		for( int i=0; i<M_; i++ ){
+			split_array * old_val = values + (i+1)*value_size;
+			split_array * new_val = new_values + (i+1)*value_size;
+			split_array * old_val_low = values_low + (i+1)*value_size;
+			split_array * new_val_low = new_values_low + (i+1)*value_size;
+			
+			int n1 = blur_neighbors_[j*M_+i].n1+1;
+			int n2 = blur_neighbors_[j*M_+i].n2+1;
+			split_array * n1_val = values + n1*value_size;
+			split_array * n2_val = values + n2*value_size;
+			split_array * n1_val_low = values_low + n1*value_size;
+			split_array * n2_val_low = values_low + n2*value_size;
+			for( int k=0; k<value_size; k++ ) {
+				weightedAddSplitArray(&new_val[k], &old_val[k], 0.5, &n1_val[k], &n2_val[k]);
+				weightedAddSplitArray(&new_val_low[k], &old_val_low[k], 0.5, &n1_val_low[k], &n2_val_low[k]);
+				// new_val[k] = old_val[k]+0.5*(n1_val[k] + n2_val[k]);
+			}
+		}
+		std::swap( values, new_values );
+		std::swap( values_low, new_values_low );
+	}
+	// Alpha is a magic scaling constant (write Andrew if you really wanna understand this)
+	float alpha = 1.0f / (1+powf(2, -d_)); // 0.8 in 2D / 0.97 in 5D
+	
+	// Slicing
+	for( int i=0; i<N_; i++ ){
+		for( int k=0; k<value_size; k++ )
+			out[i*value_size+k] = 0;
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j]+1;
+			float w = barycentric_[i*(d_+1)+j];
+			for( int k=0; k<value_size; k++ ) {
+				sliceSplitArray(&out[ i*value_size+k ], w*alpha, in[ i*value_size+k ], &values[ o*value_size+k ]);
+				sliceSplitArray(&out[ i*value_size+k ], -w*alpha, in[ i*value_size+k ], &values_low[ o*value_size+k ]);
+				//out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
+			}
+		}
+	}
+	
+	
+	delete[] values;
+	delete[] new_values;
+}
+void Permutohedral::seqCompute_upper_minus_lower_dc ( float* out, int low, int middle_low, int middle_high, int high ) const
 {
 	// Shift all values by 1 such that -1 -> 0 (used for blurring)
 	float * values = new float[ M_+2 ];
@@ -688,11 +778,14 @@ void Permutohedral::sseCompute ( float* out, const float* in, int value_size, bo
 	seqCompute( out, in, value_size, reverse );
 }
 #endif
-void Permutohedral::compute_upper_minus_lower ( MatrixXf & out, int low, int middle_low, int middle_high, int high ) const
+void Permutohedral::compute_upper_minus_lower_dc ( MatrixXf & out, int low, int middle_low, int middle_high, int high ) const
 {
 	// Here anly one label at a time so always seq
 	assert(out.cols()==N_);
-	seqCompute_upper_minus_lower(out.data(), low, middle_low, middle_high, high);
+	seqCompute_upper_minus_lower_dc(out.data(), low, middle_low, middle_high, high);
+}
+void Permutohedral::compute_upper_minus_lower_ord ( MatrixXf & out, const MatrixXf & Q) const {
+	seqCompute_upper_minus_lower_ord(out.data(), Q.data(), Q.rows());
 }
 void Permutohedral::compute ( MatrixXf & out, const MatrixXf & in, bool reverse ) const
 {
