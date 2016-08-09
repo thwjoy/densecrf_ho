@@ -100,6 +100,7 @@ public:
 	std::vector<perf_measure> tracing_concave_qp_cccp_inference(MatrixXf & init, double time_limit = 0) const;
 	// Run the energy minimisation on the LP
     MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad) const;
+    MatrixXf lp_inference_new(MatrixXf & init) const;
 	std::vector<perf_measure> tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit = 0) const;
 
 	// Perform the rounding based on argmaxes

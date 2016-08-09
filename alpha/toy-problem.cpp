@@ -35,8 +35,8 @@ MatrixXf get_unaries(int nb_variables, int nb_labels){
 int main(int argc, char *argv[])
 {
     std::srand(1337); // Set the seed
-    int nb_variables = 8;
-    int nb_labels = 3;
+    int nb_variables = 80;
+    int nb_labels = 10;
     int nb_features = 5;
     float alpha = 10;
 
@@ -55,8 +55,13 @@ int main(int argc, char *argv[])
 
 
     //crf.damp_updates(0.5);
-    crf.lp_inference(unaries, false);
+    MatrixXf Q = crf.qp_inference(unaries);
+    Q = crf.concave_qp_cccp_inference(Q);
+    Q = crf.lp_inference_new(Q);
     //crf.sequential_inference();
+    double final_energy = crf.compute_energy(Q);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    printf("Final: %lf, Proj: %lf\n", final_energy, discretized_energy);
 
     return 0;
 }

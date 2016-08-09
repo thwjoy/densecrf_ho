@@ -1134,7 +1134,7 @@ void get_limited_indices(MatrixXf const & Q, std::vector<int> & indices) {
 
     double represented = 0;
     int max_ind;
-    while(represented < 2 * Q.cols() && indices.size() < Q.rows()) {
+    while(represented < 0.99 * Q.cols() && indices.size() < Q.rows()) {
         int max_val = accum.maxCoeff(&max_ind);
         indices.push_back(max_ind);
         accum[max_ind] = -1e9;
@@ -1169,7 +1169,7 @@ void renormalize(MatrixXf & Q) {
     double uniform = 1.0/Q.rows();
     for(int i=0; i<Q.cols(); i++) {
         sum = Q.col(i).sum();
-        if(sum == 0) {
+        if(sum == 0 || sum != sum) {
             Q.col(i).fill(uniform);
         } else {
             Q.col(i) /= sum;
@@ -1224,6 +1224,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
 
     best_Q = Q;
     double best_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
+    printf("%3d: %f\n", 0, best_int_energy);
 
     // Compute the value of the energy
     double old_energy;
@@ -1281,16 +1282,16 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 printf("new:  mean %f, max %f, min %f\n", tmp.mean(), tmp.maxCoeff(), tmp.minCoeff());
                 printf("diff: mean %f, max %f, min %f\n", diff.mean(), diff.maxCoeff(), diff.minCoeff());
 
-                std::cout << Q << std::endl << std::endl;
-                std::cout << tmp2 << std::endl << std::endl;
-                std::cout << tmp << std::endl << std::endl;
-                std::cout << diff << std::endl << std::endl;
-                for (int i=0; i<tmp.rows(); ++i) {
-                    tmp.row(i) /= tmp.row(i).norm();
-                    tmp2.row(i) /= tmp2.row(i).norm();
-                }
-                tmp = tmp*tmp2.transpose();
-                std::cout << tmp << std::endl;
+                std::cout << Q.block(0,0,1,10) << std::endl << std::endl;
+                std::cout << tmp2.block(0,0,1,10) << std::endl << std::endl;
+                std::cout << tmp.block(0,0,1,10) << std::endl << std::endl;
+                // std::cout << diff.block(0,0,10,3) << std::endl << std::endl;
+                // for (int i=0; i<tmp.rows(); ++i) {
+                //     tmp.row(i) /= tmp.row(i).norm();
+                //     tmp2.row(i) /= tmp2.row(i).norm();
+                // }
+                // tmp = tmp*tmp2.transpose();
+                // std::cout << tmp << std::endl;
 
             }
                 
@@ -1302,92 +1303,63 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
 
         // Sub-gradient descent step
         double int_energy = 0;
-        if(use_cond_grad) {
-            descent_direction(desc, grad);
-
-            float min = 0.0;
-            float max = 1.0;
-            double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
-            int split = 0;
-            min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
-            max_int_energy = assignment_energy(get_original_label(currentMap(desc), indices));
-            do {
-                split++;
-                double left_third = (2*min + max)/3.0;
-                double right_third = (min + 2*max)/3.0;
-                left_third_int_energy = assignment_energy(get_original_label(currentMap(Q+(desc-Q)*left_third), indices));
-                right_third_int_energy = assignment_energy(get_original_label(currentMap(Q+(desc-Q)*right_third), indices));
-                if(left_third_int_energy < right_third_int_energy) {
-                    max = right_third;
-                    max_int_energy = right_third_int_energy;
-                    int_energy = left_third_int_energy;
-                } else {
-                    min = left_third;
-                    min_int_energy = left_third_int_energy;
-                    int_energy = right_third_int_energy;
-                }
-            } while(max-min > 0.001);
-            //std::cout<<" learning rate: "<<(max+min)/2.0<<" expected: "<<min_int_energy<<std::endl;
-
-            Q += 0.5*(max+min)*(desc - Q);
-        } else {
-            float min = 0.0;
-            float max = 1e-3;
-            double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
-            int split = 0;
-            min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
-            max_int_energy = assignment_energy(get_original_label(currentMap(Q-max*grad), indices));
-            do {
-                split++;
-                double left_third = (2*min + max)/3.0;
-                double right_third = (min + 2*max)/3.0;
-                left_third_int_energy = assignment_energy(get_original_label(currentMap(Q-left_third*grad), indices));
-                right_third_int_energy = assignment_energy(get_original_label(currentMap(Q-right_third*grad), indices));
-                if(left_third_int_energy < right_third_int_energy) {
-                    max = right_third;
-                    max_int_energy = right_third_int_energy;
-                    int_energy = left_third_int_energy;
-                } else {
-                    min = left_third;
-                    min_int_energy = left_third_int_energy;
-                    int_energy = right_third_int_energy;
-                }
-            } while(max-min > 0.00001);
-
-            Q -= 0.5*(max+min)*grad;
-
-            // Project current estimates on valid space
-            sortCols(Q, ind);
-            for(int i=0; i<N_; ++i) {
-                sum(i) = Q.col(i).sum()-1;
-                K(i) = -1;
+        float min = 0.0;
+        float max = 1e-3;
+        double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
+        int split = 0;
+        min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
+        max_int_energy = assignment_energy(get_original_label(currentMap(Q-max*grad), indices));
+        do {
+            split++;
+            double left_third = (2*min + max)/3.0;
+            double right_third = (min + 2*max)/3.0;
+            left_third_int_energy = assignment_energy(get_original_label(currentMap(Q-left_third*grad), indices));
+            right_third_int_energy = assignment_energy(get_original_label(currentMap(Q-right_third*grad), indices));
+            if(left_third_int_energy < right_third_int_energy) {
+                max = right_third;
+                max_int_energy = right_third_int_energy;
+                int_energy = left_third_int_energy;
+            } else {
+                min = left_third;
+                min_int_energy = left_third_int_energy;
+                int_energy = right_third_int_energy;
             }
-            for(int i=0; i<N_; ++i) {
-                for(int k=restricted_M; k>0; --k) {
-                    double uk = Q(ind(k-1, i), i);
-                    if(sum(i)/k < uk) {
-                        K(i) = k;
-                        break;
-                    }
-                    sum(i) -= uk;
-                }
-            }
-            tmp.fill(0);
-            for(int i=0; i<N_; ++i) {
-                for(int k=0; k<restricted_M; ++k) {
-                    tmp(k, i) = std::max(Q(k, i) - sum(i)/K(i), (double)0);
-                }
-            }
-            Q = tmp;
+        } while(max-min > 0.00001);
+
+        Q -= 0.5*(max+min)*grad;
+
+        // Project current estimates on valid space
+        sortCols(Q, ind);
+        for(int i=0; i<N_; ++i) {
+            sum(i) = Q.col(i).sum()-1;
+            K(i) = -1;
         }
+        for(int i=0; i<N_; ++i) {
+            for(int k=restricted_M; k>0; --k) {
+                double uk = Q(ind(k-1, i), i);
+                if(sum(i)/k < uk) {
+                    K(i) = k;
+                    break;
+                }
+                sum(i) -= uk;
+            }
+        }
+        tmp.fill(0);
+        for(int i=0; i<N_; ++i) {
+            for(int k=0; k<restricted_M; ++k) {
+                tmp(k, i) = std::min(std::max(Q(k, i) - sum(i)/K(i), 0.0), 1.0);
+            }
+        }
+        Q = tmp;
 
         if(int_energy < best_int_energy) {
             best_Q = Q;
             best_int_energy = int_energy;
         }
-
-        assert(valid_probability(Q));
-    } while(it<1);
+        renormalize(Q);
+        printf("%3d: %f / %f / %f\n", it,energy, int_energy, best_int_energy);
+        assert(valid_probability_debug(Q));
+    } while(it<100);
     // std::cout <<"final projected energy: " << best_int_energy << "\n";
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         delete no_norm_pairwise[k];
@@ -1396,6 +1368,103 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
 
     // Reconstruct an output with the correct number of labels
     best_Q = get_extended_matrix(best_Q, indices, M_);
+    return best_Q;
+}
+
+
+MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
+    // Restrict number of labels in the computation
+    MatrixXf Q = init;
+    renormalize(Q);
+
+    MatrixXf best_Q(M_, N_), ones(M_, N_), base_grad(M_, N_), tmp(M_, N_),
+        grad(M_, N_), tmp2(M_, N_), desc(M_, N_), tmp_single_line(1, N_);
+    MatrixP dot_tmp(M_, N_);
+    MatrixXi ind(M_, N_);
+    VectorXi K(N_);
+    VectorXd sum(N_);
+    MatrixXf unary = unary_->get();
+
+    ones.fill(1);
+
+    int i,j;
+    int nb_pairwise = pairwise_.size();
+
+    best_Q = Q;
+
+    // Compute the value of the energy
+    double old_energy;
+    assert(valid_probability(Q));
+    double energy = 0, best_energy = 1e10;
+    double int_energy = assignment_energy(currentMap(Q));
+    printf("Initial int energy in the LP: %f\n", int_energy);
+
+
+    clock_t start, end;
+
+    int it=0;
+    do {
+        ++it;
+        old_energy = energy;
+
+        // Compute the current energy and gradient
+        // Unary
+        energy = dotProduct(unary, Q, dot_tmp);
+        grad = unary;
+
+        // Pairwise
+        sortRows(Q, ind);
+        for( unsigned int k=0; k<nb_pairwise; k++ ) {
+            // Add upper minus lower
+            pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
+            energy -= dotProduct(Q, tmp2, dot_tmp);
+            grad -= tmp2;
+        }
+
+        // Print previous iteration energy
+        // printf("%5d: %f\n", it-1, energy);
+
+        // Sub-gradient descent step
+        // std::cout<<grad.block(0,0,5,5)<<std::endl<<std::endl;
+        // std::cout<<Q.block(0,0,5,5)<<std::endl<<std::endl;
+        Q -= grad/it;
+
+        // Project current estimates on valid space
+        sortCols(Q, ind);
+        for(int i=0; i<N_; ++i) {
+            sum(i) = Q.col(i).sum()-1;
+            K(i) = -1;
+        }
+        for(int i=0; i<N_; ++i) {
+            for(int k=M_; k>0; --k) {
+                double uk = Q(ind(k-1, i), i);
+                if(sum(i)/k < uk) {
+                    K(i) = k;
+                    break;
+                }
+                sum(i) -= uk;
+            }
+        }
+        tmp.fill(0);
+        for(int i=0; i<N_; ++i) {
+            for(int k=0; k<M_; ++k) {
+                tmp(k, i) = std::min(std::max(Q(k, i) - sum(i)/K(i), 0.0), 1.0);
+            }
+        }
+        Q = tmp;
+
+        int_energy = assignment_energy(currentMap(Q));
+        if( energy < best_energy) {
+            printf("New best found %4d: %10.3f / %10.3f\n", it, energy, int_energy);
+            best_Q = Q;
+            best_energy = energy;
+        }
+        renormalize(Q);
+        // printf("%3d: %f\n", it, best_int_energy);
+        assert(valid_probability_debug(Q));
+    } while(it<100);
+    std::cout <<"final projected energy: " << int_energy << "\n";
+
     return best_Q;
 }
 

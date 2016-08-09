@@ -38,7 +38,7 @@ using namespace Eigen;
 
 // Data structure for the splitted arrays
 
-#define RESOLUTION 1000
+#define RESOLUTION 100
 typedef struct {
     float data[RESOLUTION];
 } split_array;

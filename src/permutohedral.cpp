@@ -534,12 +534,13 @@ void printSplitArray(split_array *in) {
 }
 void addSplitArray(split_array *out, float alpha, float up_to, bool from_top) {
 	float *out_f = (float *)out;
-	int coeff = std::min(int(ceil((up_to+1e-9)*RESOLUTION)), RESOLUTION-1);
 	if (from_top) {
+		int coeff = std::min(int(ceil((up_to+1e-9)*RESOLUTION)), RESOLUTION-1);
 		for(int i=coeff; i<RESOLUTION; ++i) {
 			out_f[i] += alpha;
 		}
 	} else {
+		int coeff = std::min(int(ceil((up_to+1e-9)*RESOLUTION)), RESOLUTION-1);
 		for(int i=0; i<coeff; ++i) {
 			out_f[i] += alpha;
 		}
@@ -554,26 +555,25 @@ void weightedAddSplitArray(split_array *out, split_array *in1, float alpha, spli
 		out_f[i] = in1_f[i] + alpha * (in2_f[i] + in3_f[i]);
 	}
 }
-void sliceSplitArray(float *out, float alpha, float up_to, split_array *in) {
-	if (0&&alpha > 1e-5) {
-		printf("NEWWWW\n");
-		printSplitArray(in);
-		printf("%f, * %f\n", up_to, alpha);
-	}
+void sliceSplitArray(float *out, float alpha, float up_to, split_array *in, bool from_top) {
 	float *in_f = (float *)in;
-	int coeff = std::max(int(floor((up_to-1e-9)*RESOLUTION)), 0);
+	int coeff;
+	if (from_top) {
+		coeff = std::max(int(floor((up_to-1e-9)*RESOLUTION)), 0);
+	} else {
+		coeff = std::max(int(floor((up_to-1e-9)*RESOLUTION)), 0);
+	}
 	*out += in_f[coeff] * alpha;
 }
 void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* in, int value_size) const {
-	printf("Nb active lattice points: %d\n", M_);
-
 	// Shift all values by 1 such that -1 -> 0 (used for blurring)
 	split_array * values = new split_array[ (M_+2)*value_size ];
 	split_array * new_values = new split_array[ (M_+2)*value_size ];
 	
 	memset(values, 0, (M_+2)*sizeof(split_array));
 	memset(new_values, 0, (M_+2)*sizeof(split_array));
-	
+
+	// Lower
 	// Splatting
 	for( int i=0;  i<N_; i++ ){
 		for( int j=0; j<=d_; j++ ){
@@ -614,15 +614,16 @@ void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* i
 			int o = offset_[i*(d_+1)+j]+1;
 			float w = barycentric_[i*(d_+1)+j];
 			for( int k=0; k<value_size; k++ ) {
-				//sliceSplitArray(&out[ i*value_size+k ], w*alpha, in[ i*value_size+k ], &values[ o*value_size+k ]);
+				sliceSplitArray(&out[ i*value_size+k ], -w*alpha, in[ i*value_size+k ], &values[ o*value_size+k ], false);
 				//out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
 			}
 		}
 	}
-	
+
 	memset(values, 0, (M_+2)*sizeof(split_array));
 	memset(new_values, 0, (M_+2)*sizeof(split_array));
 	
+	// Upper
 	// Splatting
 	for( int i=0;  i<N_; i++ ){
 		for( int j=0; j<=d_; j++ ){
@@ -661,7 +662,7 @@ void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* i
 			int o = offset_[i*(d_+1)+j]+1;
 			float w = barycentric_[i*(d_+1)+j];
 			for( int k=0; k<value_size; k++ ) {
-				sliceSplitArray(&out[ i*value_size+k ], -w*alpha, in[ i*value_size+k ], &values[ o*value_size+k ]);
+				sliceSplitArray(&out[ i*value_size+k ], w*alpha, in[ i*value_size+k ], &values[ o*value_size+k ], false);
 				// out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
 			}
 		}
