@@ -1186,6 +1186,13 @@ VectorXs get_original_label(VectorXs const & restricted_labels, std::vector<int>
 }
 
 MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
+    // Random init to prevent too many elements to be 0
+    init.setRandom();
+    MatrixXf uns(init.rows(), init.cols());
+    uns.fill(1);
+    init = init + uns;
+    renormalize(init);
+
     // Restrict number of labels in the computation
     std::vector<int> indices;
     renormalize(init);
@@ -1278,13 +1285,15 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 printf("ORD: It: %d | id: %d | time: %f\n", it, k, perf_timing);
 
                 MatrixXf diff = tmp2 - tmp;
+                int row, col;
                 printf("GT:   mean %f, max %f, min %f\n", tmp2.mean(), tmp2.maxCoeff(), tmp2.minCoeff());
                 printf("new:  mean %f, max %f, min %f\n", tmp.mean(), tmp.maxCoeff(), tmp.minCoeff());
-                printf("diff: mean %f, max %f, min %f\n", diff.mean(), diff.maxCoeff(), diff.minCoeff());
+                printf("diff: mean %f, max %f, min %f\n", diff.mean(), diff.maxCoeff(&row, &col), diff.minCoeff());
+                printf("max is at %d x %d\n", row, col);
 
-                std::cout << Q.block(0,0,1,10) << std::endl << std::endl;
-                std::cout << tmp2.block(0,0,1,10) << std::endl << std::endl;
-                std::cout << tmp.block(0,0,1,10) << std::endl << std::endl;
+                std::cout << Q.block(0,0,7,10) << std::endl << std::endl;
+                std::cout << tmp2.block(0,0,7,10) << std::endl << std::endl;
+                std::cout << tmp.block(0,0,7,10) << std::endl << std::endl;
                 // std::cout << diff.block(0,0,10,3) << std::endl << std::endl;
                 // for (int i=0; i<tmp.rows(); ++i) {
                 //     tmp.row(i) /= tmp.row(i).norm();
