@@ -1187,11 +1187,11 @@ VectorXs get_original_label(VectorXs const & restricted_labels, std::vector<int>
 
 MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     // Random init to prevent too many elements to be 0
-    init.setRandom();
-    MatrixXf uns(init.rows(), init.cols());
-    uns.fill(1);
-    init = init + uns;
-    renormalize(init);
+    // init.setRandom();
+    // MatrixXf uns(init.rows(), init.cols());
+    // uns.fill(1);
+    // init = init + uns;
+    // renormalize(init);
 
     // Restrict number of labels in the computation
     std::vector<int> indices;
@@ -1265,8 +1265,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 tmp2.row(1) = - tmp2.row(0);
             } else {
                 // Add upper minus lower
-                start = clock();
-                sortRows(Q, ind);
+                /*start = clock();
+                sortRows(Q, ind);*/
                 no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
                 tmp2.fill(0);
                 for(i=0; i<tmp.cols(); ++i) {
@@ -1274,13 +1274,13 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                         tmp2(j, ind(j, i)) = tmp(j, i);
                     }
                 }
-                end = clock();
+                /*end = clock();
                 float perf_timing = (double(end-start)/CLOCKS_PER_SEC);
                 printf("DC: It: %d | id: %d | time: %f\n", it, k, perf_timing);
 
-                start = clock();
-                pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
-                end = clock();
+                start = clock();*/
+                // pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
+                /*end = clock();
                 perf_timing = (double(end-start)/CLOCKS_PER_SEC);
                 printf("ORD: It: %d | id: %d | time: %f\n", it, k, perf_timing);
 
@@ -1291,16 +1291,16 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 printf("diff: mean %f, max %f, min %f\n", diff.mean(), diff.maxCoeff(&row, &col), diff.minCoeff());
                 printf("max is at %d x %d\n", row, col);
 
-                std::cout << Q.block(0,0,7,10) << std::endl << std::endl;
-                std::cout << tmp2.block(0,0,7,10) << std::endl << std::endl;
-                std::cout << tmp.block(0,0,7,10) << std::endl << std::endl;
+                std::cout << Q.block(0,95730,7,10) << std::endl << std::endl;
+                std::cout << tmp2.block(0,95730,7,10) << std::endl << std::endl;
+                std::cout << tmp.block(0,95730,7,10) << std::endl << std::endl;
                 // std::cout << diff.block(0,0,10,3) << std::endl << std::endl;
                 // for (int i=0; i<tmp.rows(); ++i) {
                 //     tmp.row(i) /= tmp.row(i).norm();
                 //     tmp2.row(i) /= tmp2.row(i).norm();
                 // }
                 // tmp = tmp*tmp2.transpose();
-                // std::cout << tmp << std::endl;
+                // std::cout << tmp << std::endl;*/
 
             }
                 
@@ -1336,6 +1336,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
         } while(max-min > 0.00001);
 
         Q -= 0.5*(max+min)*grad;
+        Q -= grad/(it+5e11);
 
         // Project current estimates on valid space
         sortCols(Q, ind);
@@ -1399,14 +1400,25 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
     int i,j;
     int nb_pairwise = pairwise_.size();
 
+    // Create copies of the original pairwise since we don't want normalization
+    PairwisePotential** no_norm_pairwise;
+    no_norm_pairwise = (PairwisePotential**) malloc(pairwise_.size()*sizeof(PairwisePotential*));
+    for( unsigned int k=0; k<nb_pairwise; k++ ) {
+        no_norm_pairwise[k] = new PairwisePotential(
+            pairwise_[k]->features(),
+            new PottsCompatibility(pairwise_[k]->parameters()(0)),
+            pairwise_[k]->ktype(),
+            NO_NORMALIZATION
+            );
+    }
+
     best_Q = Q;
 
     // Compute the value of the energy
-    double old_energy;
     assert(valid_probability(Q));
-    double energy = 0, best_energy = 1e10;
+    double energy = 0, best_energy = 123456789;
     double int_energy = assignment_energy(currentMap(Q));
-    printf("Initial int energy in the LP: %f\n", int_energy);
+    // printf("Initial int energy in the LP: %f\n", int_energy);
 
 
     clock_t start, end;
@@ -1414,7 +1426,6 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
     int it=0;
     do {
         ++it;
-        old_energy = energy;
 
         // Compute the current energy and gradient
         // Unary
@@ -1425,18 +1436,30 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         sortRows(Q, ind);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
             // Add upper minus lower
-            pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
+            no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
+            tmp2.fill(0);
+            for(i=0; i<tmp.cols(); ++i) {
+                for(j=0; j<tmp.rows(); ++j) {
+                    tmp2(j, ind(j, i)) = tmp(j, i);
+                }
+            }//*/
+            // pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
 
         // Print previous iteration energy
+        printf("%4d: %10.3f / %10.3f\n", it-1, energy, int_energy);
+        if( energy < best_energy) {
+            best_Q = Q;
+            best_energy = energy;
+        }
         // printf("%5d: %f\n", it-1, energy);
 
         // Sub-gradient descent step
         // std::cout<<grad.block(0,0,5,5)<<std::endl<<std::endl;
         // std::cout<<Q.block(0,0,5,5)<<std::endl<<std::endl;
-        Q -= grad/it;
+        Q -= grad/(it+1e5);
 
         // Project current estimates on valid space
         sortCols(Q, ind);
@@ -1463,16 +1486,15 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         Q = tmp;
 
         int_energy = assignment_energy(currentMap(Q));
-        if( energy < best_energy) {
-            printf("New best found %4d: %10.3f / %10.3f\n", it, energy, int_energy);
-            best_Q = Q;
-            best_energy = energy;
-        }
         renormalize(Q);
-        // printf("%3d: %f\n", it, best_int_energy);
         assert(valid_probability_debug(Q));
     } while(it<100);
     std::cout <<"final projected energy: " << int_energy << "\n";
+
+    for( unsigned int k=0; k<nb_pairwise; k++ ) {
+        delete no_norm_pairwise[k];
+    }
+    free(no_norm_pairwise);
 
     return best_Q;
 }

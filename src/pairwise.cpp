@@ -239,12 +239,14 @@ void PairwisePotential::apply_upper_minus_lower_sorted_slice(MatrixXf & out, int
 		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
 		MatrixXf const & features = kernel_->features();
 		double alpha = 1.0 / 0.6;
+		// Upper
 		for(int c=min; c<max; ++c) {
             for(int b=min; b<c; ++b) {
                 VectorXf featDiff = (features.col(c) - features.col(b));
-                //out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
+                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
             }
         }
+        // Lower
 		for(int c=min; c<max; ++c) {
             for(int b=c; b<max; ++b) {
                 VectorXf featDiff = (features.col(c) - features.col(b));
