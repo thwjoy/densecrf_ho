@@ -1265,8 +1265,8 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 tmp2.row(1) = - tmp2.row(0);
             } else {
                 // Add upper minus lower
-                /*start = clock();
-                sortRows(Q, ind);*/
+                // The divide and conquer way
+                /*start = clock();*/
                 no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
                 tmp2.fill(0);
                 for(i=0; i<tmp.cols(); ++i) {
@@ -1276,15 +1276,18 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 }
                 /*end = clock();
                 float perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-                printf("DC: It: %d | id: %d | time: %f\n", it, k, perf_timing);
+                printf("DC: It: %d | id: %d | time: %f\n", it, k, perf_timing);*/
 
-                start = clock();*/
+                // With the new discretized split computations
+                // start = clock();
                 // pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
                 /*end = clock();
                 perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-                printf("ORD: It: %d | id: %d | time: %f\n", it, k, perf_timing);
+                printf("ORD: It: %d | id: %d | time: %f\n", it, k, perf_timing);*/
 
-                MatrixXf diff = tmp2 - tmp;
+
+                // Comparison code
+                /*MatrixXf diff = tmp2 - tmp;
                 int row, col;
                 printf("GT:   mean %f, max %f, min %f\n", tmp2.mean(), tmp2.maxCoeff(), tmp2.minCoeff());
                 printf("new:  mean %f, max %f, min %f\n", tmp.mean(), tmp.maxCoeff(), tmp.minCoeff());
@@ -1294,13 +1297,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 std::cout << Q.block(0,95730,7,10) << std::endl << std::endl;
                 std::cout << tmp2.block(0,95730,7,10) << std::endl << std::endl;
                 std::cout << tmp.block(0,95730,7,10) << std::endl << std::endl;
-                // std::cout << diff.block(0,0,10,3) << std::endl << std::endl;
-                // for (int i=0; i<tmp.rows(); ++i) {
-                //     tmp.row(i) /= tmp.row(i).norm();
-                //     tmp2.row(i) /= tmp2.row(i).norm();
-                // }
-                // tmp = tmp*tmp2.transpose();
-                // std::cout << tmp << std::endl;*/
+                std::cout << diff.block(0,0,10,3) << std::endl << std::endl;*/
 
             }
                 
@@ -1312,55 +1309,84 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
 
         // Sub-gradient descent step
         double int_energy = 0;
-        float min = 0.0;
-        float max = 1e-3;
-        double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
-        int split = 0;
-        min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
-        max_int_energy = assignment_energy(get_original_label(currentMap(Q-max*grad), indices));
-        do {
-            split++;
-            double left_third = (2*min + max)/3.0;
-            double right_third = (min + 2*max)/3.0;
-            left_third_int_energy = assignment_energy(get_original_label(currentMap(Q-left_third*grad), indices));
-            right_third_int_energy = assignment_energy(get_original_label(currentMap(Q-right_third*grad), indices));
-            if(left_third_int_energy < right_third_int_energy) {
-                max = right_third;
-                max_int_energy = right_third_int_energy;
-                int_energy = left_third_int_energy;
-            } else {
-                min = left_third;
-                min_int_energy = left_third_int_energy;
-                int_energy = right_third_int_energy;
-            }
-        } while(max-min > 0.00001);
+        if(use_cond_grad) {
+            descent_direction(desc, grad);
 
-        Q -= 0.5*(max+min)*grad;
-        Q -= grad/(it+5e11);
-
-        // Project current estimates on valid space
-        sortCols(Q, ind);
-        for(int i=0; i<N_; ++i) {
-            sum(i) = Q.col(i).sum()-1;
-            K(i) = -1;
-        }
-        for(int i=0; i<N_; ++i) {
-            for(int k=restricted_M; k>0; --k) {
-                double uk = Q(ind(k-1, i), i);
-                if(sum(i)/k < uk) {
-                    K(i) = k;
-                    break;
+            float min = 0.0;
+            float max = 1.0;
+            double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
+            int split = 0;
+            min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
+            max_int_energy = assignment_energy(get_original_label(currentMap(desc), indices));
+            do {
+                split++;
+                double left_third = (2*min + max)/3.0;
+                double right_third = (min + 2*max)/3.0;
+                left_third_int_energy = assignment_energy(get_original_label(currentMap(Q+(desc-Q)*left_third), indices));
+                right_third_int_energy = assignment_energy(get_original_label(currentMap(Q+(desc-Q)*right_third), indices));
+                if(left_third_int_energy < right_third_int_energy) {
+                    max = right_third;
+                    max_int_energy = right_third_int_energy;
+                    int_energy = left_third_int_energy;
+                } else {
+                    min = left_third;
+                    min_int_energy = left_third_int_energy;
+                    int_energy = right_third_int_energy;
                 }
-                sum(i) -= uk;
+            } while(max-min > 0.001);
+            //std::cout<<" learning rate: "<<(max+min)/2.0<<" expected: "<<min_int_energy<<std::endl;
+
+            Q += 0.5*(max+min)*(desc - Q);
+        } else {
+            float min = 0.0;
+            float max = 1e-3;
+            double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
+            int split = 0;
+            min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
+            max_int_energy = assignment_energy(get_original_label(currentMap(Q-max*grad), indices));
+            do {
+                split++;
+                double left_third = (2*min + max)/3.0;
+                double right_third = (min + 2*max)/3.0;
+                left_third_int_energy = assignment_energy(get_original_label(currentMap(Q-left_third*grad), indices));
+                right_third_int_energy = assignment_energy(get_original_label(currentMap(Q-right_third*grad), indices));
+                if(left_third_int_energy < right_third_int_energy) {
+                    max = right_third;
+                    max_int_energy = right_third_int_energy;
+                    int_energy = left_third_int_energy;
+                } else {
+                    min = left_third;
+                    min_int_energy = left_third_int_energy;
+                    int_energy = right_third_int_energy;
+                }
+            } while(max-min > 0.00001);
+
+            Q -= 0.5*(max+min)*grad;
+
+            // Project current estimates on valid space
+            sortCols(Q, ind);
+            for(int i=0; i<N_; ++i) {
+                sum(i) = Q.col(i).sum()-1;
+                K(i) = -1;
             }
-        }
-        tmp.fill(0);
-        for(int i=0; i<N_; ++i) {
-            for(int k=0; k<restricted_M; ++k) {
-                tmp(k, i) = std::min(std::max(Q(k, i) - sum(i)/K(i), 0.0), 1.0);
+            for(int i=0; i<N_; ++i) {
+                for(int k=restricted_M; k>0; --k) {
+                    double uk = Q(ind(k-1, i), i);
+                    if(sum(i)/k < uk) {
+                        K(i) = k;
+                        break;
+                    }
+                    sum(i) -= uk;
+                }
             }
+            tmp.fill(0);
+            for(int i=0; i<N_; ++i) {
+                for(int k=0; k<restricted_M; ++k) {
+                    tmp(k, i) = std::max(Q(k, i) - sum(i)/K(i), (double)0);
+                }
+            }
+            Q = tmp;
         }
-        Q = tmp;
 
         if(int_energy < best_int_energy) {
             best_Q = Q;
@@ -1381,7 +1407,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     return best_Q;
 }
 
-
+// LP inference with simple gradient descent for new implementations
 MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
     // Restrict number of labels in the computation
     MatrixXf Q = init;
