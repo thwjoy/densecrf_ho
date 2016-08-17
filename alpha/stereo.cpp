@@ -123,8 +123,7 @@ int main(int argc, char *argv[])
         Q = crf.concave_qp_cccp_inference(Q);
         discretized_energy = crf.assignment_energy(crf.currentMap(Q));
         printf("After QP concave: %lf\n", discretized_energy);
-        // Q = crf.lp_inference(Q,false);
-        Q = crf.lp_inference_new(Q);
+        Q = crf.lp_inference(Q,false);
         discretized_energy = crf.assignment_energy(crf.currentMap(Q));
         printf("After LP: %lf\n", discretized_energy);
     } else if (method == "cg_lp"){

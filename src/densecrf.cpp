@@ -1461,7 +1461,6 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         // Pairwise
         sortRows(Q, ind);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
-            clock_t st = clock();
             // Add upper minus lower
             no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
             tmp2.fill(0);
@@ -1470,11 +1469,7 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
                     tmp2(j, ind(j, i)) = tmp(j, i);
                 }
             }//*/
-            // new code
             // pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
-            //
-            clock_t et = clock();
-            printf("# Time-%d: %5.5f\t", k, (double)(et-st)/CLOCKS_PER_SEC);
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
@@ -1519,7 +1514,7 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         int_energy = assignment_energy(currentMap(Q));
         renormalize(Q);
         assert(valid_probability_debug(Q));
-    } while(it<10);
+    } while(it<100);
     std::cout <<"final projected energy: " << int_energy << "\n";
 
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
