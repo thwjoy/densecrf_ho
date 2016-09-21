@@ -6,7 +6,9 @@
 #include <iostream>
 #include <fstream>
 
-#define NUM_LABELS 16
+#define NUM_LABELS 4
+
+#define RESCALED true
 
 MatrixXf get_unaries(const unsigned char * left_img, const unsigned char * right_img, img_size & size){
     MatrixXf unaries(NUM_LABELS, size.height * size.width);
@@ -68,23 +70,47 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    float up_ratio = 1;
+	if(argc > 3) up_ratio = atof(argv[3]);
+	float uc_ratio = 1;
+	if(argc > 4) uc_ratio = atof(argv[4]);
+	int maxiter = 10;
+	if(argc > 5) maxiter = atoi(argv[5]);
+
     std::string stereo_folder = argv[1];
     std::string method = argv[2];
+
+#if RESCALED
+    std::string left_image_path = stereo_folder + "imL_025.png";
+    std::string right_image_path = stereo_folder + "imR_025.png";
+    std::string output_image_path = stereo_folder + "out_025_" + method + ".bmp";
+#else     
     std::string left_image_path = stereo_folder + "imL.png";
     std::string right_image_path = stereo_folder + "imR.png";
     std::string output_image_path = stereo_folder + "out_" + method + ".bmp";
+#endif
     std::string unary_path = stereo_folder + "unary.txt";
 
-    Potts_weight_set parameters(5, 50, 2, 15, 50);
+	// lp inference params
+	LP_inf_params lp_params;
+	lp_params.prox_max_iter = maxiter;
+
+#if RESCALED
+    Potts_weight_set parameters(2, 50, 2, 15, 50);
+#else
+	Potts_weight_set parameters(5, 50, 2, 15, 50);
+#endif
 
     img_size size = {-1, -1};
 
     unsigned char * left_img = load_image(left_image_path, size);
     unsigned char * right_img = load_image(right_image_path, size);
 
-
-    // MatrixXf unaries = get_unaries(left_img, right_img, size);
+#if RESCALED
+    MatrixXf unaries = get_unaries(left_img, right_img, size);
+#else
     MatrixXf unaries = get_unaries_from_file(unary_path, size);
+#endif
 
     DenseCRF2D crf(size.width, size.height, unaries.rows());
     crf.setUnaryEnergy(unaries);
@@ -115,6 +141,9 @@ int main(int argc, char *argv[])
     } else if (method == "ccv"){
         Q = crf.concave_qp_cccp_inference(Q);
     } else if (method == "sg_lp"){
+#if RESCALED
+		crf.setPairwisePottsWeight(up_ratio, Q);
+#endif        
         double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
         printf("Before QP: %lf\n", discretized_energy);
         Q = crf.qp_inference(Q);
@@ -124,7 +153,8 @@ int main(int argc, char *argv[])
         discretized_energy = crf.assignment_energy(crf.currentMap(Q));
         printf("After QP concave: %lf\n", discretized_energy);
         //Q = crf.lp_inference(Q,false);
-        Q = crf.lp_inference_new(Q);
+        //Q = crf.lp_inference_new(Q);
+        Q = crf.lp_inference_prox(Q, lp_params);
         discretized_energy = crf.assignment_energy(crf.currentMap(Q));
         printf("After LP: %lf\n", discretized_energy);
     } else if (method == "cg_lp"){

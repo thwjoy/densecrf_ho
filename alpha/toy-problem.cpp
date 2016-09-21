@@ -54,11 +54,15 @@ void original_toy_problem() {
         crf.addPairwiseGaussian(5, 5, new PottsCompatibility(1));
     }
 
+    LP_inf_params lp_params;
+	lp_params.prox_max_iter = 100;
+
     //crf.damp_updates(0.5);
     MatrixXf Q = unaries;
     Q = crf.qp_inference(unaries);
     Q = crf.concave_qp_cccp_inference(Q);
     //Q = crf.lp_inference(Q, false);
+    Q = crf.lp_inference_prox(Q, lp_params);
     //crf.sequential_inference();
     double final_energy = crf.compute_energy(Q);
     double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
@@ -158,9 +162,9 @@ void compare_bf_ph_energies(int argc, char *argv[]) {
 
 int main(int argc, char *argv[])
 {
-    //original_toy_problem();
+    original_toy_problem();
 
-    compare_bf_ph_energies(argc, argv);
+    //compare_bf_ph_energies(argc, argv);
 
     return 0;
 }

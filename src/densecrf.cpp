@@ -34,10 +34,12 @@
 #include "pairwise.h"
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <limits>
 #include <set>
 
-
+#define BRUTE_FORCE false	// used in LP-prox inference, brute-force subgraient computation
 
 #define DCNEG_FASTAPPROX false
 /////////////////////////////
@@ -58,6 +60,17 @@ DenseCRF2D::~DenseCRF2D() {
 /////////////////////////////////
 /////  Pairwise Potentials  /////
 /////////////////////////////////
+void DenseCRF::setPairwisePottsWeight(float ratio, const MatrixXf & Q) {
+	VectorXs l = currentMap(Q);
+	double u_energy = unaryEnergy(l).sum();
+    double p_energy = pairwise_energy_true(l).sum();
+	double p_weight = ratio*u_energy/p_energy;
+	std::cout << "#p_weight: " << p_weight << std::endl;
+	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+		pairwise_[k]->setParameters(pairwise_[k]->parameters() * p_weight);
+	}
+	//std::cout << "#u_energy: " << unaryEnergy(l).sum() << ",\tp_energy: " << pairwise_energy_true(l).sum() << std::endl;
+}
 void DenseCRF::addPairwiseEnergy (const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type) {
     assert( features.cols() == N_ );
     addPairwiseEnergy( new PairwisePotential( features, function, kernel_type, normalization_type ) );
@@ -106,6 +119,21 @@ UnaryEnergy* DenseCRF::getUnaryEnergy() {
 ///////////////////////
 /////  Inference  /////
 ///////////////////////
+LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, int prox_max_iter,
+	   	int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const):prox_reg_const(prox_reg_const),
+		dual_gap_tol(dual_gap_tol), prox_max_iter(prox_max_iter), fw_max_iter(fw_max_iter), 
+		qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const){}
+
+LP_inf_params::LP_inf_params() {
+	prox_reg_const = 1e-2;	
+	dual_gap_tol = 1e0;		
+	prox_max_iter = 10;		
+	fw_max_iter = 50;		
+	qp_max_iter = 1000;		
+	qp_tol = 1e-3;			
+	qp_const = 1e-16;			
+}
+
 MatrixXf DenseCRF::unary_init() const {
     MatrixXf Q;
     expAndNormalize(Q, -unary_->get());
@@ -1517,6 +1545,292 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
     return best_Q;
 }
 
+// rescale Q to be within [0,1]
+void rescale(MatrixXf & out, const MatrixXf & Q) {
+	out = Q;
+	float minval = out.minCoeff();
+	out = out.array() - minval;
+	float maxval = out.maxCoeff();
+	out /= maxval;
+}
+
+// Project current estimates on valid space
+void feasible_Q(MatrixXf & tmp, MatrixXi & ind, VectorXd & sum, VectorXi & K, const MatrixXf & Q) {
+    sortCols(Q, ind);
+    for(int i=0; i<Q.cols(); ++i) {
+        sum(i) = Q.col(i).sum()-1;
+        K(i) = -1;
+    }
+    for(int i=0; i<Q.cols(); ++i) {
+        for(int k=Q.rows(); k>0; --k) {
+            double uk = Q(ind(k-1, i), i);
+            if(sum(i)/k < uk) {
+                K(i) = k;
+                break;
+            }
+            sum(i) -= uk;
+        }
+    }
+    tmp.fill(0);
+    for(int i=0; i<Q.cols(); ++i) {
+        for(int k=0; k<Q.rows(); ++k) {
+            tmp(k, i) = std::min(std::max(Q(k, i) - sum(i)/K(i), 0.0), 1.0);
+        }
+    }
+}
+
+// LP inference with proximal algorithm
+MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) const {
+
+    MatrixXf best_Q(M_, N_), tmp(M_, N_), tmp2(M_, N_);
+    MatrixP dot_tmp(M_, N_);
+    MatrixXi ind(M_, N_);
+    VectorXi K(N_);
+    VectorXd sum(N_);
+    MatrixXf unary = unary_->get();
+
+    MatrixXf Q = init;
+    renormalize(Q);
+    assert(valid_probability(Q));
+    best_Q = Q;
+
+    // Compute the value of the energy
+    double energy = 0, best_energy = std::numeric_limits<double>::max(), 
+		   best_int_energy = std::numeric_limits<double>::max();
+    double int_energy = assignment_energy(currentMap(Q));
+#if BRUTE_FORCE	
+	// Create copies of the original pairwise since we don't want normalization
+    PairwisePotential** no_norm_pairwise;
+    no_norm_pairwise = (PairwisePotential**) malloc(pairwise_.size()*sizeof(PairwisePotential*));
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        no_norm_pairwise[k] = new PairwisePotential(
+            pairwise_[k]->features(),
+            new PottsCompatibility(pairwise_[k]->parameters()(0)),
+            pairwise_[k]->ktype(),
+            NO_NORMALIZATION
+            );
+    }
+
+	energy = compute_energy_LP(Q, no_norm_pairwise, pairwise_.size());
+#else
+	energy = compute_energy_LP(Q);
+#endif
+	best_energy = energy;
+    printf("Initial energy in the LP: %10.3f / %10.3f\n", energy, int_energy);
+
+	int maxiter = params.prox_max_iter;
+
+	// dual Frank-Wolfe variables
+	float tol = params.dual_gap_tol;		// dual gap tolerance
+	float lambda = params.prox_reg_const;	// proximal-regularization constant
+	int fw_maxiter = params.fw_max_iter;
+	float delta = 1;						// FW step size
+	double dual_gap = 0, dual_energy = 0;
+
+	// dual variables
+	MatrixXf alpha_tQ(M_, N_);	// A * alpha, (t - tilde not iteration)
+	MatrixXf s_tQ(M_, N_);		// A * s, conditional gradient of FW == subgradient
+	VectorXf beta(N_);			// unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
+	MatrixXf beta_mat(M_, N_);	// beta_mat.row(i) == beta forall i --> N_ * M_ elements 
+	MatrixXf gamma(M_, N_);		// nonnegative
+	
+	MatrixXf old_Q(M_, N_);		// store the Q before prox step
+	MatrixXf rescaled_Q(M_, N_);// infeasible Q rescaled to be within [0,1]
+
+	// gamma-qp variables
+	float qp_delta = params.qp_const;	// constant used in qp-gamma
+	float qp_tol = params.qp_tol;		// qp-gamma tolernace
+	int qp_maxiter = params.qp_max_iter;
+
+	MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
+	VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_);
+	MatrixXf Y(M_, N_), neg_H(M_, N_), pos_H(M_, N_);
+	VectorXf qp_values(N_);
+
+	pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/M_);				      
+	pos_C *= lambda;	// pos_C
+	neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
+	neg_C /= M_;													      
+	neg_C *= lambda; 	// neg_C
+	C = pos_C - neg_C;	// C
+	abs_C = pos_C + neg_C;	// abs_C
+
+    clock_t start, end;
+    int it=0;
+    do {
+        ++it;
+
+		// initialization
+		beta_mat.fill(0);
+		beta.fill(0);
+		gamma.fill(1);	// all zero is a fixed point of QP iteration!
+		old_Q = Q;
+		int pit = 0;
+		alpha_tQ.fill(0);	// all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
+		
+		// prox step
+		do {	
+			++pit;
+			// initialization
+			s_tQ.fill(0);
+
+			// QP-gamma -- \cite{NNQP solver Xiao and Chen 2014}
+			// case-1: solve for gamma using qp solver! 
+			// 1/2 * gamma^T * C * gamma - gamma^T * H
+			// populate Y matrix
+			tmp = alpha_tQ - unary;
+			for (int i = 0; i < N_; ++i) {
+				v_y = C * tmp.col(i);
+				Y.col(i) = v_y;
+			}	
+			Y += old_Q;		// H = -Y
+			for (int i = 0; i < N_; ++i) {
+				for (int j = 0; j < M_; ++j) {	
+					pos_H(j, i) = std::max(-Y(j, i), (float)0);		// pos_H 
+					neg_H(j, i) = std::max(Y(j, i), (float)0);		// neg_H
+				}
+			}
+			// qp iterations, 
+			int qpit = 0;
+			qp_values.fill(0);
+			float qp_value = std::numeric_limits<float>::max();
+            start = clock();
+			do {
+				//solve for each pixel separately
+				for (int i = 0; i < N_; ++i) {
+					v_gamma = gamma.col(i);
+					v_pos_h = pos_H.col(i);
+					v_neg_h = neg_H.col(i);
+					v_step = 2 * neg_C * v_gamma + v_pos_h;
+					v_step = v_step.array() + qp_delta;
+					v_tmp = abs_C * v_gamma + v_neg_h;
+				    v_tmp = v_tmp.array() + qp_delta;
+					v_step = v_step.cwiseQuotient(v_tmp);
+					v_gamma = v_gamma.cwiseProduct(v_step);
+					gamma.col(i) = v_gamma;
+
+					// qp value
+					v_tmp = C * v_gamma;
+					v_y = Y.col(i);
+					qp_values(i) = 0.5 * v_gamma.dot(v_tmp) + v_gamma.dot(v_y);
+				}
+				float qp_value1 = qp_values.sum();
+				//printf("\n#QP: %4d, %10.3f", qpit, qp_value1);
+				++qpit;
+				if (std::abs(qp_value - qp_value1) < qp_tol) break;
+				qp_value = qp_value1;
+			} while (qpit <= qp_maxiter);
+            end = clock();
+            printf("# Time-QP %d: %5.5f, %10.3f\t", qpit, (double)(end-start)/CLOCKS_PER_SEC, qp_value);
+			// end-qp-gamma
+
+			// case-2: update beta -- gradient of dual wrt beta equals to zero
+			beta_mat = (alpha_tQ + gamma - unary);	// -B^T/l * (A * alpha + gamma - phi)
+			// DON'T DO IT AT ONCE!! (RETURNS A SCALAR???)--> do it in two steps
+			beta = -beta_mat.colwise().sum();	
+			beta /= M_;
+			// repeat beta in each row of beta_mat - - B * beta
+			for (int j = 0; j < M_; ++j) {
+				beta_mat.row(j) = beta;
+			}
+
+			// case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
+			Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + old_Q;	// Q may be infeasible --> but no problem
+#if BRUTE_FORCE
+        	sortRows(Q, ind);
+#else
+			// new PH implementation doesn't work with Q values outside [0,1] - or in fact truncates to be within [0,1]
+    		// rescale Q to be within [0,1] -- order of Q values preserved!
+    		rescale(rescaled_Q, Q);
+#endif
+			// subgradient lower minus upper
+			// Pairwise
+            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+                start = clock();
+#if BRUTE_FORCE
+				// brute-force computation
+            	no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
+            	//no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp2, ind);
+            	for(int i=0; i<tmp2.cols(); ++i) {
+                	for(int j=0; j<tmp2.rows(); ++j) {
+                    	tmp(j, ind(j, i)) = tmp2(j, i);
+                	}
+            	}
+#else
+				// new PH implementation
+				// rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
+                pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);	
+#endif
+                s_tQ += tmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
+                end = clock();
+                printf("# Time-%d: %5.5f\t", k, (double)(end-start)/CLOCKS_PER_SEC);
+            }
+			// find dual gap
+			tmp = alpha_tQ - s_tQ;	
+			dual_gap = dotProduct(tmp, Q, dot_tmp);
+
+			// dual-energy value
+			tmp2 = Q - old_Q;
+			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, old_Q, dot_tmp) / lambda;
+			dual_energy -= beta.sum();
+			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
+		   	primal_energy += dotProduct(unary, Q, dot_tmp);
+			primal_energy -= dotProduct(s_tQ, Q, dot_tmp);	// cancel the neg in s_tQ
+			assert(dual_gap == (dual_energy - primal_energy));
+			//
+			printf("%4d: [%10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, -dual_energy, primal_energy);
+			if (dual_gap <= tol) break;	// stopping condition
+
+			// optimal fw step size
+			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+			delta = std::min(std::max(delta, (float)0.0), (float)1.0);
+			assert(delta > 0);
+			printf("%1.10f]\n", delta);
+
+			// update alpha_tQ
+			tmp = s_tQ - alpha_tQ;
+			tmp *= delta;
+			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
+
+		} while(pit<=fw_maxiter);
+
+		// project Q back to feasible region
+		feasible_Q(tmp, ind, sum, K, Q);
+		Q = tmp;
+		renormalize(Q);
+        assert(valid_probability_debug(Q));
+
+#if BRUTE_FORCE			
+		energy = compute_energy_LP(Q, no_norm_pairwise, pairwise_.size());
+#else
+		energy = compute_energy_LP(Q);
+#endif
+//		if( energy < best_energy) {
+//            best_Q = Q;
+//            best_energy = energy;
+//        }
+//        printf("%4d: %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, best_energy);
+
+        int_energy = assignment_energy(currentMap(Q));
+		if( int_energy < best_int_energy) {
+            best_Q = Q;
+            best_int_energy = int_energy;
+        }
+        printf("%4d: %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, best_int_energy);
+
+    } while(it<maxiter);
+
+	std::cout <<"final projected energy: " << int_energy << "\n";
+
+#if BRUTE_FORCE	
+	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        delete no_norm_pairwise[k];
+    }
+    free(no_norm_pairwise);
+#endif
+
+    return best_Q;
+}
 
 std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit) const {
     // Restrict number of labels in the computation
@@ -1982,6 +2296,21 @@ double DenseCRF::assignment_energy( const VectorXs & l) const {
     return ass_energy;
 }
 
+double DenseCRF::assignment_energy_true( const VectorXs & l) const {
+    VectorXf unary = unaryEnergy(l);
+    VectorXf pairwise = pairwise_energy_true(l);
+
+    VectorXf total_energy = unary + pairwise;
+ 
+    assert( total_energy.rows() == N_);
+    double ass_energy = 0;
+    for( int i=0; i< N_; ++i) {
+        ass_energy += total_energy[i];
+    }
+
+    return ass_energy;
+}
+
 VectorXf DenseCRF::unaryEnergy(const VectorXs & l) const{
     assert( l.rows() == N_ );
     VectorXf r( N_ );
@@ -2016,6 +2345,34 @@ VectorXf DenseCRF::pairwiseEnergy(const VectorXs & l, int term) const{
     for( int i=0; i<N_; i++ )
         if ( 0 <= l[i] && l[i] < M_ )
             r[i] =-0.5*Q(l[i],i );
+        else
+            r[i] = 0;
+    return r;
+}
+
+// true pairwise
+VectorXf DenseCRF::pairwise_energy_true(const VectorXs & l, int term) const{
+    assert( l.rows() == N_ );
+    VectorXf r( N_ );
+    r.fill(0);
+
+    if( term == -1 ) {
+        for( unsigned int i=0; i<pairwise_.size(); i++ )
+            r += pairwise_energy_true( l, i );
+        return r;
+    }
+
+    MatrixXf Q( M_, N_ );
+    // binary assignment (1 if l[i]!= j and 0 otherwise)
+    for( int i=0; i<N_; i++ )
+        for( int j=0; j<M_; j++ )
+            Q(j,i) = (l[i] == j) ? 0 : 1;	// new
+//            Q(j,i) = (l[i] == j) ? 1 : 0;	// old
+    pairwise_[ term ]->apply( Q, Q );
+    for( int i=0; i<N_; i++ )
+        if ( 0 <= l[i] && l[i] < M_ )
+            r[i] = -Q(l[i],i );	// neg to cancel the neg introduced in compatiblity_.apply()
+//            r[i] = Q(l[i],i );	// old
         else
             r[i] = 0;
     return r;
@@ -2099,7 +2456,6 @@ double DenseCRF::compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_d
     return energy;
 }
 
-
 double DenseCRF::compute_energy(const MatrixXf & Q) const {
     double energy = 0;
     MatrixP dot_tmp;
@@ -2117,6 +2473,60 @@ double DenseCRF::compute_energy(const MatrixXf & Q) const {
     return energy;
 }
 
+double DenseCRF::compute_energy_true(const MatrixXf & Q) const {
+    double energy = 0;
+    MatrixP dot_tmp;
+	// Add the unary term
+    if( unary_ ) {
+        MatrixXf unary = unary_->get();
+        energy += dotProduct(unary, Q, dot_tmp);
+    }
+	//std::cout << "\nqp-unary-energy: " << energy;
+    // Add all pairwise terms
+    MatrixXf tmp, tmp2;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        pairwise_[k]->apply( tmp, Q );
+		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
+		//std::cout << "\nqp-pairwise[" << k << "]-energy: " << dotProduct(Q, tmp, dot_tmp);
+		// constant term
+		tmp = -tmp;	// cancel the neg introdcued in apply
+		tmp.transposeInPlace();
+		tmp2 = Q*tmp;	
+		double const_energy = tmp2.sum();
+		energy += const_energy;
+		//std::cout << "\nqp-pairwise[" << k << "]-const: " << const_energy;
+    }
+
+    return energy;
+}
+
+double DenseCRF::compute_energy_true(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const {
+    double energy = 0;
+    MatrixP dot_tmp;
+	// Add the unary term
+    if( unary_ ) {
+        MatrixXf unary = unary_->get();
+        energy += dotProduct(unary, Q, dot_tmp);
+    }
+	//std::cout << "\nqp-unary-energy-bf: " << energy;
+    // Add all pairwise terms
+    MatrixXf tmp, tmp2;
+    for( unsigned int k=0; k<nb_pairwise; k++ ) {
+        no_norm_pairwise[k]->apply_bf( tmp, Q );
+		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
+		//std::cout << "\nqp-pairwise[" << k << "]-energy-bf: " << dotProduct(Q, tmp, dot_tmp);
+		// constant term
+		tmp = -tmp;	// cancel the neg introdcued in apply
+		tmp.transposeInPlace();
+		tmp2 = Q*tmp;	
+		double const_energy = tmp2.sum();
+		energy += const_energy;
+		//std::cout << "\nqp-pairwise[" << k << "]-const-bf: " << const_energy;
+    }
+
+    return energy;
+}
+
 double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const {
     double energy = 0;
     MatrixP dot_tmp;
@@ -2126,14 +2536,52 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_no
         MatrixXf unary = unary_->get();
         energy += dotProduct(unary, Q, dot_tmp);
     }
+	//std::cout << "\nbf-unary-energy: " << energy;
     // Add all pairwise terms
     sortRows(Q, ind);
     MatrixXf tmp(Q.rows(), Q.cols());
+    MatrixXf tmp2(Q.rows(), Q.cols());
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         // Add the upper minus the lower
+#if BRUTE_FORCE
+        no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp, ind);
+        //no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
+#else
+        //no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp, ind);
         no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
-        assert(tmp.maxCoeff()<1e-3);
+#endif
+		// need to sort before dot-product
+		for(int i=0; i<tmp.cols(); ++i) {
+        	for(int j=0; j<tmp.rows(); ++j) {
+            	tmp2(j, ind(j, i)) = tmp(j, i);
+        	}
+        }
+        //assert(tmp2.maxCoeff()<1e-3);
+        energy -= dotProduct(Q, tmp2, dot_tmp);
+		//std::cout << "\nbf-pairwise[" << k << "]-energy: " << -dotProduct(Q, tmp2, dot_tmp);
+    }
+
+    return energy;
+}
+
+double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
+    double energy = 0;
+    MatrixP dot_tmp;
+    MatrixXi ind(M_, N_);
+    // Add the unary term
+    if( unary_ ) {
+        MatrixXf unary = unary_->get();
+        energy += dotProduct(unary, Q, dot_tmp);
+    }
+	//std::cout << "\nph-unary-energy: " << energy;
+    // Add all pairwise terms
+    MatrixXf tmp(Q.rows(), Q.cols());
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        // Add the upper minus the lower
+        pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
+        //assert(tmp.maxCoeff()<1e-3);
         energy -= dotProduct(Q, tmp, dot_tmp);
+		//std::cout << "\nph-pairwise[" << k << "]-energy: " << -dotProduct(Q, tmp, dot_tmp);
     }
 
     return energy;

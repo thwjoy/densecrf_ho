@@ -39,6 +39,21 @@ void expAndNormalize( MatrixXf & out, const MatrixXf & in);
 void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q);
 void normalize(MatrixXf & out, const MatrixXf & in);
 
+class LP_inf_params {
+public: 
+	float prox_reg_const;	// proximal regularization constant
+	float dual_gap_tol;		// dual gap tolerance
+	int prox_max_iter;		// maximum proximal iterations
+	int fw_max_iter;		// maximum FW iterations
+	int qp_max_iter;		// maximum qp-gamma iterations
+	float qp_tol;			// qp-gamma tolerance
+	float qp_const;			// const used in qp-gamma
+	LP_inf_params(float prox_reg_const, float dual_gap_tol, int prox_max_iter, 
+			int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const);
+	LP_inf_params();	// default values
+};
+
+
 /**** DenseCRF ****/
 class DenseCRF{
 protected:
@@ -71,6 +86,9 @@ public:
 	// Add your own favorite pairwise potential (ownership will be transfered to this class)
 	void addPairwiseEnergy( PairwisePotential* potential );
 
+    // set potts compatibility weight such that ratio *  unary enegy = pairwise energy (given Q)
+	void setPairwisePottsWeight(float ratio, const MatrixXf & Q);
+
 	// Set the unary potential (ownership will be transfered to this class)
 	void setUnaryEnergy( UnaryEnergy * unary );
 	// Add a constant unary term
@@ -101,6 +119,7 @@ public:
 	// Run the energy minimisation on the LP
     MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad) const;
     MatrixXf lp_inference_new(MatrixXf & init) const;
+    MatrixXf lp_inference_prox(MatrixXf & init, LP_inf_params & params) const;
 	std::vector<perf_measure> tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit = 0) const;
 
 	// compare permutohedral and bruteforce energies
@@ -136,17 +155,32 @@ public: /* Debugging functions */
 	// Compute the pairwise energy of an assignment l (half of each pairwise potential is added to each of it's endpoints)
 	VectorXf pairwiseEnergy( const VectorXs & l, int term=-1 ) const;
 
+    // compute true pairwise energy for LP objective given integer labelling
+	VectorXf pairwise_energy_true( const VectorXs & l, int term=-1 ) const;
+
 	// Compute the energy of an assignment l.
 	double assignment_energy( const VectorXs & l) const;
+
+    // Compute the true energy of an assignment l -- actual energy (differs by a const to assignment_energy - in pairwise case)
+	double assignment_energy_true( const VectorXs & l) const;
 
 	// Compute the KL-divergence of a set of marginals
 	double klDivergence( const MatrixXf & Q ) const;
 
-    // Compute the energy associated with the QP relaxation
+    // Compute the energy associated with the QP relaxation (const - true)
     double compute_energy( const MatrixXf & Q) const;
+
+    // Compute the true-energy associated with the QP relaxation
+    double compute_energy_true( const MatrixXf & Q) const;
+
+    // Compute the true-energy associated with the QP relaxation - bf
+    double compute_energy_true( const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const;
 
     // Compute the energy associated with the LP relaxation
     double compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const;
+
+    // Compute the energy associated with the LP relaxation
+    double compute_energy_LP(const MatrixXf & Q) const;
 
 	// Compute the value of a Lafferty-Ravikumar QP
 	double compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const;
