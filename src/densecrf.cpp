@@ -1442,7 +1442,7 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
 
     // Compute the value of the energy
     assert(valid_probability(Q));
-    double energy = 0, best_energy = 123456789;
+    double energy = 0, best_energy = std::numeric_limits<double>::max();
     double int_energy = assignment_energy(currentMap(Q));
     // printf("Initial int energy in the LP: %f\n", int_energy);
 
@@ -1462,14 +1462,14 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         sortRows(Q, ind);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
             // Add upper minus lower
-            no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
+            /*no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
             tmp2.fill(0);
             for(i=0; i<tmp.cols(); ++i) {
                 for(j=0; j<tmp.rows(); ++j) {
                     tmp2(j, ind(j, i)) = tmp(j, i);
                 }
-            }//*/
-            // pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
+            }*/
+            pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
@@ -1725,6 +1725,95 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
     best_Q = get_extended_matrix(best_Q, indices, M_);
     init = best_Q;
     return perfs;
+}
+
+void DenseCRF::compare_energies(const MatrixXf & Q, double & ph_energy, double & bf_energy, 
+		bool qp, bool ph_old) const {
+	if (pairwise_.size() != 1) {
+		std::cout << "pairwise-size: " << pairwise_.size() << " (should be 1)" << std::endl;
+		exit(1);
+	}
+	if (!valid_probability(Q)) {
+		std::cout << "Q is not a valid probability!" << std::endl;
+		exit(1);
+	}
+	
+	// for bruteforce computation
+	// Create copies of the original pairwise since we don't want normalization
+    PairwisePotential** no_norm_pairwise;
+    no_norm_pairwise = (PairwisePotential**) malloc(pairwise_.size()*sizeof(PairwisePotential*));
+	const int k = 0;	//fixed
+    no_norm_pairwise[k] = new PairwisePotential(
+        pairwise_[k]->features(),
+        new PottsCompatibility(pairwise_[k]->parameters()(0)),
+        pairwise_[k]->ktype(),
+        NO_NORMALIZATION
+        );
+	
+    MatrixXf tmp(M_, N_), tmp2(M_, N_);
+	MatrixXi ind(M_, N_);
+	MatrixP dot_tmp;
+	double energy = 0;
+
+	if (qp) {
+		// ph-energy
+		energy = 0;
+        pairwise_[k]->apply( tmp, Q );
+    	energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
+    	// constant term
+    	tmp = -tmp;	// cancel the neg introdcued in apply
+    	tmp.transposeInPlace();
+    	tmp2 = Q*tmp;	
+    	double const_energy = tmp2.sum();
+    	energy += const_energy;
+		ph_energy = energy;
+
+		//bf-energy
+		energy = 0;
+		no_norm_pairwise[k]->apply_bf( tmp, Q );
+		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
+		// constant term
+		tmp = -tmp;	// cancel the neg introdcued in apply
+		tmp.transposeInPlace();
+		tmp2 = Q*tmp;	
+		const_energy = tmp2.sum();
+		energy += const_energy;
+		bf_energy = energy;
+
+	} else {
+		// ph-energy
+		energy = 0;
+		// old-ph
+		if (ph_old) {
+    		sortRows(Q, ind);
+            no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp2, ind);
+    		// need to sort before dot-product
+    		for(int i=0; i<tmp2.cols(); ++i) {
+            	for(int j=0; j<tmp2.rows(); ++j) {
+                	tmp(j, ind(j, i)) = tmp2(j, i);
+            	}
+            }
+		} else {
+        	// Add the upper minus the lower
+	        pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
+		}
+		//
+        energy -= dotProduct(Q, tmp, dot_tmp);
+		ph_energy = energy;
+
+		// bf-energy
+		energy = 0;
+		sortRows(Q, ind);
+        no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
+		// need to sort before dot-product
+		for(int i=0; i<tmp2.cols(); ++i) {
+        	for(int j=0; j<tmp2.rows(); ++j) {
+            	tmp(j, ind(j, i)) = tmp2(j, i);
+        	}
+        }
+        energy -= dotProduct(Q, tmp, dot_tmp);
+		bf_energy = energy;
+	}
 }
 
 MatrixXf DenseCRF::max_rounding(const MatrixXf &estimates) const {

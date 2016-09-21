@@ -205,7 +205,8 @@ void PairwisePotential::applyTranspose(MatrixXf & out, const MatrixXf & Q) const
 }
 void PairwisePotential::apply_upper_minus_lower_ord(MatrixXf & out, const MatrixXf & Q) const {
 	assert(Q.maxCoeff() <= 1);
-	assert(Q.minCoeff() >= 0);
+	assert(Q.minCoeff() >= 0);  // values truncated to be [0,1], doesn't need to sum to 1
+    out.fill(0);
 	kernel_->apply_upper_minus_lower_ord(out, Q);
 	
 	// Apply the compatibility
@@ -239,18 +240,20 @@ void PairwisePotential::apply_upper_minus_lower_sorted_slice(MatrixXf & out, int
 		// Alpha is a magic scaling constant (write Rudy if you really wanna understand this)
 		MatrixXf const & features = kernel_->features();
 		double alpha = 1.0 / 0.6;
-		// Upper
+		// Lower
 		for(int c=min; c<max; ++c) {
             for(int b=min; b<c; ++b) {
                 VectorXf featDiff = (features.col(c) - features.col(b));
-                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
+                //out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
+                out(0, c) -= exp(-featDiff.squaredNorm()) * alpha;
             }
         }
-        // Lower
+        // Upper
 		for(int c=min; c<max; ++c) {
-            for(int b=c; b<max; ++b) {
+            for(int b=c+1; b<max; ++b) {
                 VectorXf featDiff = (features.col(c) - features.col(b));
-                out(0, c) -= exp(-featDiff.squaredNorm()) * alpha;
+                //out(0, c) -= exp(-featDiff.squaredNorm()) * alpha;
+                out(0, c) += exp(-featDiff.squaredNorm()) * alpha;
             }
         }
 	} else {
@@ -270,6 +273,54 @@ void PairwisePotential::apply_upper_minus_lower_sorted_slice(MatrixXf & out, int
 		// Lower left
 		kernel_->apply_upper_minus_lower_dc(out, min, middle_low, middle_high, max);
 	}
+}
+void PairwisePotential::apply_upper_minus_lower_bf(MatrixXf & out, const MatrixXi & ind) const {
+	MatrixXf const & features = kernel_->features();
+	MatrixXf sorted_features = features;
+	MatrixXf single_label_out(1, features.cols());
+
+	for(int label=0; label<ind.rows(); ++label) {
+		// Sort the features with the scores for this label
+		for(int j=0; j<features.cols(); ++j) {
+			sorted_features.col(j) = features.col(ind(label, j));
+		}
+
+		single_label_out.fill(0);
+		// brute-force computation
+		// Upper
+		for(int c=0; c<ind.cols(); ++c) {
+            for(int b=c+1; b<ind.cols(); ++b) {
+                VectorXf featDiff = (sorted_features.col(c) - sorted_features.col(b));
+                single_label_out(c) += exp(-featDiff.squaredNorm());
+            }
+        }
+        // Lower
+		for(int c=0; c<ind.cols(); ++c) {
+            for(int b=0; b<c; ++b) {
+                VectorXf featDiff = (sorted_features.col(c) - sorted_features.col(b));
+                single_label_out(c) -= exp(-featDiff.squaredNorm());
+            }
+        }
+
+		out.row(label) = single_label_out;
+	}
+	compatibility_->apply(out, out);
+}
+void PairwisePotential::apply_bf(MatrixXf & out, const MatrixXf & Q) const {
+	MatrixXf const & features = kernel_->features();
+	out = Q;
+	out.fill(0);
+	for(int label=0; label<Q.rows(); ++label) {
+		// brute-force computation
+		for(int c=0; c<Q.cols(); ++c) {
+            for(int b=0; b<Q.cols(); ++b) {
+                VectorXf featDiff = (features.col(c) - features.col(b));
+                out(label, c) += exp(-featDiff.squaredNorm()) * Q(label, b);
+            }
+        }
+	}
+	// Apply the compatibility
+	compatibility_->apply( out, out );
 }
 VectorXf PairwisePotential::parameters() const {
 	return compatibility_->parameters();

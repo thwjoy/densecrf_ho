@@ -103,6 +103,9 @@ public:
     MatrixXf lp_inference_new(MatrixXf & init) const;
 	std::vector<perf_measure> tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit = 0) const;
 
+	// compare permutohedral and bruteforce energies
+    void compare_energies(const MatrixXf & Q, double & ph_energy, double & bf_energy, bool qp=true, bool ph_old = false) const;
+
 	// Perform the rounding based on argmaxes
 	MatrixXf max_rounding(const MatrixXf & estimates) const;
 	// Perform randomized roundings
