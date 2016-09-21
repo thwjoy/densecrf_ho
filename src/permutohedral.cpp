@@ -46,6 +46,8 @@ inline int round(double X) {
 # endif
 #endif
 
+#define STRICT_INEQUALITY false  // used in "_ord" functions: if true, consider strict inequalty 
+
 /************************************************/
 /***                Hash Table                ***/
 /************************************************/
@@ -537,12 +539,18 @@ void addSplitArray(split_array *out, float alpha, float up_to, bool from_top) {
     if (from_top) {	// the pixels that have lesser Q value than the current one influence the current pixel
 		int coeff = std::max(int(floor((up_to-1e-9)*RESOLUTION)), 0);
         assert(coeff >= 0 && coeff < RESOLUTION);
+#if STRICT_INEQUALITY   // don't influence pixels that belongs to the same bin
+        ++coeff;
+#endif
 		for(int i=coeff; i<RESOLUTION; ++i) {
 			out_f[i] += alpha;
 		}
 	} else {	// the pixels that have greater Q value than the current one influence the current pixel
 		int coeff = std::min(int(floor((up_to)*RESOLUTION)), RESOLUTION-1);
-		assert(coeff >= 0 && coeff <= RESOLUTION);
+		assert(coeff >= 0 && coeff < RESOLUTION);
+#if STRICT_INEQUALITY   // don't influence pixels that belongs to the same bin
+        --coeff;
+#endif
 		for(int i=0; i<=coeff; ++i) {
 			out_f[i] += alpha;
 		}

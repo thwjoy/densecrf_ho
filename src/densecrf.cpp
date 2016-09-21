@@ -1280,25 +1280,17 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
 
                 // With the new discretized split computations
                 // start = clock();
-                // pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
+                //pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
                 /*end = clock();
                 perf_timing = (double(end-start)/CLOCKS_PER_SEC);
                 printf("ORD: It: %d | id: %d | time: %f\n", it, k, perf_timing);*/
 
-
-                // Comparison code
-                /*MatrixXf diff = tmp2 - tmp;
-                int row, col;
-                printf("GT:   mean %f, max %f, min %f\n", tmp2.mean(), tmp2.maxCoeff(), tmp2.minCoeff());
-                printf("new:  mean %f, max %f, min %f\n", tmp.mean(), tmp.maxCoeff(), tmp.minCoeff());
-                printf("diff: mean %f, max %f, min %f\n", diff.mean(), diff.maxCoeff(&row, &col), diff.minCoeff());
-                printf("max is at %d x %d\n", row, col);
-
-                std::cout << Q.block(0,95730,7,10) << std::endl << std::endl;
-                std::cout << tmp2.block(0,95730,7,10) << std::endl << std::endl;
-                std::cout << tmp.block(0,95730,7,10) << std::endl << std::endl;
-                std::cout << diff.block(0,0,10,3) << std::endl << std::endl;*/
-
+                // The subgradients computed by new and old PH implementations are different 
+                // (due to the equality handling)
+                // Compare by computing the LP energy!!
+                /*double tmp2_e = -dotProduct(tmp2, Q, dot_tmp);
+                double tmp_e = -dotProduct(tmp, Q, dot_tmp);
+                std::cout << "GT enegy: " << tmp2_e << ", new energy: " << tmp_e << " diff: " << abs(tmp2_e - tmp_e) << std::endl;*/
             }
                 
             energy -= dotProduct(Q, tmp2, dot_tmp);
@@ -1727,6 +1719,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
     return perfs;
 }
 
+// only calculate pairwise energies -- assumes single kernel
 void DenseCRF::compare_energies(const MatrixXf & Q, double & ph_energy, double & bf_energy, 
 		bool qp, bool ph_old) const {
 	if (pairwise_.size() != 1) {
