@@ -535,16 +535,12 @@ void printSplitArray(split_array *in) {
 void addSplitArray(split_array *out, float alpha, float up_to, bool from_top) {
 	float *out_f = (float *)out;
     if (from_top) {	// the pixels that have lesser Q value than the current one influence the current pixel
-		//int coeff = std::max(int(floor((up_to-1e-9)*RESOLUTION)), 0);
 		int coeff = std::max(int(floor((up_to-1e-9)*RESOLUTION)), 0);
         assert(coeff >= 0 && coeff < RESOLUTION);
 		for(int i=coeff; i<RESOLUTION; ++i) {
 			out_f[i] += alpha;
 		}
 	} else {	// the pixels that have greater Q value than the current one influence the current pixel
-		//int coeff = std::min(int(ceil((up_to+1e-9)*RESOLUTION)), RESOLUTION-1);
-		//assert(coeff > 0 && coeff <= RESOLUTION);
-		//for(int i=0; i<coeff; ++i) {
 		int coeff = std::min(int(floor((up_to)*RESOLUTION)), RESOLUTION-1);
 		assert(coeff >= 0 && coeff <= RESOLUTION);
 		for(int i=0; i<=coeff; ++i) {
@@ -565,10 +561,8 @@ void sliceSplitArray(float *out, float alpha, float up_to, split_array *in, bool
 	float *in_f = (float *)in;
 	int coeff;
 	if (from_top) {	
-		//coeff = std::min(int(ceil((up_to)*RESOLUTION)), RESOLUTION-1);
 		coeff = std::max(int(floor((up_to-1e-9)*RESOLUTION)), 0);
 	} else {	
-		//coeff = std::max(int(floor((up_to)*RESOLUTION)), 0);
 		coeff = std::min(int(floor((up_to)*RESOLUTION)), RESOLUTION-1);
 	}
 	assert(coeff >= 0 && coeff < RESOLUTION);
