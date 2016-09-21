@@ -69,7 +69,6 @@ void DenseCRF::setPairwisePottsWeight(float ratio, const MatrixXf & Q) {
 	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 		pairwise_[k]->setParameters(pairwise_[k]->parameters() * p_weight);
 	}
-	//std::cout << "#u_energy: " << unaryEnergy(l).sum() << ",\tp_energy: " << pairwise_energy_true(l).sum() << std::endl;
 }
 void DenseCRF::addPairwiseEnergy (const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type) {
     assert( features.cols() == N_ );
@@ -2481,20 +2480,17 @@ double DenseCRF::compute_energy_true(const MatrixXf & Q) const {
         MatrixXf unary = unary_->get();
         energy += dotProduct(unary, Q, dot_tmp);
     }
-	//std::cout << "\nqp-unary-energy: " << energy;
     // Add all pairwise terms
     MatrixXf tmp, tmp2;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, Q );
 		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
-		//std::cout << "\nqp-pairwise[" << k << "]-energy: " << dotProduct(Q, tmp, dot_tmp);
 		// constant term
 		tmp = -tmp;	// cancel the neg introdcued in apply
 		tmp.transposeInPlace();
 		tmp2 = Q*tmp;	
 		double const_energy = tmp2.sum();
 		energy += const_energy;
-		//std::cout << "\nqp-pairwise[" << k << "]-const: " << const_energy;
     }
 
     return energy;
@@ -2508,20 +2504,17 @@ double DenseCRF::compute_energy_true(const MatrixXf & Q, PairwisePotential** no_
         MatrixXf unary = unary_->get();
         energy += dotProduct(unary, Q, dot_tmp);
     }
-	//std::cout << "\nqp-unary-energy-bf: " << energy;
     // Add all pairwise terms
     MatrixXf tmp, tmp2;
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         no_norm_pairwise[k]->apply_bf( tmp, Q );
 		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
-		//std::cout << "\nqp-pairwise[" << k << "]-energy-bf: " << dotProduct(Q, tmp, dot_tmp);
 		// constant term
 		tmp = -tmp;	// cancel the neg introdcued in apply
 		tmp.transposeInPlace();
 		tmp2 = Q*tmp;	
 		double const_energy = tmp2.sum();
 		energy += const_energy;
-		//std::cout << "\nqp-pairwise[" << k << "]-const-bf: " << const_energy;
     }
 
     return energy;
