@@ -115,9 +115,18 @@ int main(int argc, char *argv[])
     } else if (method == "ccv"){
         Q = crf.concave_qp_cccp_inference(Q);
     } else if (method == "sg_lp"){
+        double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        printf("Before QP: %lf\n", discretized_energy);
         Q = crf.qp_inference(Q);
+        discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        printf("After QP: %lf\n", discretized_energy);
         Q = crf.concave_qp_cccp_inference(Q);
-        Q = crf.lp_inference(Q, false);
+        discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        printf("After QP concave: %lf\n", discretized_energy);
+        //Q = crf.lp_inference(Q,false);
+        Q = crf.lp_inference_new(Q);
+        discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        printf("After LP: %lf\n", discretized_energy);
     } else if (method == "cg_lp"){
         Q = crf.qp_inference(Q);
         Q = crf.concave_qp_cccp_inference(Q);
