@@ -119,9 +119,9 @@ UnaryEnergy* DenseCRF::getUnaryEnergy() {
 /////  Inference  /////
 ///////////////////////
 LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, int prox_max_iter,
-	   	int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const):prox_reg_const(prox_reg_const),
+	   	int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const, bool best_int):prox_reg_const(prox_reg_const),
 		dual_gap_tol(dual_gap_tol), prox_max_iter(prox_max_iter), fw_max_iter(fw_max_iter), 
-		qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const){}
+		qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const), best_int(best_int){}
 
 LP_inf_params::LP_inf_params() {
 	prox_reg_const = 1e-2;	
@@ -131,6 +131,7 @@ LP_inf_params::LP_inf_params() {
 	qp_max_iter = 1000;		
 	qp_tol = 1e-3;			
 	qp_const = 1e-16;			
+    best_int = false;
 }
 
 MatrixXf DenseCRF::unary_init() const {
@@ -1596,7 +1597,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     // Compute the value of the energy
     double energy = 0, best_energy = std::numeric_limits<double>::max(), 
 		   best_int_energy = std::numeric_limits<double>::max();
-    double int_energy = assignment_energy(currentMap(Q));
+    double int_energy = assignment_energy_true(currentMap(Q));
+    double qp_energy = compute_energy_true(Q);
 #if BRUTE_FORCE	
 	// Create copies of the original pairwise since we don't want normalization
     PairwisePotential** no_norm_pairwise;
@@ -1614,10 +1616,20 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #else
 	energy = compute_energy_LP(Q);
 #endif
+    if (energy > int_energy) {  // choose the best initialization
+        Q = max_rounding(Q);
+#if BRUTE_FORCE        
+        energy = compute_energy_LP(Q, no_norm_pairwise, pairwise_.size());
+#else
+    	energy = compute_energy_LP(Q);
+#endif
+    }
 	best_energy = energy;
-    printf("Initial energy in the LP: %10.3f / %10.3f\n", energy, int_energy);
+	best_int_energy = int_energy;
+    printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f\n", energy, int_energy, qp_energy);
 
 	int maxiter = params.prox_max_iter;
+    bool best_int = params.best_int;
 
 	// dual Frank-Wolfe variables
 	float tol = params.dual_gap_tol;		// dual gap tolerance
@@ -1778,6 +1790,10 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			assert(dual_gap == (dual_energy - primal_energy));
 			//
 			printf("%4d: [%10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, -dual_energy, primal_energy);
+            //if (dual_gap < 0) {   // may become negative due to PH approximations!
+            //    std::cout << "\nERROR: Dual-gap cannot be negative!\n";
+            //    exit(1);
+            //}
 			if (dual_gap <= tol) break;	// stopping condition
 
 			// optimal fw step size
@@ -1804,21 +1820,24 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #else
 		energy = compute_energy_LP(Q);
 #endif
-//		if( energy < best_energy) {
-//            best_Q = Q;
-//            best_energy = energy;
-//        }
-//        printf("%4d: %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, best_energy);
-
-        int_energy = assignment_energy(currentMap(Q));
-		if( int_energy < best_int_energy) {
-            best_Q = Q;
-            best_int_energy = int_energy;
+        if (best_int) {
+            int_energy = assignment_energy_true(currentMap(Q));
+		    if( int_energy < best_int_energy) {
+                best_Q = Q;
+                best_int_energy = int_energy;
+            }
+            printf("%4d: %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, best_int_energy);
+        } else {
+    		if( energy < best_energy) {
+                best_Q = Q;
+                best_energy = energy;
+            }
+            printf("%4d: %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, best_energy);
         }
-        printf("%4d: %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, best_int_energy);
 
     } while(it<maxiter);
 
+    int_energy = assignment_energy_true(currentMap(Q));
 	std::cout <<"final projected energy: " << int_energy << "\n";
 
 #if BRUTE_FORCE	
@@ -2048,13 +2067,14 @@ void DenseCRF::compare_energies(const MatrixXf & Q, double & ph_energy, double &
 	// Create copies of the original pairwise since we don't want normalization
     PairwisePotential** no_norm_pairwise;
     no_norm_pairwise = (PairwisePotential**) malloc(pairwise_.size()*sizeof(PairwisePotential*));
-	const int k = 0;	//fixed
-    no_norm_pairwise[k] = new PairwisePotential(
-        pairwise_[k]->features(),
-        new PottsCompatibility(pairwise_[k]->parameters()(0)),
-        pairwise_[k]->ktype(),
-        NO_NORMALIZATION
-        );
+    for (int k = 0; k < pairwise_.size(); ++k) {
+        no_norm_pairwise[k] = new PairwisePotential(
+            pairwise_[k]->features(),
+            new PottsCompatibility(pairwise_[k]->parameters()(0)),
+            pairwise_[k]->ktype(),
+            NO_NORMALIZATION
+            );
+    }
 	
     MatrixXf tmp(M_, N_), tmp2(M_, N_);
 	MatrixXi ind(M_, N_);
@@ -2064,60 +2084,68 @@ void DenseCRF::compare_energies(const MatrixXf & Q, double & ph_energy, double &
 	if (qp) {
 		// ph-energy
 		energy = 0;
-        pairwise_[k]->apply( tmp, Q );
-    	energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
-    	// constant term
-    	tmp = -tmp;	// cancel the neg introdcued in apply
-    	tmp.transposeInPlace();
-    	tmp2 = Q*tmp;	
-    	double const_energy = tmp2.sum();
-    	energy += const_energy;
+        for (int k = 0; k < pairwise_.size(); ++k) {
+            pairwise_[k]->apply( tmp, Q );
+        	energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
+        	// constant term
+        	tmp = -tmp;	// cancel the neg introdcued in apply
+        	tmp.transposeInPlace();
+        	tmp2 = Q*tmp;	
+        	double const_energy = tmp2.sum();
+        	energy += const_energy;
+        }
 		ph_energy = energy;
 
 		//bf-energy
 		energy = 0;
-		no_norm_pairwise[k]->apply_bf( tmp, Q );
-		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
-		// constant term
-		tmp = -tmp;	// cancel the neg introdcued in apply
-		tmp.transposeInPlace();
-		tmp2 = Q*tmp;	
-		const_energy = tmp2.sum();
-		energy += const_energy;
+        for (int k = 0; k < pairwise_.size(); ++k) {
+    		no_norm_pairwise[k]->apply_bf( tmp, Q );
+    		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
+    		// constant term
+    		tmp = -tmp;	// cancel the neg introdcued in apply
+    		tmp.transposeInPlace();
+    		tmp2 = Q*tmp;	
+    		double const_energy = tmp2.sum();
+    		energy += const_energy;
+        }
 		bf_energy = energy;
 
 	} else {
 		// ph-energy
 		energy = 0;
-		// old-ph
-		if (ph_old) {
-    		sortRows(Q, ind);
-            no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp2, ind);
+        if (ph_old) sortRows(Q, ind);
+        for (int k = 0; k < pairwise_.size(); ++k) {
+    		// old-ph
+    		if (ph_old) {
+                no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp2, ind);
+        		// need to sort before dot-product
+        		for(int i=0; i<tmp2.cols(); ++i) {
+                	for(int j=0; j<tmp2.rows(); ++j) {
+                    	tmp(j, ind(j, i)) = tmp2(j, i);
+                	}
+                }
+    		} else {
+            	// Add the upper minus the lower
+    	        pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
+    		}
+    		//
+            energy -= dotProduct(Q, tmp, dot_tmp);
+        }
+		ph_energy = energy;
+
+		// bf-energy
+		energy = 0;
+		sortRows(Q, ind);
+        for (int k = 0; k < pairwise_.size(); ++k) {
+            no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
     		// need to sort before dot-product
     		for(int i=0; i<tmp2.cols(); ++i) {
             	for(int j=0; j<tmp2.rows(); ++j) {
                 	tmp(j, ind(j, i)) = tmp2(j, i);
             	}
             }
-		} else {
-        	// Add the upper minus the lower
-	        pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
-		}
-		//
-        energy -= dotProduct(Q, tmp, dot_tmp);
-		ph_energy = energy;
-
-		// bf-energy
-		energy = 0;
-		sortRows(Q, ind);
-        no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
-		// need to sort before dot-product
-		for(int i=0; i<tmp2.cols(); ++i) {
-        	for(int j=0; j<tmp2.rows(); ++j) {
-            	tmp(j, ind(j, i)) = tmp2(j, i);
-        	}
+            energy -= dotProduct(Q, tmp, dot_tmp);
         }
-        energy -= dotProduct(Q, tmp, dot_tmp);
 		bf_energy = energy;
 	}
 }

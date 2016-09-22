@@ -55,7 +55,7 @@ void original_toy_problem() {
     }
 
     LP_inf_params lp_params;
-	lp_params.prox_max_iter = 100;
+	lp_params.prox_max_iter = 10;
 
     //crf.damp_updates(0.5);
     MatrixXf Q = unaries;
@@ -162,9 +162,9 @@ void compare_bf_ph_energies(int argc, char *argv[]) {
 
 int main(int argc, char *argv[])
 {
-    original_toy_problem();
+    //original_toy_problem();
 
-    //compare_bf_ph_energies(argc, argv);
+    compare_bf_ph_energies(argc, argv);
 
     return 0;
 }

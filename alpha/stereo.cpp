@@ -8,7 +8,7 @@
 
 #define NUM_LABELS 4
 
-#define RESCALED true
+#define RESCALED false
 
 MatrixXf get_unaries(const unsigned char * left_img, const unsigned char * right_img, img_size & size){
     MatrixXf unaries(NUM_LABELS, size.height * size.width);
@@ -72,13 +72,24 @@ int main(int argc, char *argv[])
 
     float up_ratio = 1;
 	if(argc > 3) up_ratio = atof(argv[3]);
-	float uc_ratio = 1;
-	if(argc > 4) uc_ratio = atof(argv[4]);
-	int maxiter = 10;
-	if(argc > 5) maxiter = atoi(argv[5]);
+
+	// lp inference params
+	LP_inf_params lp_params;
+	if(argc > 4) lp_params.prox_max_iter = atoi(argv[4]);
+	if(argc > 5) lp_params.fw_max_iter = atoi(argv[5]);
+	if(argc > 6) lp_params.qp_max_iter = atoi(argv[6]);
+	if(argc > 7) lp_params.prox_reg_const = atof(argv[7]);
+	if(argc > 8) lp_params.dual_gap_tol = atof(argv[8]);
+	if(argc > 9) lp_params.qp_tol = atof(argv[9]);
+	if(argc > 10) lp_params.best_int = atoi(argv[10]);
 
     std::string stereo_folder = argv[1];
     std::string method = argv[2];
+
+    std::cout << "## COMMAND: " << argv[0] << " " << argv[1] << " " << argv[2] << " " << up_ratio << " "
+        << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
+        << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
+        << lp_params.best_int << std::endl;
 
 #if RESCALED
     std::string left_image_path = stereo_folder + "imL_025.png";
@@ -91,9 +102,6 @@ int main(int argc, char *argv[])
 #endif
     std::string unary_path = stereo_folder + "unary.txt";
 
-	// lp inference params
-	LP_inf_params lp_params;
-	lp_params.prox_max_iter = maxiter;
 
 #if RESCALED
     Potts_weight_set parameters(2, 50, 2, 15, 50);
@@ -141,9 +149,6 @@ int main(int argc, char *argv[])
     } else if (method == "ccv"){
         Q = crf.concave_qp_cccp_inference(Q);
     } else if (method == "sg_lp"){
-#if RESCALED
-		crf.setPairwisePottsWeight(up_ratio, Q);
-#endif        
         double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
         printf("Before QP: %lf\n", discretized_energy);
         Q = crf.qp_inference(Q);
@@ -152,10 +157,30 @@ int main(int argc, char *argv[])
         Q = crf.concave_qp_cccp_inference(Q);
         discretized_energy = crf.assignment_energy(crf.currentMap(Q));
         printf("After QP concave: %lf\n", discretized_energy);
+        Q = crf.lp_inference(Q,false);
+        //Q = crf.lp_inference_new(Q);
+        discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        printf("After LP: %lf\n", discretized_energy);
+    } else if (method == "prox_lp"){
+#if RESCALED
+		crf.setPairwisePottsWeight(up_ratio, Q);
+#endif        
+        double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+        printf("Before QP: %lf\n", discretized_energy);
+        Q = crf.qp_inference(Q);
+        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+        printf("After QP: %lf\n", discretized_energy);
+        Q = crf.concave_qp_cccp_inference(Q);
+        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+        printf("After QP concave: %lf\n", discretized_energy);
+
+        MatrixXf int_Q = crf.max_rounding(Q);
+        std::cout << "# QP: " << crf.compute_energy_true(int_Q) << ", LP: " << crf.compute_energy_LP(int_Q) 
+            << ", int: " << crf.assignment_energy_true(crf.currentMap(int_Q)) << std::endl;
         //Q = crf.lp_inference(Q,false);
         //Q = crf.lp_inference_new(Q);
         Q = crf.lp_inference_prox(Q, lp_params);
-        discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
         printf("After LP: %lf\n", discretized_energy);
     } else if (method == "cg_lp"){
         Q = crf.qp_inference(Q);
@@ -213,8 +238,10 @@ int main(int argc, char *argv[])
         double timing = (double(end-start)/CLOCKS_PER_SEC);
         double final_energy = crf.compute_energy(Q);
         double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
-        std::cout << "Fractional Energy: " << final_energy << '\n';
-        std::cout << "Integer Energy: " << discretized_energy << '\n';
+        double final_energy_true = crf.compute_energy_true(Q);
+        double discretized_energy_true = crf.assignment_energy_true(crf.currentMap(Q));
+        std::cout << "Fractional Energy: " << final_energy << ", True fractional enegy: " << final_energy_true << '\n';
+        std::cout << "Integer Energy: " << discretized_energy << ", True integer enegy: " << discretized_energy_true << '\n';
 
         write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
         save_map(Q, size, output_image_path, "Stereo_special");
