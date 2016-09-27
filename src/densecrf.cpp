@@ -2168,13 +2168,14 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
     return perfs;
 }
 
-// only calculate pairwise energies -- assumes single kernel
-void DenseCRF::compare_energies(const MatrixXf & Q, double & ph_energy, double & bf_energy, 
-		bool qp, bool ph_old) const {
-	if (pairwise_.size() != 1) {
-		std::cout << "pairwise-size: " << pairwise_.size() << " (should be 1)" << std::endl;
-		exit(1);
-	}
+// only calculate pairwise energies 
+void DenseCRF::compare_energies(MatrixXf & Q, double & ph_energy, double & bf_energy, 
+		bool qp, bool ph_old, bool subgrad) const {
+//	if (pairwise_.size() != 1) {
+//		std::cout << "pairwise-size: " << pairwise_.size() << " (should be 1)" << std::endl;
+//		exit(1);
+//	}
+    renormalize(Q);
 	if (!valid_probability(Q)) {
 		std::cout << "Q is not a valid probability!" << std::endl;
 		exit(1);
@@ -2197,12 +2198,17 @@ void DenseCRF::compare_energies(const MatrixXf & Q, double & ph_energy, double &
 	MatrixXi ind(M_, N_);
 	MatrixP dot_tmp;
 	double energy = 0;
+    MatrixXf ph_grad(M_, N_), bf_grad(M_, N_);
+    ph_grad.fill(0);
+    bf_grad.fill(0);
 
 	if (qp) {
 		// ph-energy
 		energy = 0;
         for (int k = 0; k < pairwise_.size(); ++k) {
-            pairwise_[k]->apply( tmp, Q );
+            //pairwise_[k]->apply( tmp, Q );
+            no_norm_pairwise[k]->apply( tmp, Q );   // must be no-normalized pairwise term
+            if (subgrad) ph_grad -= tmp;
         	energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
         	// constant term
         	tmp = -tmp;	// cancel the neg introdcued in apply
@@ -2217,6 +2223,7 @@ void DenseCRF::compare_energies(const MatrixXf & Q, double & ph_energy, double &
 		energy = 0;
         for (int k = 0; k < pairwise_.size(); ++k) {
     		no_norm_pairwise[k]->apply_bf( tmp, Q );
+            if (subgrad) bf_grad -= tmp;
     		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
     		// constant term
     		tmp = -tmp;	// cancel the neg introdcued in apply
@@ -2246,6 +2253,7 @@ void DenseCRF::compare_energies(const MatrixXf & Q, double & ph_energy, double &
     	        pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
     		}
     		//
+            if (subgrad) ph_grad -= tmp;
             energy -= dotProduct(Q, tmp, dot_tmp);
         }
 		ph_energy = energy;
@@ -2254,17 +2262,30 @@ void DenseCRF::compare_energies(const MatrixXf & Q, double & ph_energy, double &
 		energy = 0;
 		sortRows(Q, ind);
         for (int k = 0; k < pairwise_.size(); ++k) {
-            no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
+            if (ph_old) no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
+            else no_norm_pairwise[k]->apply_upper_minus_lower_bf_ord(tmp2, ind, Q);
     		// need to sort before dot-product
     		for(int i=0; i<tmp2.cols(); ++i) {
             	for(int j=0; j<tmp2.rows(); ++j) {
                 	tmp(j, ind(j, i)) = tmp2(j, i);
             	}
             }
+            if (subgrad) bf_grad -= tmp;
             energy -= dotProduct(Q, tmp, dot_tmp);
         }
 		bf_energy = energy;
 	}
+
+    if (subgrad) {  // compare subgradients
+        // should be coliner 
+        MatrixXf ph_bf = ph_grad - bf_grad;
+        double costh = dotProduct(ph_grad, bf_grad, dot_tmp)/
+            (sqrt(dotProduct(ph_grad, ph_grad, dot_tmp))*sqrt(dotProduct(bf_grad, bf_grad, dot_tmp)));
+        std::cout << "#cos-theta: " << costh << std::endl;
+        std::cout << "BF   :: mean=" << bf_grad.mean() << ",\tmax=" << bf_grad.maxCoeff() << ",\tmin=" << bf_grad.minCoeff() << std::endl;
+        std::cout << "PH   :: mean=" << ph_grad.mean() << ",\tmax=" << ph_grad.maxCoeff() << ",\tmin=" << ph_grad.minCoeff() << std::endl;
+        std::cout << "PH-BF:: mean=" << ph_bf.mean() << ",\tmax=" << ph_bf.maxCoeff() << ",\tmin=" << ph_bf.minCoeff() << std::endl;
+    }
 }
 
 MatrixXf DenseCRF::max_rounding(const MatrixXf &estimates) const {

@@ -65,7 +65,7 @@ void original_toy_problem(int argc, char *argv[]) {
     MatrixXf unaries = get_unaries(nb_variables, nb_labels);
     DenseCRF2D crf(w, h, unaries.rows());
     crf.setUnaryEnergy(unaries);
-    crf.addPairwiseGaussian(sigma, sigma, new PottsCompatibility(1));
+    crf.addPairwiseGaussian(sigma, sigma, new PottsCompatibility(10));
 
     //crf.damp_updates(0.5);
     MatrixXf Q = crf.unary_init();
@@ -86,16 +86,25 @@ void original_toy_problem(int argc, char *argv[]) {
     discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
     std::cout << "After LP: " << final_energy << ", " << discretized_energy << std::endl;
     //crf.sequential_inference();
-    final_energy = crf.compute_energy(Q);
-    discretized_energy = crf.assignment_energy(crf.currentMap(Q));
-    printf("Final: %lf, Proj: %lf\n", final_energy, discretized_energy);
+    final_energy = crf.compute_energy_true(Q);
+    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+    MatrixXf kt_Q = crf.interval_rounding(Q, 100);	// best of 100 KT rounding
+	double kt_energy = crf.assignment_energy_true(crf.currentMap(kt_Q));
+    printf("Final energy: %lf, best_Q: %lf, kt: %lf\n", final_energy, discretized_energy, kt_energy);
+
+    double ph_energy = 0, bf_energy = 0;
+    crf.compare_energies(Q, ph_energy, bf_energy, true, true);
+    std::cout << "# lp-pairwise: " << ph_energy << "," << bf_energy << std::endl;
+    MatrixXf int_Q = crf.max_rounding(Q);
+    crf.compare_energies(int_Q, ph_energy, bf_energy, true, true);
+    std::cout << "# int-pairwise: " << ph_energy << "," << bf_energy << std::endl;
 }
 
 void compare_bf_ph_energies(int argc, char *argv[]) {
     std::srand(1337); // Set the seed
 
 	if (argc < 6) {
-		printf("usage: %s w h sigma qp ph-old", argv[0]);
+		printf("usage: %s w h sigma qp ph-old subgrad", argv[0]);
         exit(1);
 	}
 	int w = atoi(argv[1]);
@@ -103,8 +112,10 @@ void compare_bf_ph_energies(int argc, char *argv[]) {
 	int sigma = atoi(argv[3]);
 	bool qp = atoi(argv[4]);
 	bool ph_old = atoi(argv[5]);	
+    bool subgrad = false;
+    if (argc > 6) subgrad = atoi(argv[6]);
 
-	printf("command: %s %d %d %d %d %d\n", argv[0], w, h, sigma, qp, ph_old);
+	printf("command: %s %d %d %d %d %d %d\n", argv[0], w, h, sigma, qp, ph_old, subgrad);
 
     int nb_variables = w*h;
     int nb_labels = 2;    
@@ -126,7 +137,7 @@ void compare_bf_ph_energies(int argc, char *argv[]) {
     double ph_energy = 0, bf_energy = 0;
     int level2 = levels/2;
     // all zeros
-    crf.compare_energies(Q, ph_energy, bf_energy, qp, ph_old);
+    crf.compare_energies(Q, ph_energy, bf_energy, qp, ph_old, subgrad);
     fout << nb_ones << "," << ph_energy << "," << bf_energy << std::endl;
     std::cout << "#" << nb_ones << "," << ph_energy << "," << bf_energy << std::endl;
     int loopmax = 1e6;
@@ -143,7 +154,7 @@ void compare_bf_ph_energies(int argc, char *argv[]) {
             Q(0, p) = 0;
             Q(1, p) = 1;
         }
-        crf.compare_energies(Q, ph_energy, bf_energy, qp, ph_old);
+        crf.compare_energies(Q, ph_energy, bf_energy, qp, ph_old, subgrad);
         fout << nb_ones << "," << ph_energy << "," << bf_energy << std::endl;
         std::cout << "#" << nb_ones << "," << ph_energy << "," << bf_energy << std::endl;
         Q.row(0).fill(1);    
@@ -167,7 +178,7 @@ void compare_bf_ph_energies(int argc, char *argv[]) {
             Q(1, p) = 0;
         }
         nb_ones = nb_variables - nb_zeros;
-        crf.compare_energies(Q, ph_energy, bf_energy, qp, ph_old);
+        crf.compare_energies(Q, ph_energy, bf_energy, qp, ph_old, subgrad);
         fout << nb_ones << "," << ph_energy << "," << bf_energy << std::endl;
         std::cout << "#" << nb_ones << "," << ph_energy << "," << bf_energy << std::endl;
         Q.row(0).fill(0);
@@ -175,18 +186,26 @@ void compare_bf_ph_energies(int argc, char *argv[]) {
     }
     // all ones    
     nb_ones = nb_variables;
-    crf.compare_energies(Q, ph_energy, bf_energy, qp, ph_old);
+    crf.compare_energies(Q, ph_energy, bf_energy, qp, ph_old, subgrad);
     fout << nb_ones << "," << ph_energy << "," << bf_energy << std::endl;
     std::cout << "#" << nb_ones << "," << ph_energy << "," << bf_energy << std::endl;
     fout.close();
-}
 
+    for (int i = 0; i < Q.cols(); ++i) {
+        for (int j = 0; j < Q.rows(); ++j) {
+            int r = randint(10);
+            Q(j, i) = float(r)/10.0;
+        }
+    }
+    crf.compare_energies(Q, ph_energy, bf_energy, qp, ph_old, subgrad);
+    std::cout << "#random-frac: " << ph_energy << "," << bf_energy << std::endl;
+}
 
 int main(int argc, char *argv[])
 {
-    original_toy_problem(argc, argv);
+    //original_toy_problem(argc, argv);
 
-    //compare_bf_ph_energies(argc, argv);
+    compare_bf_ph_energies(argc, argv);
 
     return 0;
 }

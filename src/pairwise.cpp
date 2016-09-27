@@ -208,6 +208,9 @@ void PairwisePotential::apply_upper_minus_lower_ord(MatrixXf & out, const Matrix
 	assert(Q.minCoeff() >= 0);  // values truncated to be [0,1], doesn't need to sum to 1
     out.fill(0);
 	kernel_->apply_upper_minus_lower_ord(out, Q);
+
+    //float alpha = 0.6;  // magic constant (bf-lp-energy/ph-lp-energy)
+    //out *= alpha;
 	
 	// Apply the compatibility
 	compatibility_->apply( out, out );
@@ -295,6 +298,41 @@ void PairwisePotential::apply_upper_minus_lower_bf(MatrixXf & out, const MatrixX
         // Lower
 		for(int c=0; c<ind.cols(); ++c) {
             for(int b=0; b<c; ++b) {
+                VectorXf featDiff = (sorted_features.col(c) - sorted_features.col(b));
+                single_label_out(c) -= exp(-featDiff.squaredNorm());
+            }
+        }
+
+		out.row(label) = single_label_out;
+	}
+	compatibility_->apply(out, out);
+}
+void PairwisePotential::apply_upper_minus_lower_bf_ord(MatrixXf & out, const MatrixXi & ind, 
+        const MatrixXf & Q) const {
+	MatrixXf const & features = kernel_->features();
+	MatrixXf sorted_features = features;
+	MatrixXf single_label_out(1, features.cols());
+
+	for(int label=0; label<ind.rows(); ++label) {
+		// Sort the features with the scores for this label
+		for(int j=0; j<features.cols(); ++j) {
+			sorted_features.col(j) = features.col(ind(label, j));
+		}
+
+		single_label_out.fill(0);
+		// brute-force computation
+		// Upper
+		for(int c=0; c<ind.cols(); ++c) {
+            for(int b=0; b<ind.cols(); ++b) {
+                if (Q(label, ind(label,b)) > Q(label, ind(label,c))) continue;    // equality considered
+                VectorXf featDiff = (sorted_features.col(c) - sorted_features.col(b));
+                single_label_out(c) += exp(-featDiff.squaredNorm());
+            }
+        }
+        // Lower
+		for(int c=0; c<ind.cols(); ++c) {
+            for(int b=0; b<ind.cols(); ++b) {
+                if (Q(label, ind(label,b)) < Q(label, ind(label,c))) continue;    // equality considered
                 VectorXf featDiff = (sorted_features.col(c) - sorted_features.col(b));
                 single_label_out(c) -= exp(-featDiff.squaredNorm());
             }
