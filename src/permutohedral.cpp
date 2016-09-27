@@ -578,7 +578,7 @@ void sliceSplitArray(float *out, float alpha, float up_to, split_array *in, bool
 }
 void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* in, int value_size) const {
 	// Shift all values by 1 such that -1 -> 0 (used for blurring)
-	split_array * values = new split_array[ (M_+2)*value_size ];
+	split_array * values = new split_array[ (M_+2)*value_size ];    // ALLOCATE ONCE!!
 	split_array * new_values = new split_array[ (M_+2)*value_size ];
 
 	// Alpha is a magic scaling constant (write Andrew if you really wanna understand this)

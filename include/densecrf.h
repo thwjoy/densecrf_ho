@@ -129,7 +129,7 @@ public:
 	// Perform the rounding based on argmaxes
 	MatrixXf max_rounding(const MatrixXf & estimates) const;
 	// Perform randomized roundings
-	MatrixXf interval_rounding(const MatrixXf & estimates) const;
+	MatrixXf interval_rounding(const MatrixXf & estimates, int nb_random_rounding = 10) const;
 
 	// Run the inference with gradually lower lambda values.
 	MatrixXf grad_inference(const MatrixXf & init) const;

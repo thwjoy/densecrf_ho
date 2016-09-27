@@ -34,38 +34,60 @@ MatrixXf get_unaries(int nb_variables, int nb_labels){
     return unaries;
 }
 
-void original_toy_problem() {
+void original_toy_problem(int argc, char *argv[]) {
     std::srand(1337); // Set the seed
-    int nb_variables = 100;
-    int nb_labels = 5;
-    int nb_features = 1;
+    if (argc < 4) {
+		printf("usage: %s w h sigma", argv[0]);
+        exit(1);
+	}
+	int w = atoi(argv[1]);
+	int h = atoi(argv[2]);
+	int sigma = atoi(argv[3]);
+    // lp inference params
+	LP_inf_params lp_params;
+	if(argc > 4) lp_params.prox_max_iter = atoi(argv[4]);
+	if(argc > 5) lp_params.fw_max_iter = atoi(argv[5]);
+	if(argc > 6) lp_params.qp_max_iter = atoi(argv[6]);
+	if(argc > 7) lp_params.prox_reg_const = atof(argv[7]);
+	if(argc > 8) lp_params.dual_gap_tol = atof(argv[8]);
+	if(argc > 9) lp_params.qp_tol = atof(argv[9]);
+	if(argc > 10) lp_params.best_int = atoi(argv[10]);
+
+    std::cout << "## COMMAND: " << argv[0] << " " << w << " " << h << " " << sigma << " "
+        << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
+        << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
+        << lp_params.best_int << std::endl;
+
+    int nb_variables = w*h;
+    int nb_labels = 2;    
     float alpha = 10;
 
     MatrixXf unaries = get_unaries(nb_variables, nb_labels);
-    //std::vector<MatrixXf*> all_pairwise = get_pairwise(nb_variables, nb_features);
-
-    AlphaCRF crf(1, nb_variables, nb_labels, alpha); // width, height, nb_labels, alpha
-    crf.keep_track_of_steps();
-    //crf.compute_exact_marginals();
-
+    DenseCRF2D crf(w, h, unaries.rows());
     crf.setUnaryEnergy(unaries);
-    for (int filter = 0; filter < nb_features; filter++) {
-        // crf.addPairwiseEnergy(*(all_pairwise[filter]), new PottsCompatibility(1));
-        crf.addPairwiseGaussian(5, 5, new PottsCompatibility(1));
-    }
-
-    LP_inf_params lp_params;
-	lp_params.prox_max_iter = 10;
+    crf.addPairwiseGaussian(sigma, sigma, new PottsCompatibility(1));
 
     //crf.damp_updates(0.5);
-    MatrixXf Q = unaries;
+    MatrixXf Q = crf.unary_init();
+    double final_energy = crf.compute_energy_true(Q);
+    double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+    std::cout << "Before QP: " << final_energy << ", " << discretized_energy << std::endl;
     Q = crf.qp_inference(unaries);
-    Q = crf.concave_qp_cccp_inference(Q);
+    final_energy = crf.compute_energy_true(Q);
+    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+    std::cout << "After QP: " << final_energy << ", " << discretized_energy << std::endl;
+//    Q = crf.concave_qp_cccp_inference(Q);
+//    final_energy = crf.compute_energy_true(Q);
+//    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+//    std::cout << "After QP-CCCP: " << final_energy << ", " << discretized_energy << std::endl;
     //Q = crf.lp_inference(Q, false);
     Q = crf.lp_inference_prox(Q, lp_params);
+    final_energy = crf.compute_energy_true(Q);
+    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+    std::cout << "After LP: " << final_energy << ", " << discretized_energy << std::endl;
     //crf.sequential_inference();
-    double final_energy = crf.compute_energy(Q);
-    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    final_energy = crf.compute_energy(Q);
+    discretized_energy = crf.assignment_energy(crf.currentMap(Q));
     printf("Final: %lf, Proj: %lf\n", final_energy, discretized_energy);
 }
 
@@ -162,9 +184,9 @@ void compare_bf_ph_energies(int argc, char *argv[]) {
 
 int main(int argc, char *argv[])
 {
-    //original_toy_problem();
+    original_toy_problem(argc, argv);
 
-    compare_bf_ph_energies(argc, argv);
+    //compare_bf_ph_energies(argc, argv);
 
     return 0;
 }

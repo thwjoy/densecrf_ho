@@ -99,6 +99,7 @@ int main(int argc, char *argv[])
     std::string left_image_path = stereo_folder + "imL.png";
     std::string right_image_path = stereo_folder + "imR.png";
     std::string output_image_path = stereo_folder + "out_" + method + ".bmp";
+    std::string output_image_path_kt = stereo_folder + "out_" + method + "_kt.bmp";
 #endif
     std::string unary_path = stereo_folder + "unary.txt";
 
@@ -166,17 +167,24 @@ int main(int argc, char *argv[])
 		crf.setPairwisePottsWeight(up_ratio, Q);
 #endif        
         double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-        printf("Before QP: %lf\n", discretized_energy);
-        Q = crf.qp_inference(Q);
-        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-        printf("After QP: %lf\n", discretized_energy);
-        Q = crf.concave_qp_cccp_inference(Q);
-        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-        printf("After QP concave: %lf\n", discretized_energy);
+//        printf("Before QP: %lf\n", discretized_energy);
+//        Q = crf.qp_inference(Q);
+//        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+//        printf("After QP: %lf\n", discretized_energy);
+//        Q = crf.concave_qp_cccp_inference(Q);
+//        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+//        printf("After QP concave: %lf\n", discretized_energy);
 
         MatrixXf int_Q = crf.max_rounding(Q);
         std::cout << "# QP: " << crf.compute_energy_true(int_Q) << ", LP: " << crf.compute_energy_LP(int_Q) 
             << ", int: " << crf.assignment_energy_true(crf.currentMap(int_Q)) << std::endl;
+
+//        double ph_energy = 0, bf_energy = 0;
+//        crf.compare_energies(int_Q, ph_energy, bf_energy, true, false);
+//        std::cout << "# qp: " << ph_energy << "," << bf_energy << std::endl;
+//        crf.compare_energies(int_Q, ph_energy, bf_energy, false, false);
+//        std::cout << "# lp: " << ph_energy << "," << bf_energy << std::endl;
+//        exit(1);
         //Q = crf.lp_inference(Q,false);
         //Q = crf.lp_inference_new(Q);
         Q = crf.lp_inference_prox(Q, lp_params);
@@ -245,6 +253,24 @@ int main(int argc, char *argv[])
 
         write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
         save_map(Q, size, output_image_path, "Stereo_special");
+
+        MatrixXf kt_Q = crf.interval_rounding(Q, 100);	// best of 100 KT rounding
+		VectorXs kt_l = crf.currentMap(kt_Q);
+		std::cout <<"#best_Q rounded: " << discretized_energy << " (KT-rounding: " << 
+			crf.assignment_energy(kt_l) << ")\n";	
+		std::cout <<"#best_Q rounded-true: " << discretized_energy_true << " (KT-rounding: " << 
+			crf.assignment_energy_true(kt_l) << ")\n";	
+        save_map(kt_Q, size, output_image_path_kt, "Stereo_special");
+
+//		// dump Q
+//		std::ofstream fout("out_q.txt");
+//		fout << Q << std::endl;
+//		fout.close();
+//		// dump kt_l
+//		fout.open("out_kt_l.txt");
+//		fout << kt_l << std::endl;
+//		fout.close();
+
     }
 
     return 0;

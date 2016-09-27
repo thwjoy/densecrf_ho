@@ -1295,20 +1295,20 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
                 // Add upper minus lower
                 // The divide and conquer way
                 /*start = clock();*/
-                no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
-                tmp2.fill(0);
-                for(i=0; i<tmp.cols(); ++i) {
-                    for(j=0; j<tmp.rows(); ++j) {
-                        tmp2(j, ind(j, i)) = tmp(j, i);
-                    }
-                }
+//                no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
+//                tmp2.fill(0);
+//                for(i=0; i<tmp.cols(); ++i) {
+//                    for(j=0; j<tmp.rows(); ++j) {
+//                        tmp2(j, ind(j, i)) = tmp(j, i);
+//                    }
+//                }
                 /*end = clock();
                 float perf_timing = (double(end-start)/CLOCKS_PER_SEC);
                 printf("DC: It: %d | id: %d | time: %f\n", it, k, perf_timing);*/
 
                 // With the new discretized split computations
                 // start = clock();
-                //pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
+                pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
                 /*end = clock();
                 perf_timing = (double(end-start)/CLOCKS_PER_SEC);
                 printf("ORD: It: %d | id: %d | time: %f\n", it, k, perf_timing);*/
@@ -1462,10 +1462,18 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
 
     // Compute the value of the energy
     assert(valid_probability(Q));
-    double energy = 0, best_energy = std::numeric_limits<double>::max();
-    double int_energy = assignment_energy(currentMap(Q));
+    double energy = 0, best_energy = std::numeric_limits<double>::max(), best_int_energy = std::numeric_limits<double>::max();
+    double int_energy = assignment_energy_true(currentMap(Q));
     // printf("Initial int energy in the LP: %f\n", int_energy);
 
+    bool adaptive = false;
+	float delta_k = 1e6;
+	float delta = 1e3;
+	float beta = 0.5;
+	float lambda = 1.5;
+	float gamma_k = 1.9;
+	float alpha_k = 1;
+	double f_target = 0;
 
     clock_t start, end;
 
@@ -1494,18 +1502,66 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
             grad -= tmp2;
         }
 
-        // Print previous iteration energy
-        printf("%4d: %10.3f / %10.3f\n", it-1, energy, int_energy);
-        if( energy < best_energy) {
-            best_Q = Q;
-            best_energy = energy;
-        }
         // printf("%5d: %f\n", it-1, energy);
+        
+        if (adaptive) {
+			if (it == 1) delta_k = energy/1.1;
+			f_target = best_energy - delta_k;
+			alpha_k = (float)(gamma_k * (energy - f_target)/dotProduct(grad, grad, dot_tmp));
 
-        // Sub-gradient descent step
-        // std::cout<<grad.block(0,0,5,5)<<std::endl<<std::endl;
-        // std::cout<<Q.block(0,0,5,5)<<std::endl<<std::endl;
-        Q -= grad/(it+1e5);
+			Q -= alpha_k * grad;	// subgrad-descent
+
+			// update delta_k after projection					
+			double new_energy = compute_energy_LP(Q);
+			delta_k = (new_energy <= f_target) ? lambda * delta_k : std::max(beta * delta_k, delta);
+
+            printf("%4d: %10.3f / %10.3f / %10.3f (%10.3f, %10.3f, %5.3f, %5.10f)\n", it-1, energy, 
+					int_energy, best_energy, f_target, new_energy, delta_k, alpha_k);
+		} else {
+            // Print previous iteration energy
+            //printf("%4d: %10.3f / %10.3f\n", it-1, energy, int_energy);
+//          if( energy < best_energy) {
+//                best_Q = Q;
+//              best_energy = energy;
+//          }
+
+            // Sub-gradient descent step
+            //Q -= grad/(it+1e5);
+
+            // line-search
+            float min = 0.0;
+            float max = 1e-3;
+            double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
+            int split = 0;
+            min_int_energy = assignment_energy_true(currentMap(Q));
+            max_int_energy = assignment_energy_true(currentMap(Q-max*grad));
+            do {
+                split++;
+                double left_third = (2*min + max)/3.0;
+                double right_third = (min + 2*max)/3.0;
+                left_third_int_energy = assignment_energy_true(currentMap(Q-left_third*grad));
+                right_third_int_energy = assignment_energy_true(currentMap(Q-right_third*grad));
+                if(left_third_int_energy < right_third_int_energy) {
+                    max = right_third;
+                    max_int_energy = right_third_int_energy;
+                    int_energy = left_third_int_energy;
+                } else {
+                    min = left_third;
+                    min_int_energy = left_third_int_energy;
+                    int_energy = right_third_int_energy;
+                }
+            } while(max-min > 0.00001);
+    		
+			if(int_energy < best_int_energy) {
+                best_Q = Q;
+                best_int_energy = int_energy;
+            }
+            printf("%3d: %f / %f / %f [%f, %f, %d]\n", it,energy, int_energy, best_int_energy, max,min, split);
+            
+			// sub-grad-step
+			Q -= 0.5*(max+min)*grad;
+    		//                
+        }
 
         // Project current estimates on valid space
         sortCols(Q, ind);
@@ -1531,10 +1587,10 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         }
         Q = tmp;
 
-        int_energy = assignment_energy(currentMap(Q));
+        int_energy = assignment_energy_true(currentMap(Q));
         renormalize(Q);
         assert(valid_probability_debug(Q));
-    } while(it<100);
+    } while(it<10);
     std::cout <<"final projected energy: " << int_energy << "\n";
 
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
@@ -1616,14 +1672,14 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #else
 	energy = compute_energy_LP(Q);
 #endif
-    if (energy > int_energy) {  // choose the best initialization
-        Q = max_rounding(Q);
-#if BRUTE_FORCE        
-        energy = compute_energy_LP(Q, no_norm_pairwise, pairwise_.size());
-#else
-    	energy = compute_energy_LP(Q);
-#endif
-    }
+//    if (energy > int_energy) {  // choose the best initialization -- cannot compare directly
+//        Q = max_rounding(Q);
+//#if BRUTE_FORCE        
+//        energy = compute_energy_LP(Q, no_norm_pairwise, pairwise_.size());
+//#else
+//    	energy = compute_energy_LP(Q);
+//#endif
+//    }
 	best_energy = energy;
 	best_int_energy = int_energy;
     printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f\n", energy, int_energy, qp_energy);
@@ -1685,6 +1741,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			// initialization
 			s_tQ.fill(0);
 
+            //if (pit == 1) { // only compute beta and gamma in the first iteration
 			// QP-gamma -- \cite{NNQP solver Xiao and Chen 2014}
 			// case-1: solve for gamma using qp solver! 
 			// 1/2 * gamma^T * C * gamma - gamma^T * H
@@ -1744,6 +1801,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			for (int j = 0; j < M_; ++j) {
 				beta_mat.row(j) = beta;
 			}
+            //}
 
 			// case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
 			Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + old_Q;	// Q may be infeasible --> but no problem
@@ -1788,8 +1846,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		   	primal_energy += dotProduct(unary, Q, dot_tmp);
 			primal_energy -= dotProduct(s_tQ, Q, dot_tmp);	// cancel the neg in s_tQ
 			assert(dual_gap == (dual_energy - primal_energy));
-			//
-			printf("%4d: [%10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, -dual_energy, primal_energy);
+			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, primal_energy+dual_energy, 
+                    -dual_energy, primal_energy);
             //if (dual_gap < 0) {   // may become negative due to PH approximations!
             //    std::cout << "\nERROR: Dual-gap cannot be negative!\n";
             //    exit(1);
@@ -1797,10 +1855,67 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			if (dual_gap <= tol) break;	// stopping condition
 
 			// optimal fw step size
-			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));   // may be a constant factor away?
 			delta = std::min(std::max(delta, (float)0.0), (float)1.0);
 			assert(delta > 0);
 			printf("%1.10f]\n", delta);
+
+//            /////////////
+// 			// do line search for delta		
+// 			int sz = 10;		
+// 			float delta_ls = 0;		
+// 			double dual_energy1 = std::numeric_limits<double>::max(), primal_energy1 = primal_energy;		
+// 			for (int i = 0; i <= sz; ++i) {		
+// 				float d = (float)i/sz;		
+//                tmp = s_tQ - alpha_tQ;
+//                tmp *= d;
+// 				MatrixXf t1 = alpha_tQ + tmp;	// tmp = alpha_tQ + d * (s_tQ - alpha_tQ);		
+// 				t1 = lambda * (t1 + beta_mat + gamma - unary) + old_Q;		
+// 				tmp2 = t1 - old_Q;		
+// 				double de = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, old_Q, dot_tmp) / lambda;		
+// 				de -= beta.sum();		
+// 				double pe = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
+//                MatrixXf rescaled_t1 = t1;
+//                MatrixXf s_t1 = t1;
+//                s_t1.fill(0);
+//#if BRUTE_FORCE
+//            	sortRows(t1, ind);
+//#else
+//    			// new PH implementation doesn't work with Q values outside [0,1] - or in fact truncates to be within [0,1]
+//    	    	// rescale Q to be within [0,1] -- order of Q values preserved!
+//    		    rescale(rescaled_t1, t1);
+//#endif
+//			    // subgradient lower minus upper
+//		    	// Pairwise
+//                for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+//#if BRUTE_FORCE
+//    				// brute-force computation
+//            	    no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
+//                  	//no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp2, ind);
+//                	for(int ii=0; ii<tmp2.cols(); ++ii) {
+//                    	for(int j=0; j<tmp2.rows(); ++j) {
+//                        	tmp(j, ind(j, ii)) = tmp2(j, ii);
+//                    	}
+//                	}
+//#else
+//		    		// new PH implementation
+//	    			// rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
+//                    pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_t1);	
+//#endif
+//                    s_t1 += tmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
+//                }
+//		   	    pe += dotProduct(unary, t1, dot_tmp);   // unary
+//                pe -= dotProduct(s_t1, t1, dot_tmp);    // pairwise
+// 			    //printf("\ninside: (%10.3f, %10.3f, %1.10f)", -de, pe, d);
+// 				if (de < dual_energy1) {		
+// 					delta_ls = d;		
+// 					dual_energy1 = de;		
+// 					primal_energy1 = pe;		
+// 				}		
+// 			}	
+// 			printf("##%4d: (%10.3f, %10.3f, %1.10f) ", pit-1, -dual_energy1, primal_energy1, delta_ls);
+//            if (dual_energy < dual_energy1) std::cout << "\nERROR: step size is not optimal!";
+//            //////////////////////
 
 			// update alpha_tQ
 			tmp = s_tQ - alpha_tQ;
@@ -1820,19 +1935,21 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #else
 		energy = compute_energy_LP(Q);
 #endif
+        int_energy = assignment_energy_true(currentMap(Q));
+        qp_energy = compute_energy_true(Q);
+
         if (best_int) {
-            int_energy = assignment_energy_true(currentMap(Q));
 		    if( int_energy < best_int_energy) {
                 best_Q = Q;
                 best_int_energy = int_energy;
             }
-            printf("%4d: %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, best_int_energy);
+            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, qp_energy, best_int_energy);
         } else {
     		if( energy < best_energy) {
                 best_Q = Q;
                 best_energy = energy;
             }
-            printf("%4d: %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, best_energy);
+            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, qp_energy, best_energy);
         }
 
     } while(it<maxiter);
@@ -2160,9 +2277,7 @@ MatrixXf DenseCRF::max_rounding(const MatrixXf &estimates) const {
     return rounded;
 }
 
-MatrixXf DenseCRF::interval_rounding(const MatrixXf &estimates) const {
-    int nb_random_rounding = 10;
-
+MatrixXf DenseCRF::interval_rounding(const MatrixXf &estimates, int nb_random_rounding) const {
     MatrixXf best_rounded;
     double best_energy = 1e18;
 

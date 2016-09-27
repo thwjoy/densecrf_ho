@@ -335,6 +335,71 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     delete[] img;
 }
 
+void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
+                      Potts_weight_set parameters, std::string path_to_output,
+                      std::string dataset_name, int argc, char* argv[]) {
+
+    // lp inference params
+	LP_inf_params lp_params;
+	if(argc > 1) lp_params.prox_max_iter = atoi(argv[1]);
+	if(argc > 2) lp_params.fw_max_iter = atoi(argv[2]);
+	if(argc > 3) lp_params.qp_max_iter = atoi(argv[3]);
+	if(argc > 4) lp_params.prox_reg_const = atof(argv[4]);
+	if(argc > 5) lp_params.dual_gap_tol = atof(argv[5]);
+	if(argc > 6) lp_params.qp_tol = atof(argv[6]);
+	if(argc > 7) lp_params.best_int = atoi(argv[7]);
+
+    img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
+    // Load the unaries potentials for our image.
+    MatrixXf unaries = load_unary(path_to_unaries, size);
+    unsigned char * img = load_image(path_to_image, size);
+
+    // Load a crf
+    DenseCRF2D crf(size.width, size.height, unaries.rows());
+    std::cout << "CRF: W = " << size.width << ", H = " << size.height << ", L = " << unaries.rows() << std::endl;
+
+    crf.setUnaryEnergy(unaries);
+    crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
+                            new PottsCompatibility(parameters.spatial_potts_weight));
+    crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
+                             parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
+                             img, new PottsCompatibility(parameters.bilat_potts_weight));
+    //crf.compute_kl_divergence();
+    MatrixXf init = crf.unary_init();
+    clock_t start, end;
+    MatrixXf Q = crf.qp_inference(init);
+    Q = crf.concave_qp_cccp_inference(Q);
+
+    double timing = -1;
+    /*for(int it=0; it<20; it++) {
+      std::string partial_out = path_to_output + "-" + std::to_string(it)+ ".bmp";
+      Q = crf.lp_inference(Q);
+      double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+      double final_energy = crf.compute_energy(Q);
+      write_down_perf(timing, final_energy, discretized_energy, partial_out);
+      save_map(Q, size, partial_out, dataset_name);
+      }/**/
+    start = clock();
+    srand(start);
+    
+    Q = crf.lp_inference_prox(Q, lp_params);
+    end = clock();
+    timing = (double(end-start)/CLOCKS_PER_SEC);
+    double final_energy = crf.compute_energy(Q);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
+    double final_energy_true = crf.compute_energy_true(Q);
+    double discretized_energy_true = crf.assignment_energy_true(crf.currentMap(Q));
+    std::cout << "QP: " << final_energy_true << ", int: " << discretized_energy_true << std::endl;
+    std::cout << "#TRUE QP: " << final_energy_true << ", int: " << discretized_energy_true << std::endl;
+// std::cout << "Time taken: " << timing << '\n';
+// std::cout << "Done with inference"<< '\n';
+// Perform the MAP estimation on the fully factorized distribution
+// and write the results to an image file with a dumb color code
+    save_map(Q, size, path_to_output, dataset_name);
+    delete[] img;
+}
+
 void gradually_minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
                                    Potts_weight_set parameters, std::string path_to_output,
                                    std::string dataset_name) {
