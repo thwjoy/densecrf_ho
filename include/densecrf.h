@@ -168,6 +168,9 @@ public: /* Debugging functions */
 	// Compute the KL-divergence of a set of marginals
 	double klDivergence( const MatrixXf & Q ) const;
 
+    // KL-divergence between two probabilities KL(Q||P)
+    double klDivergence(const MatrixXf & Q, const MatrixXf & P) const;
+
     // Compute the energy associated with the QP relaxation (const - true)
     double compute_energy( const MatrixXf & Q) const;
 

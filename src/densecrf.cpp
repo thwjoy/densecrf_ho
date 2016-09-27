@@ -1654,7 +1654,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     double energy = 0, best_energy = std::numeric_limits<double>::max(), 
 		   best_int_energy = std::numeric_limits<double>::max();
     double int_energy = assignment_energy_true(currentMap(Q));
-    double qp_energy = compute_energy_true(Q);
+    double kl = klDivergence(Q, max_rounding(Q));
 #if BRUTE_FORCE	
 	// Create copies of the original pairwise since we don't want normalization
     PairwisePotential** no_norm_pairwise;
@@ -1682,7 +1682,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 //    }
 	best_energy = energy;
 	best_int_energy = int_energy;
-    printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f\n", energy, int_energy, qp_energy);
+    printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f\n", energy, int_energy, kl);
 
 	int maxiter = params.prox_max_iter;
     bool best_int = params.best_int;
@@ -1936,20 +1936,20 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		energy = compute_energy_LP(Q);
 #endif
         int_energy = assignment_energy_true(currentMap(Q));
-        qp_energy = compute_energy_true(Q);
+        kl = klDivergence(Q, max_rounding(Q));
 
         if (best_int) {
 		    if( int_energy < best_int_energy) {
                 best_Q = Q;
                 best_int_energy = int_energy;
             }
-            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, qp_energy, best_int_energy);
+            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_int_energy);
         } else {
     		if( energy < best_energy) {
                 best_Q = Q;
                 best_energy = energy;
             }
-            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, qp_energy, best_energy);
+            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
         }
 
     } while(it<maxiter);
@@ -2575,6 +2575,18 @@ double DenseCRF::klDivergence( const MatrixXf & Q ) const {
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, Q );
         kl += (Q.array()*tmp.array()).sum();
+    }
+    return kl;
+}
+
+double DenseCRF::klDivergence( const MatrixXf & Q, const MatrixXf & P ) const {
+    double kl = 0;
+    assert(valid_probability_debug(Q));
+    assert(valid_probability_debug(P));
+    for (int i = 0; i < Q.cols(); ++i) {
+        for (int j = 0; j < Q.rows(); ++j) {
+            kl += std::max(Q(j, i), 1e-20f) * log(std::max(Q(j, i), 1e-20f) / std::max(P(j, i), 1e-20f));
+        }
     }
     return kl;
 }
