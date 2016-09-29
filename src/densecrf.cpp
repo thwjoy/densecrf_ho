@@ -70,6 +70,7 @@ void DenseCRF::setPairwisePottsWeight(float ratio, const MatrixXf & Q) {
 	std::cout << "#p_weight: " << p_weight << std::endl;
 	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 		pairwise_[k]->setParameters(pairwise_[k]->parameters() * p_weight);
+		no_norm_pairwise_[k]->setParameters(no_norm_pairwise_[k]->parameters() * p_weight);
 	}
 }
 void DenseCRF::addPairwiseEnergy (const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type) {

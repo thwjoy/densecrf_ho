@@ -8,7 +8,7 @@
 
 #define NUM_LABELS 4
 
-#define RESCALED false
+#define RESCALED true
 
 MatrixXf get_unaries(const unsigned char * left_img, const unsigned char * right_img, img_size & size){
     MatrixXf unaries(NUM_LABELS, size.height * size.width);
@@ -95,6 +95,7 @@ int main(int argc, char *argv[])
     std::string left_image_path = stereo_folder + "imL_025.png";
     std::string right_image_path = stereo_folder + "imR_025.png";
     std::string output_image_path = stereo_folder + "out_025_" + method + ".bmp";
+    std::string output_image_path_kt = stereo_folder + "out_025_" + method + "_kt.bmp";
 #else     
     std::string left_image_path = stereo_folder + "imL.png";
     std::string right_image_path = stereo_folder + "imR.png";
@@ -179,14 +180,13 @@ int main(int argc, char *argv[])
         std::cout << "# QP: " << crf.compute_energy_true(int_Q) << ", LP: " << crf.compute_energy_LP(int_Q) 
             << ", int: " << crf.assignment_energy_true(crf.currentMap(int_Q)) << std::endl;
 
-//        double ph_energy = 0, bf_energy = 0;
-//        crf.compare_energies(int_Q, ph_energy, bf_energy, true, false);
-//        std::cout << "# qp: " << ph_energy << "," << bf_energy << std::endl;
-//        crf.compare_energies(int_Q, ph_energy, bf_energy, false, false);
-//        std::cout << "# lp: " << ph_energy << "," << bf_energy << std::endl;
-//        exit(1);
+        //double ph_energy = 0, bf_energy = 0;
+        //crf.compare_energies(int_Q, ph_energy, bf_energy, false, false, true);
+        //std::cout << "# lp: " << ph_energy << "," << bf_energy << std::endl;
+        //exit(1);
         //Q = crf.lp_inference(Q,false);
         //Q = crf.lp_inference_new(Q);
+
         Q = crf.lp_inference_prox(Q, lp_params);
         discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
         printf("After LP: %lf\n", discretized_energy);
