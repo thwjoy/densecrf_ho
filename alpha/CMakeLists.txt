@@ -1,4 +1,4 @@
-include_directories(../external/ProbImage ../external/ppm)
+include_directories(../external/ProbImage ../external/ppm ../external/ibfs ../external/ )
 
 find_package(OpenCV REQUIRED)
 
@@ -11,6 +11,9 @@ endif()
 
 # Libraries
 add_library(eigen_utils eigen_utils.cpp)
+
+add_library(runibfs runibfs.cpp)
+target_link_libraries(runibfs ibfs)
 
 add_library(newton_cccp newton_cccp.cpp)
 target_link_libraries(newton_cccp eigen_utils)
@@ -38,7 +41,7 @@ add_executable(example_inference  example_inference.cpp)
 target_link_libraries(example_inference inference file_storage)
 
 add_executable(toy-problem toy-problem.cpp)
-target_link_libraries(toy-problem inference)
+target_link_libraries(toy-problem inference runibfs)
 
 add_executable(evaluate evaluate_on_dataset.cpp)
 target_link_libraries(evaluate inference file_storage color_to_label evaluation)

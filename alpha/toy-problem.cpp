@@ -1,6 +1,7 @@
 #include "toy-problem.hpp"
 #include "brute_force.hpp"
 #include "alpha_crf.hpp"
+#include "runibfs.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -61,33 +62,38 @@ void original_toy_problem(int argc, char *argv[]) {
     int nb_variables = w*h;
     int nb_labels = 2;    
     float alpha = 10;
+    float weight = 1;
 
     MatrixXf unaries = get_unaries(nb_variables, nb_labels);
     DenseCRF2D crf(w, h, unaries.rows());
     crf.setUnaryEnergy(unaries);
-    crf.addPairwiseGaussian(sigma, sigma, new PottsCompatibility(1));
+    crf.addPairwiseGaussian(sigma, sigma, new PottsCompatibility(weight));
 
-    //crf.damp_updates(0.5);
+    // run maxflow
+    VectorXs labels(nb_variables);
+    double flow = testIBFS(labels, h, w, unaries, sigma, weight);
+    std::cout << "# IBFS:: flow = " << flow << ", energy = " << crf.assignment_energy_true(labels) << std::endl;
+
     MatrixXf Q = crf.unary_init();
     double final_energy = crf.compute_energy_true(Q);
     double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
     std::cout << "Init: " << final_energy << ", " << discretized_energy << std::endl;
 
-    Q = crf.qp_inference(unaries);
-    final_energy = crf.compute_energy_true(Q);
-    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-    std::cout << "After QP: " << final_energy << ", " << discretized_energy << std::endl;
+//    Q = crf.qp_inference(unaries);
+//    final_energy = crf.compute_energy_true(Q);
+//    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+//    std::cout << "After QP: " << final_energy << ", " << discretized_energy << std::endl;
 
 //    Q = crf.concave_qp_cccp_inference(Q);
 //    final_energy = crf.compute_energy_true(Q);
 //    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
 //    std::cout << "After QP-CCCP: " << final_energy << ", " << discretized_energy << std::endl;
 
-    //Q = crf.lp_inference(Q, false);
-    Q = crf.lp_inference_prox(Q, lp_params);
-    final_energy = crf.compute_energy_true(Q);
-    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-    std::cout << "After LP: " << final_energy << ", " << discretized_energy << std::endl;
+//    //Q = crf.lp_inference(Q, false);
+//    Q = crf.lp_inference_prox(Q, lp_params);
+//    final_energy = crf.compute_energy_true(Q);
+//    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+//    std::cout << "After LP: " << final_energy << ", " << discretized_energy << std::endl;
 
     //crf.sequential_inference();
     final_energy = crf.compute_energy_true(Q);
@@ -108,6 +114,7 @@ void original_toy_problem(int argc, char *argv[]) {
     std::ofstream fout("Q-dump.out");
     fout << "#fract-Q#\n" << Q << std::endl;
     fout << "#int-Q#\n" << int_Q << std::endl;
+    fout << "#ibfs-labels#\n" << labels << std::endl;
     fout.close();
 }
 
