@@ -371,14 +371,6 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     Q = crf.concave_qp_cccp_inference(Q);
 
     double timing = -1;
-    /*for(int it=0; it<20; it++) {
-      std::string partial_out = path_to_output + "-" + std::to_string(it)+ ".bmp";
-      Q = crf.lp_inference(Q);
-      double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
-      double final_energy = crf.compute_energy(Q);
-      write_down_perf(timing, final_energy, discretized_energy, partial_out);
-      save_map(Q, size, partial_out, dataset_name);
-      }/**/
     start = clock();
     srand(start);
     
@@ -390,7 +382,7 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     write_down_perf(timing, final_energy, discretized_energy, path_to_output);
     double final_energy_true = crf.compute_energy_true(Q);
     double discretized_energy_true = crf.assignment_energy_true(crf.currentMap(Q));
-    std::cout << "QP: " << final_energy_true << ", int: " << discretized_energy_true << std::endl;
+    std::cout << "QP: " << final_energy << ", int: " << discretized_energy << std::endl;
     std::cout << "#TRUE QP: " << final_energy_true << ", int: " << discretized_energy_true << std::endl;
 // std::cout << "Time taken: " << timing << '\n';
 // std::cout << "Done with inference"<< '\n';

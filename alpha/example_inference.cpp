@@ -2,15 +2,17 @@
 #include "inference.hpp"
 
 int main(int argc, char* argv[]) {
-    std::string dataset_name = "MSRC";
+    std::string dataset_name = "Pascal2010";
     std::string path_to_unaries;
     std::string path_to_image;
     if (dataset_name=="MSRC") {
         path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/5_14_s.c_unary";
         path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/5_14_s.bmp";
     } else if(dataset_name == "Pascal2010"){
-        path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/logit_unaries/2008_000645.c_unary";
-        path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/JPEGImages/2008_000645.jpg";
+        //path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/logit_unaries/2008_000645.c_unary";
+        path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/logit_unaries/2007_007470.c_unary";
+        //path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/JPEGImages/2008_000645.jpg";
+        path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/JPEGImages/2007_007470.jpg";
     }
 
 
@@ -42,8 +44,8 @@ int main(int argc, char* argv[]) {
     // minimize_LR_QP(path_to_image, path_to_unaries, params, path_to_qplroutput, dataset_name);
     // // std::cout << "CCCP QP" << '\n';n
     // // minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
-    // std::cout << "Concave QP CCCP" << '\n';
-    // minimize_concave_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_ccv_output, dataset_name);
+    //std::cout << "Concave QP CCCP" << '\n';
+    //minimize_concave_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_ccv_output, dataset_name);
     //std::cout << "LP SG line search" << '\n';
     //minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_sg_line_output, dataset_name, false);
     // std::cout << "LP CG line search" << '\n';

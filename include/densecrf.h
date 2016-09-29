@@ -67,6 +67,9 @@ protected:
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
 
+	// Store all pairwise potentials -- no-normalization: used to caluclate energy 
+	std::vector<PairwisePotential*> no_norm_pairwise_;
+
 	// How to stop inference
 	bool compute_kl = false;
 
@@ -86,6 +89,8 @@ public:
 
 	// Add your own favorite pairwise potential (ownership will be transfered to this class)
 	void addPairwiseEnergy( PairwisePotential* potential );
+    // add non-norm-pairwise
+	void addNoNormPairwiseEnergy( PairwisePotential* potential );
 
     // set potts compatibility weight such that ratio *  unary enegy = pairwise energy (given Q)
 	void setPairwisePottsWeight(float ratio, const MatrixXf & Q);

@@ -73,9 +73,13 @@ void DenseCRF::setPairwisePottsWeight(float ratio, const MatrixXf & Q) {
 void DenseCRF::addPairwiseEnergy (const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type) {
     assert( features.cols() == N_ );
     addPairwiseEnergy( new PairwisePotential( features, function, kernel_type, normalization_type ) );
+    addNoNormPairwiseEnergy( new PairwisePotential( features, function, kernel_type, NO_NORMALIZATION ) );
 }
 void DenseCRF::addPairwiseEnergy ( PairwisePotential* potential ){
     pairwise_.push_back( potential );
+}
+void DenseCRF::addNoNormPairwiseEnergy ( PairwisePotential* potential ){
+    no_norm_pairwise_.push_back( potential );
 }
 void DenseCRF2D::addPairwiseGaussian ( float sx, float sy, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type ) {
     MatrixXf feature( 2, N_ );
@@ -1647,7 +1651,9 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 
     MatrixXf Q = init;
     renormalize(Q);
-    assert(valid_probability(Q));
+    if (not valid_probability(Q)) {
+        std::cout << "Bad probability" << '\n';
+    }
     best_Q = Q;
 
     // Compute the value of the energy
@@ -1684,13 +1690,13 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 	best_int_energy = int_energy;
     printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f\n", energy, int_energy, kl);
 
-	int maxiter = params.prox_max_iter;
-    bool best_int = params.best_int;
+	const int maxiter = params.prox_max_iter;
+    const bool best_int = params.best_int;
 
 	// dual Frank-Wolfe variables
-	float tol = params.dual_gap_tol;		// dual gap tolerance
-	float lambda = params.prox_reg_const;	// proximal-regularization constant
-	int fw_maxiter = params.fw_max_iter;
+	const float tol = params.dual_gap_tol;		// dual gap tolerance
+	const float lambda = params.prox_reg_const;	// proximal-regularization constant
+	const int fw_maxiter = params.fw_max_iter;
 	float delta = 1;						// FW step size
 	double dual_gap = 0, dual_energy = 0;
 
@@ -1705,9 +1711,9 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 	MatrixXf rescaled_Q(M_, N_);// infeasible Q rescaled to be within [0,1]
 
 	// gamma-qp variables
-	float qp_delta = params.qp_const;	// constant used in qp-gamma
-	float qp_tol = params.qp_tol;		// qp-gamma tolernace
-	int qp_maxiter = params.qp_max_iter;
+	const float qp_delta = params.qp_const;	// constant used in qp-gamma
+	const float qp_tol = params.qp_tol;		// qp-gamma tolernace
+	const int qp_maxiter = params.qp_max_iter;
 
 	MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
 	VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_);
@@ -1721,6 +1727,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 	neg_C *= lambda; 	// neg_C
 	C = pos_C - neg_C;	// C
 	abs_C = pos_C + neg_C;	// abs_C
+    
+    //std::cout << "\n## C ##\n" << C << std::endl; exit(1);
 
     clock_t start, end;
     int it=0;
@@ -1761,6 +1769,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			// qp iterations, 
 			int qpit = 0;
 			qp_values.fill(0);
+		    //gamma.fill(1);	// initializing gamma here affects efficiency!
 			float qp_value = std::numeric_limits<float>::max();
             start = clock();
 			do {
@@ -1811,6 +1820,10 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			// new PH implementation doesn't work with Q values outside [0,1] - or in fact truncates to be within [0,1]
     		// rescale Q to be within [0,1] -- order of Q values preserved!
     		rescale(rescaled_Q, Q);
+//            // check colinearity of subgradients
+//            double ph_e = 0, bf_e = 0;
+//            compare_energies(rescaled_Q, ph_e, bf_e, false, false, true);
+//            //
 #endif
 			// subgradient lower minus upper
 			// Pairwise
@@ -1845,7 +1858,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
 		   	primal_energy += dotProduct(unary, Q, dot_tmp);
 			primal_energy -= dotProduct(s_tQ, Q, dot_tmp);	// cancel the neg in s_tQ
-			assert(dual_gap == (dual_energy - primal_energy));
+			//assert(dual_gap == (dual_energy - primal_energy));
 			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, primal_energy+dual_energy, 
                     -dual_energy, primal_energy);
             //if (dual_gap < 0) {   // may become negative due to PH approximations!
@@ -1855,8 +1868,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			if (dual_gap <= tol) break;	// stopping condition
 
 			// optimal fw step size
-			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));   // may be a constant factor away?
-			delta = std::min(std::max(delta, (float)0.0), (float)1.0);
+			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+			delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
 			assert(delta > 0);
 			printf("%1.10f]\n", delta);
 
@@ -1956,6 +1969,15 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 
     int_energy = assignment_energy_true(currentMap(Q));
 	std::cout <<"final projected energy: " << int_energy << "\n";
+
+    // verify KKT conditions
+    // gamma
+    tmp = gamma.cwiseProduct(Q);
+    std::cout << "gamma\t:: mean=" << gamma.mean() << ",\tmax=" << gamma.maxCoeff() << ",\tmin=" << gamma.minCoeff() << std::endl;
+    std::cout << "gamma.cwiseProduct(Q)\t:: mean=" << tmp.mean() << ",\tmax=" << tmp.maxCoeff() << ",\tmin=" << tmp.minCoeff() << std::endl;
+    std::cout << "beta_mat\t:: mean=" << beta_mat.mean() << ",\tmax=" << beta_mat.maxCoeff() << ",\tmin=" << beta_mat.minCoeff() << std::endl;
+    std::cout << "alpha_tQ\t:: mean=" << alpha_tQ.mean() << ",\tmax=" << alpha_tQ.maxCoeff() << ",\tmin=" << alpha_tQ.minCoeff() << std::endl;
+
 
 #if BRUTE_FORCE	
 	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -2520,7 +2542,7 @@ VectorXf DenseCRF::pairwise_energy_true(const VectorXs & l, int term) const{
     r.fill(0);
 
     if( term == -1 ) {
-        for( unsigned int i=0; i<pairwise_.size(); i++ )
+        for( unsigned int i=0; i<no_norm_pairwise_.size(); i++ )
             r += pairwise_energy_true( l, i );
         return r;
     }
@@ -2531,7 +2553,7 @@ VectorXf DenseCRF::pairwise_energy_true(const VectorXs & l, int term) const{
         for( int j=0; j<M_; j++ )
             Q(j,i) = (l[i] == j) ? 0 : 1;	// new
 //            Q(j,i) = (l[i] == j) ? 1 : 0;	// old
-    pairwise_[ term ]->apply( Q, Q );
+    no_norm_pairwise_[ term ]->apply( Q, Q );
     for( int i=0; i<N_; i++ )
         if ( 0 <= l[i] && l[i] < M_ )
             r[i] = -Q(l[i],i );	// neg to cancel the neg introduced in compatiblity_.apply()
