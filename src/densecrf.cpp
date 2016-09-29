@@ -1665,30 +1665,10 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		   best_int_energy = std::numeric_limits<double>::max();
     double int_energy = assignment_energy_true(currentMap(Q));
     double kl = klDivergence(Q, max_rounding(Q));
-#if BRUTE_FORCE	
-	// Create copies of the original pairwise since we don't want normalization
-    PairwisePotential** no_norm_pairwise;
-    no_norm_pairwise = (PairwisePotential**) malloc(pairwise_.size()*sizeof(PairwisePotential*));
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        no_norm_pairwise[k] = new PairwisePotential(
-            pairwise_[k]->features(),
-            new PottsCompatibility(pairwise_[k]->parameters()(0)),
-            pairwise_[k]->ktype(),
-            NO_NORMALIZATION
-            );
-    }
-
-	energy = compute_energy_LP(Q, no_norm_pairwise, pairwise_.size());
-#else
 	energy = compute_energy_LP(Q);
-#endif
 //    if (energy > int_energy) {  // choose the best initialization -- cannot compare directly
 //        Q = max_rounding(Q);
-//#if BRUTE_FORCE        
-//        energy = compute_energy_LP(Q, no_norm_pairwise, pairwise_.size());
-//#else
 //    	energy = compute_energy_LP(Q);
-//#endif
 //    }
 	best_energy = energy;
 	best_int_energy = int_energy;
@@ -1835,8 +1815,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                 start = clock();
 #if BRUTE_FORCE
 				// brute-force computation
-            	no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
-            	//no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp2, ind);
+            	no_norm_pairwise_[k]->apply_upper_minus_lower_bf(tmp2, ind);
+            	//no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp2, ind);
             	for(int i=0; i<tmp2.cols(); ++i) {
                 	for(int j=0; j<tmp2.rows(); ++j) {
                     	tmp(j, ind(j, i)) = tmp2(j, i);
@@ -1907,8 +1887,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 //                for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 //#if BRUTE_FORCE
 //    				// brute-force computation
-//            	    no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
-//                  	//no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp2, ind);
+//            	    no_norm_pairwise_[k]->apply_upper_minus_lower_bf(tmp2, ind);
+//                  	//no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp2, ind);
 //                	for(int ii=0; ii<tmp2.cols(); ++ii) {
 //                    	for(int j=0; j<tmp2.rows(); ++j) {
 //                        	tmp(j, ind(j, ii)) = tmp2(j, ii);
@@ -1947,11 +1927,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		renormalize(Q);
         assert(valid_probability_debug(Q));
 
-#if BRUTE_FORCE			
-		energy = compute_energy_LP(Q, no_norm_pairwise, pairwise_.size());
-#else
 		energy = compute_energy_LP(Q);
-#endif
         int_energy = assignment_energy_true(currentMap(Q));
         kl = klDivergence(Q, max_rounding(Q));
 
@@ -1981,14 +1957,6 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     std::cout << "gamma.cwiseProduct(Q)\t:: mean=" << tmp.mean() << ",\tmax=" << tmp.maxCoeff() << ",\tmin=" << tmp.minCoeff() << std::endl;
     std::cout << "beta_mat\t:: mean=" << beta_mat.mean() << ",\tmax=" << beta_mat.maxCoeff() << ",\tmin=" << beta_mat.minCoeff() << std::endl;
     std::cout << "alpha_tQ\t:: mean=" << alpha_tQ.mean() << ",\tmax=" << alpha_tQ.maxCoeff() << ",\tmin=" << alpha_tQ.minCoeff() << std::endl;
-
-
-#if BRUTE_FORCE	
-	for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        delete no_norm_pairwise[k];
-    }
-    free(no_norm_pairwise);
-#endif
 
     return best_Q;
 }
@@ -2693,43 +2661,6 @@ double DenseCRF::compute_energy_true(const MatrixXf & Q) const {
 		tmp2 = Q*tmp;	
 		double const_energy = tmp2.sum();
 		energy += const_energy;
-    }
-
-    return energy;
-}
-
-double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const {
-    double energy = 0;
-    MatrixP dot_tmp;
-    MatrixXi ind(M_, N_);
-    // Add the unary term
-    if( unary_ ) {
-        MatrixXf unary = unary_->get();
-        energy += dotProduct(unary, Q, dot_tmp);
-    }
-	//std::cout << "\nbf-unary-energy: " << energy;
-    // Add all pairwise terms
-    sortRows(Q, ind);
-    MatrixXf tmp(Q.rows(), Q.cols());
-    MatrixXf tmp2(Q.rows(), Q.cols());
-    for( unsigned int k=0; k<nb_pairwise; k++ ) {
-        // Add the upper minus the lower
-#if BRUTE_FORCE
-        no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp, ind);
-        //no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
-#else
-        //no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp, ind);
-        no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
-#endif
-		// need to sort before dot-product
-		for(int i=0; i<tmp.cols(); ++i) {
-        	for(int j=0; j<tmp.rows(); ++j) {
-            	tmp2(j, ind(j, i)) = tmp(j, i);
-        	}
-        }
-        //assert(tmp2.maxCoeff()<1e-3);
-        energy -= dotProduct(Q, tmp2, dot_tmp);
-		//std::cout << "\nbf-pairwise[" << k << "]-energy: " << -dotProduct(Q, tmp2, dot_tmp);
     }
 
     return energy;

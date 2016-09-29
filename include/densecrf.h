@@ -180,12 +180,6 @@ public: /* Debugging functions */
     // Compute the true-energy associated with the QP relaxation
     double compute_energy_true( const MatrixXf & Q) const;
 
-    // Compute the true-energy associated with the QP relaxation - bf
-    double compute_energy_true( const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const;
-
-    // Compute the energy associated with the LP relaxation
-    double compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const;
-
     // Compute the energy associated with the LP relaxation
     double compute_energy_LP(const MatrixXf & Q) const;
 
