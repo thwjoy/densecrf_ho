@@ -102,7 +102,8 @@ void original_toy_problem(int argc, char *argv[]) {
     MatrixXf int_Q = crf.max_rounding(Q);
     crf.compare_energies(int_Q, ph_energy, bf_energy, false, false, true);
     std::cout << "# int-pairwise: " << ph_energy << "," << bf_energy << std::endl;
-    std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << std::endl;
+    std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
+        << crf.compute_energy_true(int_Q) << std::endl;
 
     std::ofstream fout("Q-dump.out");
     fout << "#fract-Q#\n" << Q << std::endl;

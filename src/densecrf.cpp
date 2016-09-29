@@ -52,6 +52,8 @@ DenseCRF::~DenseCRF() {
         delete unary_;
     for( unsigned int i=0; i<pairwise_.size(); i++ )
         delete pairwise_[i];
+    for( unsigned int i=0; i<no_norm_pairwise_.size(); i++ )
+        delete no_norm_pairwise_[i];
 }
 DenseCRF2D::DenseCRF2D(int W, int H, int M) : DenseCRF(W*H,M), W_(W), H_(H) {
 }
@@ -73,13 +75,15 @@ void DenseCRF::setPairwisePottsWeight(float ratio, const MatrixXf & Q) {
 void DenseCRF::addPairwiseEnergy (const MatrixXf & features, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type) {
     assert( features.cols() == N_ );
     addPairwiseEnergy( new PairwisePotential( features, function, kernel_type, normalization_type ) );
-    addNoNormPairwiseEnergy( new PairwisePotential( features, function, kernel_type, NO_NORMALIZATION ) );
 }
 void DenseCRF::addPairwiseEnergy ( PairwisePotential* potential ){
     pairwise_.push_back( potential );
-}
-void DenseCRF::addNoNormPairwiseEnergy ( PairwisePotential* potential ){
-    no_norm_pairwise_.push_back( potential );
+    // no-norm-pairwise
+    no_norm_pairwise_.push_back( new PairwisePotential(
+            potential->features(),
+            new PottsCompatibility(potential->parameters()(0)),
+            potential->ktype(),
+            NO_NORMALIZATION) );
 }
 void DenseCRF2D::addPairwiseGaussian ( float sx, float sy, LabelCompatibility * function, KernelType kernel_type, NormalizationType normalization_type ) {
     MatrixXf feature( 2, N_ );
@@ -2680,32 +2684,8 @@ double DenseCRF::compute_energy_true(const MatrixXf & Q) const {
     }
     // Add all pairwise terms
     MatrixXf tmp, tmp2;
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, Q );
-		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
-		// constant term
-		tmp = -tmp;	// cancel the neg introdcued in apply
-		tmp.transposeInPlace();
-		tmp2 = Q*tmp;	
-		double const_energy = tmp2.sum();
-		energy += const_energy;
-    }
-
-    return energy;
-}
-
-double DenseCRF::compute_energy_true(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const {
-    double energy = 0;
-    MatrixP dot_tmp;
-	// Add the unary term
-    if( unary_ ) {
-        MatrixXf unary = unary_->get();
-        energy += dotProduct(unary, Q, dot_tmp);
-    }
-    // Add all pairwise terms
-    MatrixXf tmp, tmp2;
-    for( unsigned int k=0; k<nb_pairwise; k++ ) {
-        no_norm_pairwise[k]->apply_bf( tmp, Q );
+    for( unsigned int k=0; k<no_norm_pairwise_.size(); k++ ) {
+        no_norm_pairwise_[k]->apply( tmp, Q );
 		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
 		// constant term
 		tmp = -tmp;	// cancel the neg introdcued in apply
@@ -2756,6 +2736,7 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_no
 }
 
 double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
+    assert(pairwise_.size() == no_norm_pairwise_.size());
     double energy = 0;
     MatrixP dot_tmp;
     MatrixXi ind(M_, N_);
@@ -2767,10 +2748,25 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
 	//std::cout << "\nph-unary-energy: " << energy;
     // Add all pairwise terms
     MatrixXf tmp(Q.rows(), Q.cols());
+#if BRUTE_FORCE
+    MatrixXf tmp2(Q.rows(), Q.cols());
+    MatrixXi ind(Q.rows(), Q.cols());
+    sortRows(Q, ind);
+#endif
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         // Add the upper minus the lower
+#if BRUTE_FORCE
+        no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
+        // need to sort before dot-product
+        for(int i=0; i<tmp2.cols(); ++i) {
+        	for(int j=0; j<tmp2.rows(); ++j) {
+            	tmp(j, ind(j, i)) = tmp2(j, i);
+        	}
+        }
+#else             
+        // new-PH
         pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
-        //assert(tmp.maxCoeff()<1e-3);
+#endif        
         energy -= dotProduct(Q, tmp, dot_tmp);
 		//std::cout << "\nph-pairwise[" << k << "]-energy: " << -dotProduct(Q, tmp, dot_tmp);
     }
