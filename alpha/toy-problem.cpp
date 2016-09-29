@@ -73,10 +73,10 @@ void original_toy_problem(int argc, char *argv[]) {
     double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
     std::cout << "Init: " << final_energy << ", " << discretized_energy << std::endl;
 
-//    Q = crf.qp_inference(unaries);
-//    final_energy = crf.compute_energy_true(Q);
-//    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-//    std::cout << "After QP: " << final_energy << ", " << discretized_energy << std::endl;
+    Q = crf.qp_inference(unaries);
+    final_energy = crf.compute_energy_true(Q);
+    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+    std::cout << "After QP: " << final_energy << ", " << discretized_energy << std::endl;
 
 //    Q = crf.concave_qp_cccp_inference(Q);
 //    final_energy = crf.compute_energy_true(Q);

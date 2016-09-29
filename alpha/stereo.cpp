@@ -167,13 +167,13 @@ int main(int argc, char *argv[])
 		crf.setPairwisePottsWeight(up_ratio, Q);
 #endif        
         double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-//        printf("Before QP: %lf\n", discretized_energy);
-//        Q = crf.qp_inference(Q);
-//        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-//        printf("After QP: %lf\n", discretized_energy);
-//        Q = crf.concave_qp_cccp_inference(Q);
-//        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-//        printf("After QP concave: %lf\n", discretized_energy);
+        printf("Before QP: %lf\n", discretized_energy);
+        Q = crf.qp_inference(Q);
+        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+        printf("After QP: %lf\n", discretized_energy);
+        Q = crf.concave_qp_cccp_inference(Q);
+        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+        printf("After QP concave: %lf\n", discretized_energy);
 
         MatrixXf int_Q = crf.max_rounding(Q);
         std::cout << "# QP: " << crf.compute_energy_true(int_Q) << ", LP: " << crf.compute_energy_LP(int_Q) 
