@@ -6,10 +6,12 @@
 #include "alpha_crf.hpp"
 #include "color_to_label.hpp"
 #include "inference.hpp"
+#include "runibfs.hpp"
 
 using namespace Eigen;
 
 #define DEFAULT_SIZE -1
+#define BINARY true
 
 Potts_weight_set::Potts_weight_set(float spatial_std, float spatial_potts_weight,
                                    float bilat_spatial_std, float bilat_color_std,
@@ -354,6 +356,21 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     MatrixXf unaries = load_unary(path_to_unaries, size);
     unsigned char * img = load_image(path_to_image, size);
 
+#if BINARY
+    int bg, fg;
+    if (dataset_name == "Pascal2010") {
+        bg = 0;
+        fg = 1;
+    } else if (dataset_name=="MSRC") {
+        bg = 1;
+        fg = 3;
+    }
+    MatrixXf tmp(2, unaries.cols());
+    tmp.row(0) = unaries.row(bg);
+    tmp.row(1) = unaries.row(fg);
+    unaries = tmp;
+#endif
+
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
     std::cout << "CRF: W = " << size.width << ", H = " << size.height << ", L = " << unaries.rows() << std::endl;
@@ -383,12 +400,41 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     double final_energy_true = crf.compute_energy_true(Q);
     double discretized_energy_true = crf.assignment_energy_true(crf.currentMap(Q));
     std::cout << "QP: " << final_energy << ", int: " << discretized_energy << std::endl;
-    std::cout << "#TRUE QP: " << final_energy_true << ", int: " << discretized_energy_true << std::endl;
+    std::cout << "#TRUE QP: " << final_energy_true << ", LP: " << crf.compute_energy_LP(Q) 
+        << ", int: " << discretized_energy_true << std::endl;
+    
+    MatrixXf int_Q = crf.max_rounding(Q);
+    std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
+        << crf.compute_energy_true(int_Q) << std::endl;
+
+
+
 // std::cout << "Time taken: " << timing << '\n';
 // std::cout << "Done with inference"<< '\n';
 // Perform the MAP estimation on the fully factorized distribution
 // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
+
+//    //VectorXf t = Q.rowwise().maxCoeff();
+//    //std::cout << "#\n" << t << std::endl;
+//    // run maxflow
+//    int nb_variables = size.width * size.height;
+//    VectorXs labels(nb_variables);
+//    double flow = testIBFS(labels, size.height, size.width, unaries, parameters.spatial_std, parameters.spatial_potts_weight);
+//    std::cout << "# IBFS:: flow = " << flow << ", energy = " << crf.assignment_energy_true(labels) << std::endl;
+//    MatrixXf opt_Q = Q;
+//    for (int i = 0; i < Q.cols(); ++i) {
+//        if (labels(i) == 0) {
+//            opt_Q(0, i) = 1;
+//            opt_Q(1, i) = 0;
+//        } else {
+//            opt_Q(0, i) = 0;
+//            opt_Q(1, i) = 1;
+//        }
+//    }
+//    save_map(opt_Q, size, path_to_output+"_opt_Q.bmp", dataset_name);
+    
+
     delete[] img;
 }
 
