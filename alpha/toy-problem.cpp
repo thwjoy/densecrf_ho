@@ -62,17 +62,12 @@ void original_toy_problem(int argc, char *argv[]) {
     int nb_variables = w*h;
     int nb_labels = 2;    
     float alpha = 10;
-    float weight = 1;
+    float weight = 10;
 
     MatrixXf unaries = get_unaries(nb_variables, nb_labels);
     DenseCRF2D crf(w, h, unaries.rows());
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(sigma, sigma, new PottsCompatibility(weight));
-
-    // run maxflow
-    VectorXs labels(nb_variables);
-    double flow = testIBFS(labels, h, w, unaries, sigma, weight);
-    std::cout << "# IBFS:: flow = " << flow << ", energy = " << crf.assignment_energy_true(labels) << std::endl;
 
     MatrixXf Q = crf.unary_init();
     double final_energy = crf.compute_energy_true(Q);
@@ -89,11 +84,11 @@ void original_toy_problem(int argc, char *argv[]) {
 //    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
 //    std::cout << "After QP-CCCP: " << final_energy << ", " << discretized_energy << std::endl;
 
-//    //Q = crf.lp_inference(Q, false);
-//    Q = crf.lp_inference_prox(Q, lp_params);
-//    final_energy = crf.compute_energy_true(Q);
-//    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-//    std::cout << "After LP: " << final_energy << ", " << discretized_energy << std::endl;
+    //Q = crf.lp_inference(Q, false);
+    Q = crf.lp_inference_prox(Q, lp_params);
+    final_energy = crf.compute_energy_true(Q);
+    discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+    std::cout << "After LP: " << final_energy << ", " << discretized_energy << std::endl;
 
     //crf.sequential_inference();
     final_energy = crf.compute_energy_true(Q);
@@ -110,6 +105,11 @@ void original_toy_problem(int argc, char *argv[]) {
     std::cout << "# int-pairwise: " << ph_energy << "," << bf_energy << std::endl;
     std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
         << crf.compute_energy_true(int_Q) << std::endl;
+
+    // run maxflow
+    VectorXs labels(nb_variables);
+    double flow = testIBFS(labels, h, w, unaries, sigma, weight);
+    std::cout << "# IBFS:: flow = " << flow << ", energy = " << crf.assignment_energy_true(labels) << std::endl;
 
     std::ofstream fout("Q-dump.out");
     fout << "#fract-Q#\n" << Q << std::endl;

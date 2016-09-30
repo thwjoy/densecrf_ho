@@ -8,7 +8,7 @@
 
 #define NUM_LABELS 4
 
-#define RESCALED true
+#define RESCALED false
 
 MatrixXf get_unaries(const unsigned char * left_img, const unsigned char * right_img, img_size & size){
     MatrixXf unaries(NUM_LABELS, size.height * size.width);

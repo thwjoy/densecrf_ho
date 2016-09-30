@@ -17,15 +17,23 @@ void construct(IBFSGraph* g, int N, const MatrixXf & unaries, const MatrixXf & f
 
 	// unary potentials
 	for (int i = 0; i < N; ++i) {	// image grid
-        g->addNode(i, unaries(0, i), unaries(1, i));
+        g->addNode(i, unaries(1, i), unaries(0, i));
 	}
 
-	// binary potentials
+    MatrixXf pweights(N, N);
+    pweights.fill(0);
+	// binary potentials --> accumulate weights
 	for (int i = 0; i < N; ++i) {
 		for (int j = 0; j < N; ++j) {
-            //if (i == j) continue;
+            if (i == j) continue;
             VectorXf featDiff = (features.col(i) - features.col(j));
-            float w = weight * exp(-featDiff.squaredNorm());
+            pweights(i, j) += weight * exp(-featDiff.squaredNorm());
+		}
+	}
+    // add edges
+    for (int i = 0; i < N; ++i) {
+		for (int j = i+1; j < N; ++j) {
+            float w = pweights(i, j) + pweights(j, i);
             g->addEdge(i, j, w, w);
 		}
 	}
@@ -33,7 +41,7 @@ void construct(IBFSGraph* g, int N, const MatrixXf & unaries, const MatrixXf & f
 
 void minimumCut(VectorXs & labels, IBFSGraph* g, int N) {
 	for (int i = 0; i < N; ++i) {	// image grid
-        labels(i) = g->isNodeOnSrcSide(i) ? 0 : 1;
+        labels(i) = g->isNodeOnSrcSide(i, 1) ? 0 : 1;
 	}
 }
 
