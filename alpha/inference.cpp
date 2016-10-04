@@ -6,12 +6,11 @@
 #include "alpha_crf.hpp"
 #include "color_to_label.hpp"
 #include "inference.hpp"
-#include "runibfs.hpp"
 
 using namespace Eigen;
 
 #define DEFAULT_SIZE -1
-#define BINARY true
+#define BINARY false
 
 Potts_weight_set::Potts_weight_set(float spatial_std, float spatial_potts_weight,
                                    float bilat_spatial_std, float bilat_color_std,
@@ -351,6 +350,11 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
 	if(argc > 6) lp_params.qp_tol = atof(argv[6]);
 	if(argc > 7) lp_params.best_int = atoi(argv[7]);
 
+    std::cout << "## COMMAND: " << argv[0] << " " 
+        << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
+        << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
+        << lp_params.best_int << std::endl;
+
     img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
@@ -402,38 +406,25 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     std::cout << "QP: " << final_energy << ", int: " << discretized_energy << std::endl;
     std::cout << "#TRUE QP: " << final_energy_true << ", LP: " << crf.compute_energy_LP(Q) 
         << ", int: " << discretized_energy_true << std::endl;
-    
+
     MatrixXf int_Q = crf.max_rounding(Q);
+
+#if BINARY    
+    double ph_energy = 0, bf_energy = 0;
+    crf.compare_energies(Q, ph_energy, bf_energy, false, false, true);
+    std::cout << "# lp-pairwise: " << ph_energy << "," << bf_energy << std::endl;
+    crf.compare_energies(int_Q, ph_energy, bf_energy, false, false, true);
+    std::cout << "# int-pairwise: " << ph_energy << "," << bf_energy << std::endl;
+#endif
+
     std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
         << crf.compute_energy_true(int_Q) << std::endl;
-
-
 
 // std::cout << "Time taken: " << timing << '\n';
 // std::cout << "Done with inference"<< '\n';
 // Perform the MAP estimation on the fully factorized distribution
 // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
-
-//    //VectorXf t = Q.rowwise().maxCoeff();
-//    //std::cout << "#\n" << t << std::endl;
-//    // run maxflow
-//    int nb_variables = size.width * size.height;
-//    VectorXs labels(nb_variables);
-//    double flow = testIBFS(labels, size.height, size.width, unaries, parameters.spatial_std, parameters.spatial_potts_weight);
-//    std::cout << "# IBFS:: flow = " << flow << ", energy = " << crf.assignment_energy_true(labels) << std::endl;
-//    MatrixXf opt_Q = Q;
-//    for (int i = 0; i < Q.cols(); ++i) {
-//        if (labels(i) == 0) {
-//            opt_Q(0, i) = 1;
-//            opt_Q(1, i) = 0;
-//        } else {
-//            opt_Q(0, i) = 0;
-//            opt_Q(1, i) = 1;
-//        }
-//    }
-//    save_map(opt_Q, size, path_to_output+"_opt_Q.bmp", dataset_name);
-    
 
     delete[] img;
 }

@@ -29,7 +29,8 @@ int main(int argc, char* argv[]) {
     std::string path_to_prox_lp_output = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/densecrf/res-prox-lp.bmp";
     // the image that we are using is from the validation set.
 
-    Potts_weight_set params(3, 2, 50, 15, 3);
+    //Potts_weight_set params(3, 2, 50, 15, 30);
+    Potts_weight_set params(3, 0.5, 50, 1, 1);
 
     // minimize_dense_alpha_divergence(path_to_image, path_to_unaries, path_to_alpha_output, path_to_parameters, 5);n
     // std::cout << "Unaries" << '\n';

@@ -29,7 +29,7 @@ MatrixXf get_unaries(int nb_variables, int nb_labels){
     MatrixXf unaries(nb_labels, nb_variables);
     for (int j=0; j<nb_labels; j++) {
         for (int i = 0; i < nb_variables; i++) {
-            unaries(j,i) = randint(10);
+            unaries(j,i) = randint(10) * 10;
         }
     }
     return unaries;
@@ -62,7 +62,7 @@ void original_toy_problem(int argc, char *argv[]) {
     int nb_variables = w*h;
     int nb_labels = 2;    
     float alpha = 10;
-    float weight = 10;
+    float weight = 1;
 
     MatrixXf unaries = get_unaries(nb_variables, nb_labels);
     DenseCRF2D crf(w, h, unaries.rows());
@@ -108,13 +108,24 @@ void original_toy_problem(int argc, char *argv[]) {
 
     // run maxflow
     VectorXs labels(nb_variables);
-    double flow = testIBFS(labels, h, w, unaries, sigma, weight);
-    std::cout << "# IBFS:: flow = " << flow << ", energy = " << crf.assignment_energy_true(labels) << std::endl;
+    double opt_energy = testIBFS(labels, h, w, unaries, sigma, weight);
+    MatrixXf opt_Q = Q;
+    for (int i = 0; i < Q.cols(); ++i) {
+        if (labels(i) == 0) {
+            opt_Q(0, i) = 1;
+            opt_Q(1, i) = 0;
+        } else {
+            opt_Q(0, i) = 0;
+            opt_Q(1, i) = 1;
+        }
+    }
+    std::cout << "# IBFS:: opt-energy = " << opt_energy << 
+        ", ph-energy = " << crf.compute_energy_LP(opt_Q) << std::endl;
 
     std::ofstream fout("Q-dump.out");
     fout << "#fract-Q#\n" << Q << std::endl;
     fout << "#int-Q#\n" << int_Q << std::endl;
-    fout << "#ibfs-labels#\n" << labels << std::endl;
+    fout << "#opt_Q#\n" << opt_Q << std::endl;
     fout.close();
 }
 

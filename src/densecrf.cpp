@@ -1667,10 +1667,10 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     double int_energy = assignment_energy_true(currentMap(Q));
     double kl = klDivergence(Q, max_rounding(Q));
 	energy = compute_energy_LP(Q);
-//    if (energy > int_energy) {  // choose the best initialization -- cannot compare directly
-//        Q = max_rounding(Q);
-//    	energy = compute_energy_LP(Q);
-//    }
+    if (energy > int_energy) {  // choose the best initialization 
+        Q = max_rounding(Q);
+    	energy = compute_energy_LP(Q);
+    }
 	best_energy = energy;
 	best_int_energy = int_energy;
     printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f\n", energy, int_energy, kl);
@@ -1944,6 +1944,11 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                 best_energy = energy;
             }
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
+        }
+
+        if (energy < 0) {
+            std::cout << "\n##ERROR: LP energy cannot be negative! aborting...\n";
+            break;
         }
 
     } while(it<maxiter);
@@ -2654,7 +2659,11 @@ double DenseCRF::compute_energy_true(const MatrixXf & Q) const {
     // Add all pairwise terms
     MatrixXf tmp, tmp2;
     for( unsigned int k=0; k<no_norm_pairwise_.size(); k++ ) {
+#if BRUTE_FORCE
+        no_norm_pairwise_[k]->apply_bf( tmp, Q );
+#else
         no_norm_pairwise_[k]->apply( tmp, Q );
+#endif
 		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
 		// constant term
 		tmp = -tmp;	// cancel the neg introdcued in apply
@@ -2682,13 +2691,12 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
     MatrixXf tmp(Q.rows(), Q.cols());
 #if BRUTE_FORCE
     MatrixXf tmp2(Q.rows(), Q.cols());
-    MatrixXi ind(Q.rows(), Q.cols());
     sortRows(Q, ind);
 #endif
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         // Add the upper minus the lower
 #if BRUTE_FORCE
-        no_norm_pairwise[k]->apply_upper_minus_lower_bf(tmp2, ind);
+        no_norm_pairwise_[k]->apply_upper_minus_lower_bf(tmp2, ind);
         // need to sort before dot-product
         for(int i=0; i<tmp2.cols(); ++i) {
         	for(int j=0; j<tmp2.rows(); ++j) {
