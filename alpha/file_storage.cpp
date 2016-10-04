@@ -117,6 +117,24 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "Pascal2010");
     }
     // Add some possible other datasets
+    else if (dataset_name == "Pascal2010_2") {
+        return Dataset("/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/JPEGImages/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/logit_unaries/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/SegmentationClass/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/",
+                       ".jpg",
+                       ".png",
+                       "Pascal2010_2");
+    }
+    else if (dataset_name == "MSRC_2") {
+        return Dataset("/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/",
+                       ".bmp",
+                       "_GT.bmp",
+                       "MSRC");
+    }
 }
 
 std::string get_output_path(const std::string & path_to_results_folder, const std::string & image_name){

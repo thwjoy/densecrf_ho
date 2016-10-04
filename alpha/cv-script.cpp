@@ -5,7 +5,8 @@
 #include "densecrf.h"
 
 void image_inference(Dataset dataset, std::string method, std::string path_to_results,
-                     std::string image_name, float spc_std, float spc_potts, float bil_spcstd, float bil_colstd, float bil_potts)
+                     std::string image_name, float spc_std, float spc_potts, 
+                     float bil_spcstd, float bil_colstd, float bil_potts, LP_inf_params & lp_params)
 {
 
     std::string image_path = dataset.get_image_path(image_name);
@@ -54,6 +55,10 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
                 Q = crf.lp_inference(Q, true);
+            } else if (method == "prox_lp"){
+                Q = crf.qp_inference(Q);
+                Q = crf.concave_qp_cccp_inference(Q);
+                Q = crf.lp_inference_prox(Q, lp_params);
             } else if (method == "unary"){
                 (void)0;
             } else{
@@ -79,7 +84,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
 int main(int argc, char *argv[])
 {
     if (argc<4) {
-        std::cout << "./generate split dataset method results_path spc_std spc_potts bil_spcstd bil_colstd bil_potts" << '\n';
+        std::cout << "./generate split dataset method results_path spc_std spc_potts bil_spcstd bil_colstd bil_potts lp_params[7]" << '\n';
         std::cout << "Example: ./generate Validation Pascal2010 method /data/MSRC/results/train/ 3 38 40 5 50" << '\n';
         return 1;
     }
@@ -101,15 +106,32 @@ int main(int argc, char *argv[])
     std::string param5 = argv[9];
     float bil_potts = std::stof(param5);
 
+    // lp inference params
+	LP_inf_params lp_params;
+	if(argc > 10) lp_params.prox_max_iter = atoi(argv[10]);
+	if(argc > 11) lp_params.fw_max_iter = atoi(argv[11]);
+	if(argc > 12) lp_params.qp_max_iter = atoi(argv[12]);
+	if(argc > 13) lp_params.prox_reg_const = atof(argv[13]);
+	if(argc > 14) lp_params.dual_gap_tol = atof(argv[14]);
+	if(argc > 15) lp_params.qp_tol = atof(argv[15]);
+	if(argc > 16) lp_params.best_int = atoi(argv[16]);
+
+    std::cout << "## COMMAND: " << argv[0] << " " << dataset_split << " " << dataset_name << " " << method << " "
+        << path_to_results << " " << spc_std << " " << spc_potts << " " << bil_spcstd << " " << bil_colstd << " "
+        << bil_potts << " " 
+        << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
+        << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
+        << lp_params.best_int << std::endl;
+
     make_dir(path_to_results);
 
     Dataset ds = get_dataset_by_name(dataset_name);
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-    omp_set_num_threads(8);
-#pragma omp parallel for
+//    omp_set_num_threads(1);
+//#pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
-                        bil_spcstd, bil_colstd, bil_potts);
+                        bil_spcstd, bil_colstd, bil_potts, lp_params);
     }
 
 
