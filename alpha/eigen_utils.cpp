@@ -110,3 +110,7 @@ void sortCols(const MatrixXf & M, MatrixXi & ind) {
     }
 
 }
+
+float infiniteNorm(const MatrixXf & M) {
+    return M.cwiseAbs().maxCoeff();
+}

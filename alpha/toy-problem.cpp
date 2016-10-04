@@ -29,7 +29,7 @@ MatrixXf get_unaries(int nb_variables, int nb_labels){
     MatrixXf unaries(nb_labels, nb_variables);
     for (int j=0; j<nb_labels; j++) {
         for (int i = 0; i < nb_variables; i++) {
-            unaries(j,i) = randint(10) * 10;
+            unaries(j,i) = randint(10) * 1;
         }
     }
     return unaries;
@@ -53,11 +53,13 @@ void original_toy_problem(int argc, char *argv[]) {
 	if(argc > 8) lp_params.dual_gap_tol = atof(argv[8]);
 	if(argc > 9) lp_params.qp_tol = atof(argv[9]);
 	if(argc > 10) lp_params.best_int = atoi(argv[10]);
+    lp_params.prox_energy_tol = lp_params.dual_gap_tol;
+	if(argc > 11) lp_params.prox_energy_tol = atof(argv[11]);
 
     std::cout << "## COMMAND: " << argv[0] << " " << w << " " << h << " " << sigma << " "
         << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
         << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
-        << lp_params.best_int << std::endl;
+        << lp_params.best_int << " " << lp_params.prox_energy_tol << std::endl;
 
     int nb_variables = w*h;
     int nb_labels = 2;    
@@ -85,10 +87,13 @@ void original_toy_problem(int argc, char *argv[]) {
 //    std::cout << "After QP-CCCP: " << final_energy << ", " << discretized_energy << std::endl;
 
     //Q = crf.lp_inference(Q, false);
+    clock_t st = clock();
     Q = crf.lp_inference_prox(Q, lp_params);
+    clock_t et = clock();
     final_energy = crf.compute_energy_true(Q);
     discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-    std::cout << "After LP: " << final_energy << ", " << discretized_energy << std::endl;
+    std::cout << "After LP: " << final_energy << ", " << discretized_energy << ", Time: " 
+        << double(et - st)/CLOCKS_PER_SEC << std::endl;
 
     //crf.sequential_inference();
     final_energy = crf.compute_energy_true(Q);

@@ -115,13 +115,15 @@ int main(int argc, char *argv[])
 	if(argc > 14) lp_params.dual_gap_tol = atof(argv[14]);
 	if(argc > 15) lp_params.qp_tol = atof(argv[15]);
 	if(argc > 16) lp_params.best_int = atoi(argv[16]);
+    lp_params.prox_energy_tol = lp_params.dual_gap_tol;
+	if(argc > 17) lp_params.prox_energy_tol = atof(argv[17]);
 
     std::cout << "## COMMAND: " << argv[0] << " " << dataset_split << " " << dataset_name << " " << method << " "
         << path_to_results << " " << spc_std << " " << spc_potts << " " << bil_spcstd << " " << bil_colstd << " "
         << bil_potts << " " 
         << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
         << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
-        << lp_params.best_int << std::endl;
+        << lp_params.best_int << " " << lp_params.prox_energy_tol << std::endl;
 
     make_dir(path_to_results);
 

@@ -17,3 +17,4 @@ void clamp_and_normalize(VectorXf & prob);
 typeP dotProduct(const MatrixXf & M1, const MatrixXf & M2, MatrixP & temp);
 void sortRows(const MatrixXf & M, MatrixXi & ind);
 void sortCols(const MatrixXf & M, MatrixXi & ind);
+float infiniteNorm(const MatrixXf & M);

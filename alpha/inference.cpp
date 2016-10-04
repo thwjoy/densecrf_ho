@@ -349,11 +349,13 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
 	if(argc > 5) lp_params.dual_gap_tol = atof(argv[5]);
 	if(argc > 6) lp_params.qp_tol = atof(argv[6]);
 	if(argc > 7) lp_params.best_int = atoi(argv[7]);
+    lp_params.prox_energy_tol = lp_params.dual_gap_tol;
+	if(argc > 8) lp_params.prox_energy_tol = atof(argv[8]);
 
     std::cout << "## COMMAND: " << argv[0] << " " 
         << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
         << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
-        << lp_params.best_int << std::endl;
+        << lp_params.best_int << " " << lp_params.prox_energy_tol << std::endl;
 
     img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
     // Load the unaries potentials for our image.

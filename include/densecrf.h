@@ -43,14 +43,16 @@ class LP_inf_params {
 public: 
 	float prox_reg_const;	// proximal regularization constant
 	float dual_gap_tol;		// dual gap tolerance
+	float prox_energy_tol;	// proximal energy tolerance
 	int prox_max_iter;		// maximum proximal iterations
 	int fw_max_iter;		// maximum FW iterations
 	int qp_max_iter;		// maximum qp-gamma iterations
 	float qp_tol;			// qp-gamma tolerance
 	float qp_const;			// const used in qp-gamma
     bool best_int;          // return the Q that yields the best integer energy
-	LP_inf_params(float prox_reg_const, float dual_gap_tol, int prox_max_iter, 
-			int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const, bool best_int);
+	LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, 
+        int prox_max_iter, int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const, 
+        bool best_int);
 	LP_inf_params();	// default values
 };
 

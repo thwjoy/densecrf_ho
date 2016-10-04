@@ -127,7 +127,7 @@ UnaryEnergy* DenseCRF::getUnaryEnergy() {
 ///////////////////////
 /////  Inference  /////
 ///////////////////////
-LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, int prox_max_iter,
+LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, int prox_max_iter,
 	   	int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const, bool best_int):prox_reg_const(prox_reg_const),
 		dual_gap_tol(dual_gap_tol), prox_max_iter(prox_max_iter), fw_max_iter(fw_max_iter), 
 		qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const), best_int(best_int){}
@@ -135,6 +135,7 @@ LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, int prox_
 LP_inf_params::LP_inf_params() {
 	prox_reg_const = 1e-2;	
 	dual_gap_tol = 1e0;		
+	prox_energy_tol = 1e0;		
 	prox_max_iter = 10;		
 	fw_max_iter = 50;		
 	qp_max_iter = 1000;		
@@ -1677,9 +1678,10 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 
 	const int maxiter = params.prox_max_iter;
     const bool best_int = params.best_int;
+	const float prox_tol = params.prox_energy_tol;		// proximal energy tolerance
 
 	// dual Frank-Wolfe variables
-	const float tol = params.dual_gap_tol;		// dual gap tolerance
+	const float dual_gap_tol = params.dual_gap_tol;		// dual gap tolerance
 	const float lambda = params.prox_reg_const;	// proximal-regularization constant
 	const int fw_maxiter = params.fw_max_iter;
 	float delta = 1;						// FW step size
@@ -1692,8 +1694,14 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 	MatrixXf beta_mat(M_, N_);	// beta_mat.row(i) == beta forall i --> N_ * M_ elements 
 	MatrixXf gamma(M_, N_);		// nonnegative
 	
-	MatrixXf old_Q(M_, N_);		// store the Q before prox step
+	MatrixXf cur_Q(M_, N_);		// current Q in prox step
 	MatrixXf rescaled_Q(M_, N_);// infeasible Q rescaled to be within [0,1]
+	MatrixXf int_Q(M_, N_);		// store integral Q
+
+    // accelerated prox_lp
+	MatrixXf prev_Q(M_, N_);	// Q resulted in prev prox step
+    prev_Q.fill(0);
+    float w_it = 1;             // momentum weight: eg. it/(it+3)
 
 	// gamma-qp variables
 	const float qp_delta = params.qp_const;	// constant used in qp-gamma
@@ -1717,6 +1725,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 
     clock_t start, end;
     int it=0;
+    int count = 0;
     do {
         ++it;
 
@@ -1724,7 +1733,15 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		beta_mat.fill(0);
 		beta.fill(0);
 		gamma.fill(1);	// all zero is a fixed point of QP iteration!
-		old_Q = Q;
+		cur_Q = Q;
+        
+        // accelerated prox
+        w_it = float(it)/(it+3.0);  // simplest choice
+        tmp = Q - prev_Q;
+        tmp *= w_it;
+        cur_Q += tmp;   // cur_Q = Q + w_it(Q - prev_Q)
+        prev_Q = Q;
+        
 		int pit = 0;
 		alpha_tQ.fill(0);	// all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
 		
@@ -1744,7 +1761,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 				v_y = C * tmp.col(i);
 				Y.col(i) = v_y;
 			}	
-			Y += old_Q;		// H = -Y
+			Y += cur_Q;		// H = -Y
 			for (int i = 0; i < N_; ++i) {
 				for (int j = 0; j < M_; ++j) {	
 					pos_H(j, i) = std::max(-Y(j, i), (float)0);		// pos_H 
@@ -1798,7 +1815,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
             //}
 
 			// case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
-			Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + old_Q;	// Q may be infeasible --> but no problem
+			Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;	// Q may be infeasible --> but no problem
 #if BRUTE_FORCE
         	sortRows(Q, ind);
 #else
@@ -1837,8 +1854,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			dual_gap = dotProduct(tmp, Q, dot_tmp);
 
 			// dual-energy value
-			tmp2 = Q - old_Q;
-			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, old_Q, dot_tmp) / lambda;
+			tmp2 = Q - cur_Q;
+			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
 			dual_energy -= beta.sum();
 			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
 		   	primal_energy += dotProduct(unary, Q, dot_tmp);
@@ -1850,7 +1867,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
             //    std::cout << "\nERROR: Dual-gap cannot be negative!\n";
             //    exit(1);
             //}
-			if (dual_gap <= tol) break;	// stopping condition
+			if (dual_gap <= dual_gap_tol) break;	// stopping condition
 
 			// optimal fw step size
 			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
@@ -1868,9 +1885,9 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 //                tmp = s_tQ - alpha_tQ;
 //                tmp *= d;
 // 				MatrixXf t1 = alpha_tQ + tmp;	// tmp = alpha_tQ + d * (s_tQ - alpha_tQ);		
-// 				t1 = lambda * (t1 + beta_mat + gamma - unary) + old_Q;		
-// 				tmp2 = t1 - old_Q;		
-// 				double de = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, old_Q, dot_tmp) / lambda;		
+// 				t1 = lambda * (t1 + beta_mat + gamma - unary) + cur_Q;		
+// 				tmp2 = t1 - cur_Q;		
+// 				double de = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;		
 // 				de -= beta.sum();		
 // 				double pe = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
 //                MatrixXf rescaled_t1 = t1;
@@ -1928,9 +1945,19 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		renormalize(Q);
         assert(valid_probability_debug(Q));
 
+        double prev_energy = energy;
 		energy = compute_energy_LP(Q);
         int_energy = assignment_energy_true(currentMap(Q));
-        kl = klDivergence(Q, max_rounding(Q));
+        int_Q = max_rounding(Q);
+        kl = klDivergence(Q, int_Q);
+
+        if (abs(energy - prev_energy) < prox_tol) ++count;
+        else count = 0;
+        if (count >= 5) {
+            std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
+                << " iterations! terminating...\n";
+            break;
+        }
 
         if (best_int) {
 		    if( int_energy < best_int_energy) {
@@ -1945,6 +1972,14 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
             }
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
         }
+
+//        if (infiniteNorm(Q - int_Q) < 0.5) ++count; // doesn't apply for our objective
+//        else count = 0;
+//        if (count >= 50) {
+//            std::cout << "\n##CONV: Each label is chosen with probability > 0.5 for last " << count 
+//                << " iterations! terminating...\n";
+//            break;
+//        }
 
         if (energy < 0) {
             std::cout << "\n##ERROR: LP energy cannot be negative! aborting...\n";
