@@ -69,8 +69,8 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             make_dir(path_to_subexp_results);
             end = clock();
             timing = (double(end-start)/CLOCKS_PER_SEC);
-            double final_energy = crf.compute_energy(Q);
-            double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+            double final_energy = crf.compute_energy_true(Q);
+            double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
             std::string txt_output = output_path;
             txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
