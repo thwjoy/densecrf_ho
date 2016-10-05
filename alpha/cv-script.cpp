@@ -129,8 +129,8 @@ int main(int argc, char *argv[])
 
     Dataset ds = get_dataset_by_name(dataset_name);
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-//    omp_set_num_threads(1);
-//#pragma omp parallel for
+    omp_set_num_threads(2);
+#pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params);

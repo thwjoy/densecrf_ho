@@ -1425,7 +1425,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
         renormalize(Q);
         printf("%3d: %f / %f / %f\n", it,energy, int_energy, best_int_energy);
         assert(valid_probability_debug(Q));
-    } while(it<100);
+    } while(it<5);
     // std::cout <<"final projected energy: " << best_int_energy << "\n";
     for( unsigned int k=0; k<nb_pairwise; k++ ) {
         delete no_norm_pairwise[k];

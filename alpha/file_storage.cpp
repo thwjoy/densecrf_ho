@@ -133,7 +133,26 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/",
                        ".bmp",
                        "_GT.bmp",
-                       "MSRC");
+                       "MSRC_2");
+    }
+    // Add some possible other datasets
+    else if (dataset_name == "Pascal2010_3") {
+        return Dataset("/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/JPEGImages/",
+                       "/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/logit_unaries/",
+                       "/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/SegmentationClass/",
+                       "/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/",
+                       ".jpg",
+                       ".png",
+                       "Pascal2010_3");
+    }
+    else if (dataset_name == "MSRC_3") {
+        return Dataset("/media/ajanthan/sheep/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
+                       "/media/ajanthan/sheep/Ajanthan/data/MSRC/texton_unaries/",
+                       "/media/ajanthan/sheep/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
+                       "/media/ajanthan/sheep/Ajanthan/data/MSRC/",
+                       ".bmp",
+                       "_GT.bmp",
+                       "MSRC_3");
     }
 }
 
