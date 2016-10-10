@@ -79,7 +79,7 @@ protected:
 		// Filter
 		lattice_.compute_upper_minus_lower_dc( out, low, middle_low, middle_high, high );
 	}
-	void filter_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) const {
+	void filter_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) {
 		lattice_.compute_upper_minus_lower_ord( out, Q );
 	}
 	// Compute d/df a^T*K*b
@@ -127,7 +127,7 @@ public:
 	virtual void apply_upper_minus_lower_dc( MatrixXf & out, int low, int middle_low, int middle_high, int high) const {
 		filter_upper_minus_lower_dc(out, low, middle_low, middle_high, high);
 	}
-	virtual void apply_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) const {
+	virtual void apply_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) {
 		filter_upper_minus_lower_ord(out, Q);
 	}
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const {
@@ -203,7 +203,7 @@ void PairwisePotential::applyTranspose(MatrixXf & out, const MatrixXf & Q) const
 	// Apply the compatibility
 	compatibility_->applyTranspose( out, out );
 }
-void PairwisePotential::apply_upper_minus_lower_ord(MatrixXf & out, const MatrixXf & Q) const {
+void PairwisePotential::apply_upper_minus_lower_ord(MatrixXf & out, const MatrixXf & Q) {
 	assert(Q.maxCoeff() <= 1);
 	assert(Q.minCoeff() >= 0);  // values truncated to be [0,1], doesn't need to sum to 1
     out.fill(0);
