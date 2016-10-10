@@ -1,19 +1,19 @@
 function score = voc_test(path, dataset_split)
-addpath('/data/PascalVOC2010/VOCdevkit/VOCcode');
+addpath('/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/VOCdevkit/VOCcode');
 
 VOCinit;
 
 
 
-VOCopts.datadir = '/data/PascalVOC2010';
+VOCopts.datadir = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010';
 testset = dataset_split;
 
 
-gtimgpath= '/data/PascalVOC2010/SegmentationClass/%s.png';
-imgsetpath= '/data/PascalVOC2010/split/%s.txt';
+gtimgpath= '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/SegmentationClass/%s.png';
+imgsetpath= '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/split/%s.txt';
 respath_tmpl=[path '/%s.png'];
 
-path_to_test_set = ['/data/PascalVOC2010/split/' dataset_split '.txt'];
+path_to_test_set = ['/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/split/' dataset_split '.txt'];
 [gtids,t]=textread(path_to_test_set,'%s %d');
 
 num = 21; % Number of classes
@@ -29,6 +29,7 @@ for i=1:length(gtids)
     [gtim,map] = imread(gtfile);
     gtim = double(gtim);
 
+    try
     % results file
     resfile = sprintf(respath_tmpl, imname);
     [resim,map] = imread(resfile);
@@ -57,6 +58,9 @@ for i=1:length(gtids)
     hs = histc(sumim(locs),1:num*num);
     count = count + numel(find(locs));
     confcounts(:) = confcounts(:) + hs(:);
+
+    catch
+    end
 end
 
 % confusion matrix - first index is true label, second is inferred label

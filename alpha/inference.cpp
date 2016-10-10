@@ -391,7 +391,11 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     MatrixXf init = crf.unary_init();
     clock_t start, end;
     MatrixXf Q = crf.qp_inference(init);
+    start = clock();
     Q = crf.concave_qp_cccp_inference(Q);
+    end = clock();
+    std::cout << "DC-neg: " << (double(end-start)/CLOCKS_PER_SEC) << std::endl;
+
 
     double timing = -1;
     start = clock();
