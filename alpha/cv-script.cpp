@@ -1,3 +1,4 @@
+#include <ctime>
 #include <fstream>
 #include <vector>
 #include <string>
@@ -30,10 +31,12 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
         std::string path_to_subexp_results = path_to_results + "/" + method + "/";
         std::string output_path = get_output_path(path_to_subexp_results, image_name);
         if (not file_exist(output_path)) {
-            clock_t start, end;
+            //clock_t start, end;
+            time_t start, end;
             double timing;
             std::cout << image_path << std::endl;
-            start = clock();
+            //start = clock();
+            start = time(NULL);
             Q = crf.unary_init();
             if (method == "mf5") {
                 Q = crf.inference(Q, 5);
@@ -67,8 +70,10 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
 
 
             make_dir(path_to_subexp_results);
-            end = clock();
-            timing = (double(end-start)/CLOCKS_PER_SEC);
+            //end = clock();
+            end = time(NULL);
+            //timing = (double(end-start)/CLOCKS_PER_SEC);
+            timing = difftime(end, start);
             double final_energy = crf.compute_energy_true(Q);
             double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
