@@ -50,9 +50,10 @@ public:
 	float qp_tol;			// qp-gamma tolerance
 	float qp_const;			// const used in qp-gamma
     bool best_int;          // return the Q that yields the best integer energy
+    bool accel_prox;        // accelerated proximal method
 	LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, 
         int prox_max_iter, int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const, 
-        bool best_int);
+        bool best_int, bool accel_prox);
 	LP_inf_params();	// default values
 };
 

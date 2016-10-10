@@ -128,9 +128,10 @@ UnaryEnergy* DenseCRF::getUnaryEnergy() {
 /////  Inference  /////
 ///////////////////////
 LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, int prox_max_iter,
-	   	int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const, bool best_int):prox_reg_const(prox_reg_const),
-		dual_gap_tol(dual_gap_tol), prox_max_iter(prox_max_iter), fw_max_iter(fw_max_iter), 
-		qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const), best_int(best_int){}
+	   	int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const, bool best_int, bool accel_prox):
+        prox_reg_const(prox_reg_const),	dual_gap_tol(dual_gap_tol), prox_max_iter(prox_max_iter), 
+        fw_max_iter(fw_max_iter), qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const), 
+        best_int(best_int), accel_prox(accel_prox){}
 
 LP_inf_params::LP_inf_params() {
 	prox_reg_const = 1e-2;	
@@ -142,6 +143,7 @@ LP_inf_params::LP_inf_params() {
 	qp_tol = 1e-3;			
 	qp_const = 1e-16;			
     best_int = false;
+    accel_prox = true;
 }
 
 MatrixXf DenseCRF::unary_init() const {
@@ -1678,6 +1680,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 
 	const int maxiter = params.prox_max_iter;
     const bool best_int = params.best_int;
+    const bool accel_prox = params.accel_prox;
 	const float prox_tol = params.prox_energy_tol;		// proximal energy tolerance
 
 	// dual Frank-Wolfe variables
@@ -1735,12 +1738,13 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		gamma.fill(1);	// all zero is a fixed point of QP iteration!
 		cur_Q = Q;
         
-        // accelerated prox
-        w_it = float(it)/(it+3.0);  // simplest choice
-        tmp = Q - prev_Q;
-        tmp *= w_it;
-        cur_Q += tmp;   // cur_Q = Q + w_it(Q - prev_Q)
-        prev_Q = Q;
+        if (accel_prox) {   // accelerated prox
+            w_it = float(it)/(it+3.0);  // simplest choice
+            tmp = Q - prev_Q;
+            tmp *= w_it;
+            cur_Q += tmp;   // cur_Q = Q + w_it(Q - prev_Q)
+            prev_Q = Q;
+        }
         
 		int pit = 0;
 		alpha_tQ.fill(0);	// all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
