@@ -404,6 +404,7 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     Q = crf.lp_inference_prox(Q, lp_params);
     end = clock();
     timing = (double(end-start)/CLOCKS_PER_SEC);
+    std::cout << "PROX-LP: " << timing << std::endl;
     double final_energy = crf.compute_energy(Q);
     double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
     write_down_perf(timing, final_energy, discretized_energy, path_to_output);

@@ -51,9 +51,14 @@ public:
 	float qp_const;			// const used in qp-gamma
     bool best_int;          // return the Q that yields the best integer energy
     bool accel_prox;        // accelerated proximal method
+    // multi-plane FW params (work_set_size==0 && approx_fw_iter==0 ==> standard FW)
+    int work_set_size;      // working set size 
+    int approx_fw_iter;     // approximate FW iterations
 	LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, 
-        int prox_max_iter, int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const, 
-        bool best_int, bool accel_prox);
+        int prox_max_iter, int fw_max_iter, 
+        int qp_max_iter, float qp_tol, float qp_const, 
+        bool best_int, bool accel_prox, 
+        int work_set_size, int approx_fw_iter);
 	LP_inf_params();	// default values
 };
 

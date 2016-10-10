@@ -127,23 +127,30 @@ UnaryEnergy* DenseCRF::getUnaryEnergy() {
 ///////////////////////
 /////  Inference  /////
 ///////////////////////
-LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, int prox_max_iter,
-	   	int fw_max_iter, int qp_max_iter, float qp_tol, float qp_const, bool best_int, bool accel_prox):
-        prox_reg_const(prox_reg_const),	dual_gap_tol(dual_gap_tol), prox_max_iter(prox_max_iter), 
-        fw_max_iter(fw_max_iter), qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const), 
-        best_int(best_int), accel_prox(accel_prox){}
+LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, 
+        int prox_max_iter, int fw_max_iter, 
+        int qp_max_iter, float qp_tol, float qp_const, 
+        bool best_int, bool accel_prox, 
+        int work_set_size, int approx_fw_iter):
+        prox_reg_const(prox_reg_const),	dual_gap_tol(dual_gap_tol), prox_energy_tol(prox_energy_tol), 
+        prox_max_iter(prox_max_iter), fw_max_iter(fw_max_iter), 
+        qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const), 
+        best_int(best_int), accel_prox(accel_prox),
+        work_set_size(work_set_size), approx_fw_iter(approx_fw_iter) {}
 
 LP_inf_params::LP_inf_params() {
 	prox_reg_const = 1e-2;	
-	dual_gap_tol = 1e0;		
-	prox_energy_tol = 1e0;		
+	dual_gap_tol = 1e3;		
+	prox_energy_tol = 1e3;		
 	prox_max_iter = 10;		
-	fw_max_iter = 50;		
+	fw_max_iter = 10;		
 	qp_max_iter = 1000;		
-	qp_tol = 1e-3;			
+	qp_tol = 1e3;			
 	qp_const = 1e-16;			
-    best_int = false;
+    best_int = true;
     accel_prox = true;
+    work_set_size = 10;
+    approx_fw_iter = 100;
 }
 
 MatrixXf DenseCRF::unary_init() const {
@@ -1726,6 +1733,12 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     
     //std::cout << "\n## C ##\n" << C << std::endl; exit(1);
 
+    // multi-plane FW --> NO ADAPTIVE SELECTION OF WORKING-SET-SIZE AND APPROX-FW-ITER as of now
+    const int work_set_size = 0;//params.work_set_size;
+    const int approx_fw_iter = 0;//params.approx_fw_iter;
+    const bool mp_fw = (work_set_size != 0 || approx_fw_iter != 0);
+    std::vector<MatrixXf> working_set;    // stores conditional gradients (copied)
+
     clock_t start, end;
     int it=0;
     int count = 0;
@@ -1940,6 +1953,66 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			tmp = s_tQ - alpha_tQ;
 			tmp *= delta;
 			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
+
+            if (mp_fw) {
+                if (working_set.size() == work_set_size) working_set.erase(working_set.begin());
+                working_set.push_back(s_tQ);
+            }
+
+            // multi-plane approximate iterations
+            for (int appit = 0; appit < approx_fw_iter; ++appit) {
+                // case-1: use the old-gamma
+                // case-2:
+                beta_mat = (alpha_tQ + gamma - unary);	// -B^T/l * (A * alpha + gamma - phi)
+			    beta = -beta_mat.colwise().sum();	
+			    beta /= M_;
+			    // repeat beta in each row of beta_mat - - B * beta
+			    for (int j = 0; j < M_; ++j) {
+				    beta_mat.row(j) = beta;
+			    }
+                //
+                // case-3
+                Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;
+                double maxe = 0;
+                MatrixXf& s_tQ_hat = working_set[0];
+                clock_t st = clock();
+                for (int i = 0; i < working_set.size(); ++i) {
+                    double e = dotProduct(working_set[i], Q, dot_tmp);
+                    if (maxe < e) {
+                        maxe = e;
+                        s_tQ_hat = working_set[i];
+                    }
+                }
+                clock_t et = clock();
+                printf("#App-FW-Time: %5.5f\t", (double)(et-st)/CLOCKS_PER_SEC);
+
+                // find dual gap
+    			tmp = alpha_tQ - s_tQ_hat;	
+    			dual_gap = dotProduct(tmp, Q, dot_tmp);
+    
+    			// dual-energy value
+    			tmp2 = Q - cur_Q;
+    			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
+    			dual_energy -= beta.sum();
+    			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
+    		   	primal_energy += dotProduct(unary, Q, dot_tmp);
+    			primal_energy -= dotProduct(s_tQ_hat, Q, dot_tmp);	// cancel the neg in s_tQ_hat
+    			//assert(dual_gap == (dual_energy - primal_energy));
+    			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", appit, dual_gap, primal_energy+dual_energy, 
+                        -dual_energy, primal_energy);
+    			if (dual_gap <= dual_gap_tol) break;	// stopping condition
+    
+    			// optimal fw step size
+    			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+    			delta = std::min(std::max(delta, (float)0.0), (float)1.0);
+    			assert(delta > 0);
+    			printf("%1.10f]\n", delta);
+
+                // update alpha_tQ
+		    	tmp = s_tQ_hat - alpha_tQ;
+	    		tmp *= delta;
+    			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ_hat - alpha_tQ);
+            }
 
 		} while(pit<=fw_maxiter);
 
