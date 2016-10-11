@@ -124,7 +124,7 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/",
                        ".jpg",
                        ".png",
-                       "Pascal2010_2");
+                       "Pascal2010");
     }
     else if (dataset_name == "MSRC_2") {
         return Dataset("/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
@@ -133,7 +133,7 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/",
                        ".bmp",
                        "_GT.bmp",
-                       "MSRC_2");
+                       "MSRC");
     }
     // Add some possible other datasets
     else if (dataset_name == "Pascal2010_3") {
@@ -143,7 +143,7 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/",
                        ".jpg",
                        ".png",
-                       "Pascal2010_3");
+                       "Pascal2010");
     }
     else if (dataset_name == "MSRC_3") {
         return Dataset("/media/ajanthan/sheep/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
@@ -152,7 +152,7 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "/media/ajanthan/sheep/Ajanthan/data/MSRC/",
                        ".bmp",
                        "_GT.bmp",
-                       "MSRC_3");
+                       "MSRC");
     }
 }
 

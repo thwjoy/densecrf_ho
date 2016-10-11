@@ -26,10 +26,11 @@ for i=1:length(gtids)
 
     % ground truth label file
     gtfile = sprintf(gtimgpath,imname);
+%     break;
     [gtim,map] = imread(gtfile);
     gtim = double(gtim);
 
-    try
+    %try
     % results file
     resfile = sprintf(respath_tmpl, imname);
     [resim,map] = imread(resfile);
@@ -59,8 +60,8 @@ for i=1:length(gtids)
     count = count + numel(find(locs));
     confcounts(:) = confcounts(:) + hs(:);
 
-    catch
-    end
+    %catch
+    %end
 end
 
 % confusion matrix - first index is true label, second is inferred label
