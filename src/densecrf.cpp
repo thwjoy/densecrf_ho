@@ -34,13 +34,14 @@
 #include "pairwise.h"
 #include <cmath>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <set>
 
 #define BRUTE_FORCE false	// brute-force subgraient computation, used in lp_prox and energy computations
-#define VERBOSE false	    // print intermediate energy values and timings, used in lp_prox
+#define VERBOSE true	    // print intermediate energy values and timings, used in lp_prox
 
 #define DCNEG_FASTAPPROX false
 /////////////////////////////
@@ -151,7 +152,7 @@ LP_inf_params::LP_inf_params() {
     best_int = true;
     accel_prox = true;
     work_set_size = 10;
-    approx_fw_iter = 100;
+    approx_fw_iter = 10;
 }
 
 MatrixXf DenseCRF::unary_init() const {
@@ -2025,6 +2026,424 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #endif
 
     return best_Q;
+}
+
+// LP inference with proximal algorithm - tracing 
+std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, LP_inf_params & params, 
+        double time_limit, std::string out_file_name) const {
+
+    MatrixXf best_Q(M_, N_), tmp(M_, N_), tmp2(M_, N_);
+    MatrixP dot_tmp(M_, N_);
+    MatrixXi ind(M_, N_);
+    VectorXi K(N_);
+    VectorXd sum(N_);
+    MatrixXf unary = unary_->get();
+
+    MatrixXf Q = init;
+    renormalize(Q);
+    assert(valid_probability_debug(Q));
+    best_Q = Q;
+
+    bool dump = false;
+    std::ofstream fout;
+    if (out_file_name != "") {
+        dump = true;
+        fout.open(out_file_name.c_str());
+    }
+
+    // Compute the value of the energy
+    double energy = 0, best_energy = std::numeric_limits<double>::max(), 
+		   best_int_energy = std::numeric_limits<double>::max();
+    double int_energy = assignment_energy_true(currentMap(Q));
+#if VERBOSE    
+    double kl = klDivergence(Q, max_rounding(Q));
+#endif
+	energy = compute_energy_LP(Q);
+    if (energy > int_energy) {  // choose the best initialization 
+        Q = max_rounding(Q);
+    	energy = compute_energy_LP(Q);
+    }
+	best_energy = energy;
+	best_int_energy = int_energy;
+#if VERBOSE    
+    std::cout << "#file: " << out_file_name << ", dump: " << dump << std::endl;
+    printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f", energy, int_energy, kl);
+    if (dump) fout << "Initial energy in the LP-Prox: " << energy << " / " << int_energy << " / " << kl;
+#endif
+
+	const int maxiter = params.prox_max_iter;
+    const bool best_int = params.best_int;
+    const bool accel_prox = params.accel_prox;
+	const float prox_tol = params.prox_energy_tol;		// proximal energy tolerance
+
+	// dual Frank-Wolfe variables
+	const float dual_gap_tol = params.dual_gap_tol;		// dual gap tolerance
+	const float lambda = params.prox_reg_const;	// proximal-regularization constant
+	const int fw_maxiter = params.fw_max_iter;
+	float delta = 1;						// FW step size
+	double dual_gap = 0, dual_energy = 0;
+
+	// dual variables
+	MatrixXf alpha_tQ(M_, N_);	// A * alpha, (t - tilde not iteration)
+	MatrixXf s_tQ(M_, N_);		// A * s, conditional gradient of FW == subgradient
+	VectorXf beta(N_);			// unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
+	MatrixXf beta_mat(M_, N_);	// beta_mat.row(i) == beta forall i --> N_ * M_ elements 
+	MatrixXf gamma(M_, N_);		// nonnegative
+	
+	MatrixXf cur_Q(M_, N_);		// current Q in prox step
+	MatrixXf rescaled_Q(M_, N_);// infeasible Q rescaled to be within [0,1]
+#if VERBOSE
+	MatrixXf int_Q(M_, N_);		// store integral Q
+#endif
+
+    // accelerated prox_lp
+	MatrixXf prev_Q(M_, N_);	// Q resulted in prev prox step
+    prev_Q.fill(0);
+    float w_it = 1;             // momentum weight: eg. it/(it+3)
+
+	// gamma-qp variables
+	const float qp_delta = params.qp_const;	// constant used in qp-gamma
+	const float qp_tol = params.qp_tol;		// qp-gamma tolernace
+	const int qp_maxiter = params.qp_max_iter;
+
+	MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
+	VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_);
+	MatrixXf Y(M_, N_), neg_H(M_, N_), pos_H(M_, N_);
+	VectorXf qp_values(N_);
+
+	pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/M_);				      
+	pos_C *= lambda;	// pos_C
+	neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
+	neg_C /= M_;													      
+	neg_C *= lambda; 	// neg_C
+	C = pos_C - neg_C;	// C
+	abs_C = pos_C + neg_C;	// abs_C
+    
+    // multi-plane FW --> NO ADAPTIVE SELECTION OF WORKING-SET-SIZE AND APPROX-FW-ITER as of now
+    const int work_set_size = 0;//params.work_set_size;
+    const int approx_fw_iter = 0;//params.approx_fw_iter;
+    const bool mp_fw = (work_set_size != 0 || approx_fw_iter != 0);
+    std::vector<MatrixXf> working_set;    // stores conditional gradients (copied)
+
+    double perf_energy, perf_timing;
+    double total_time = 0;
+    perf_measure latest_perf;
+    std::vector<perf_measure> perfs;
+    //clock_t start, end;
+    time_t start, end;
+    int it=0;
+    int count = 0;
+    do {
+        ++it;
+
+        //start = clock();
+        start = time(NULL);
+
+		// initialization
+		beta_mat.fill(0);
+		beta.fill(0);
+		gamma.fill(1);	// all zero is a fixed point of QP iteration!
+		cur_Q = Q;
+        
+        if (accel_prox) {   // accelerated prox
+            w_it = float(it)/(it+3.0);  // simplest choice
+            tmp = Q - prev_Q;
+            tmp *= w_it;
+            cur_Q += tmp;   // cur_Q = Q + w_it(Q - prev_Q)
+            prev_Q = Q;
+        }
+        
+		int pit = 0;
+		alpha_tQ.fill(0);	// all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
+		
+		// prox step
+		do {	
+			++pit;
+			// initialization
+			s_tQ.fill(0);
+
+            //if (pit == 1) { // only compute beta and gamma in the first iteration
+			// QP-gamma -- \cite{NNQP solver Xiao and Chen 2014}
+			// case-1: solve for gamma using qp solver! 
+			// 1/2 * gamma^T * C * gamma - gamma^T * H
+			// populate Y matrix
+			tmp = alpha_tQ - unary;
+			for (int i = 0; i < N_; ++i) {
+				v_y = C * tmp.col(i);
+				Y.col(i) = v_y;
+			}	
+			Y += cur_Q;		// H = -Y
+			for (int i = 0; i < N_; ++i) {
+				for (int j = 0; j < M_; ++j) {	
+					pos_H(j, i) = std::max(-Y(j, i), (float)0);		// pos_H 
+					neg_H(j, i) = std::max(Y(j, i), (float)0);		// neg_H
+				}
+			}
+			// qp iterations, 
+			int qpit = 0;
+			qp_values.fill(0);
+		    //gamma.fill(1);	// initializing gamma here affects efficiency!
+			float qp_value = std::numeric_limits<float>::max();
+#if VERBOSE
+            //clock_t st = clock();
+            time_t st = time(NULL);
+#endif
+			do {
+				//solve for each pixel separately
+				for (int i = 0; i < N_; ++i) {
+					v_gamma = gamma.col(i);
+					v_pos_h = pos_H.col(i);
+					v_neg_h = neg_H.col(i);
+					v_step = 2 * neg_C * v_gamma + v_pos_h;
+					v_step = v_step.array() + qp_delta;
+					v_tmp = abs_C * v_gamma + v_neg_h;
+				    v_tmp = v_tmp.array() + qp_delta;
+					v_step = v_step.cwiseQuotient(v_tmp);
+					v_gamma = v_gamma.cwiseProduct(v_step);
+					gamma.col(i) = v_gamma;
+
+					// qp value
+					v_tmp = C * v_gamma;
+					v_y = Y.col(i);
+					qp_values(i) = 0.5 * v_gamma.dot(v_tmp) + v_gamma.dot(v_y);
+				}
+				float qp_value1 = qp_values.sum();
+				//printf("\n#QP: %4d, %10.3f", qpit, qp_value1);
+				++qpit;
+				if (std::abs(qp_value - qp_value1) < qp_tol) break;
+				qp_value = qp_value1;
+			} while (qpit <= qp_maxiter);
+#if VERBOSE
+            //clock_t et = clock();
+            time_t et = time(NULL);
+            //double dt = (double)(et-st)/CLOCKS_PER_SEC;
+            double dt = difftime(et,st);
+            printf("\n# Time-QP %d: %5.5f, %10.3f\t", qpit, dt, qp_value);
+            if (dump) fout << "\n# Time-QP " << qpit << ": " << dt << ", " << qp_value << '\t';
+#endif
+			// end-qp-gamma
+
+			// case-2: update beta -- gradient of dual wrt beta equals to zero
+			beta_mat = (alpha_tQ + gamma - unary);	// -B^T/l * (A * alpha + gamma - phi)
+			// DON'T DO IT AT ONCE!! (RETURNS A SCALAR???)--> do it in two steps
+			beta = -beta_mat.colwise().sum();	
+			beta /= M_;
+			// repeat beta in each row of beta_mat - - B * beta
+			for (int j = 0; j < M_; ++j) {
+				beta_mat.row(j) = beta;
+			}
+            //}
+
+			// case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
+			Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;	// Q may be infeasible --> but no problem
+
+			// new PH implementation doesn't work with Q values outside [0,1] - or in fact truncates to be within [0,1]
+    		// rescale Q to be within [0,1] -- order of Q values preserved!
+    		rescale(rescaled_Q, Q);
+
+			// subgradient lower minus upper
+			// Pairwise
+            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+#if VERBOSE
+                //st = clock();
+                st = time(NULL);
+#endif
+				// new PH implementation
+				// rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
+                pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);	
+
+                s_tQ += tmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
+#if VERBOSE
+                //et = clock();
+                et = time(NULL);
+                //dt = (double)(et-st)/CLOCKS_PER_SEC;
+                dt = difftime(et,st);
+                printf("# Time-%d: %5.5f\t", k, dt);
+                if (dump) fout << "# Time-" << k << ": " << dt << '\t';
+#endif
+            }
+			// find dual gap
+			tmp = alpha_tQ - s_tQ;	
+			dual_gap = dotProduct(tmp, Q, dot_tmp);
+
+#if VERBOSE
+			// dual-energy value
+			tmp2 = Q - cur_Q;
+			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
+			dual_energy -= beta.sum();
+			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
+		   	primal_energy += dotProduct(unary, Q, dot_tmp);
+			primal_energy -= dotProduct(s_tQ, Q, dot_tmp);	// cancel the neg in s_tQ
+			//assert(dual_gap == (dual_energy - primal_energy));
+			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, primal_energy+dual_energy, 
+                    -dual_energy, primal_energy);
+			if (dump) fout << pit-1 << ": [" << dual_gap << " = " << primal_energy+dual_energy << ", "
+                    << -dual_energy << ", " << primal_energy << ", ";
+            //if (dual_gap < 0) {   // may become negative due to PH approximations!
+            //    std::cout << "\nERROR: Dual-gap cannot be negative!\n";
+            //    exit(1);
+            //}
+#endif
+			if (dual_gap <= dual_gap_tol) break;	// stopping condition
+
+			// optimal fw step size
+			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+			delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
+			assert(delta > 0);
+#if VERBOSE
+			printf("%1.10f]", delta);
+			if (dump) fout << delta << "]";
+#endif
+			// update alpha_tQ
+			tmp = s_tQ - alpha_tQ;
+			tmp *= delta;
+			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
+
+            if (mp_fw) {
+                if (working_set.size() == work_set_size) working_set.erase(working_set.begin());
+                working_set.push_back(s_tQ);
+            }
+
+            // multi-plane approximate iterations
+            for (int appit = 0; appit < approx_fw_iter; ++appit) {
+                // case-1: use the old-gamma
+                // case-2:
+                beta_mat = (alpha_tQ + gamma - unary);	// -B^T/l * (A * alpha + gamma - phi)
+			    beta = -beta_mat.colwise().sum();	
+			    beta /= M_;
+			    // repeat beta in each row of beta_mat - - B * beta
+			    for (int j = 0; j < M_; ++j) {
+				    beta_mat.row(j) = beta;
+			    }
+                //
+                // case-3
+                Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;
+                double maxe = 0;
+                MatrixXf& s_tQ_hat = working_set[0];
+#if VERBOSE
+                //st = clock();
+                st = time(NULL);
+#endif
+                for (int i = 0; i < working_set.size(); ++i) {
+                    double e = dotProduct(working_set[i], Q, dot_tmp);
+                    if (maxe < e) {
+                        maxe = e;
+                        s_tQ_hat = working_set[i];
+                    }
+                }
+#if VERBOSE
+                //et = clock();
+                et = time(NULL);
+                //dt = (double)(et-st)/CLOCKS_PER_SEC;
+                dt = difftime(et,st);
+                printf("#App-FW-Time: %5.5f\t", dt);
+                if (dump) fout << "#App-FW-Time: " << dt << '\t';
+#endif
+
+                // find dual gap
+    			tmp = alpha_tQ - s_tQ_hat;	
+    			dual_gap = dotProduct(tmp, Q, dot_tmp);
+    
+#if VERBOSE
+    			// dual-energy value
+    			tmp2 = Q - cur_Q;
+    			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
+    			dual_energy -= beta.sum();
+    			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
+    		   	primal_energy += dotProduct(unary, Q, dot_tmp);
+    			primal_energy -= dotProduct(s_tQ_hat, Q, dot_tmp);	// cancel the neg in s_tQ_hat
+    			//assert(dual_gap == (dual_energy - primal_energy));
+    			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", appit, dual_gap, primal_energy+dual_energy, 
+                        -dual_energy, primal_energy);
+			    if (dump) fout << appit << ": [" << dual_gap << " = " << primal_energy+dual_energy << ", "
+                        << -dual_energy << ", " << primal_energy << ", ";
+#endif
+    			if (dual_gap <= dual_gap_tol) break;	// stopping condition
+    
+    			// optimal fw step size
+    			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+    			delta = std::min(std::max(delta, (float)0.0), (float)1.0);
+    			assert(delta > 0);
+#if VERBOSE
+    			printf("%1.10f]", delta);
+			    if (dump) fout << delta << "]";
+#endif
+                // update alpha_tQ
+		    	tmp = s_tQ_hat - alpha_tQ;
+	    		tmp *= delta;
+    			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ_hat - alpha_tQ);
+            }
+
+		} while(pit<=fw_maxiter);
+
+		// project Q back to feasible region
+		feasible_Q(tmp, ind, sum, K, Q);
+		Q = tmp;
+		renormalize(Q);
+        assert(valid_probability_debug(Q));
+
+        double prev_energy = energy;
+		energy = compute_energy_LP(Q);
+        int_energy = assignment_energy_true(currentMap(Q));
+#if VERBOSE
+        int_Q = max_rounding(Q);
+        kl = klDivergence(Q, int_Q);
+#endif
+
+        if (abs(energy - prev_energy) < prox_tol) ++count;
+        else count = 0;
+        if (count >= 5) {
+            std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
+                << " iterations! terminating...\n";
+            if (dump) fout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
+                << " iterations! terminating...\n";
+            break;
+        }
+
+        if (best_int) {
+		    if( int_energy < best_int_energy) {
+                best_Q = Q;
+                best_int_energy = int_energy;
+            }
+#if VERBOSE
+            printf("\n# Prox%4d: %10.3f / %10.3f / %10.3f / %10.3f [%4d, %10.3f]\n", it-1, energy, 
+                int_energy, kl, best_int_energy, pit-1, dual_gap);
+            if (dump) fout << "\n# Prox-" << it-1 << ": " << energy << " / " << int_energy << " / " << kl << " / " 
+                << best_int_energy << " [" << pit-1 << ", " << dual_gap << "]" << std::endl;
+#endif
+        } else {
+    		if( energy < best_energy) {
+                best_Q = Q;
+                best_energy = energy;
+            }
+#if VERBOSE
+            printf("\n%4d: %10.3f / %10.3f / %10.3f / %10.3f [%4d, %10.3f]\n", it-1, energy, int_energy, 
+                kl, best_energy, pit-1, dual_gap);
+            if (dump) fout << "\n" << it-1 << ": " << energy << " / " << int_energy << " / " << kl << " / " 
+                << best_energy << " [" << pit-1 << ", " << dual_gap << "]" << std::endl;
+#endif
+        }
+
+        if (energy < 0) {
+            std::cout << "\n##ERROR: LP energy cannot be negative! aborting...\n";
+            if (dump) fout << "\n##ERROR: LP energy cannot be negative! aborting...\n";
+            break;
+        }
+        //end = clock();
+        //perf_timing = (double(end-start)/CLOCKS_PER_SEC);
+        end = time(NULL);
+        perf_timing = difftime(end, start);
+        perf_energy = int_energy;
+        latest_perf = std::make_pair(perf_timing, perf_energy);
+        perfs.push_back(latest_perf);
+        total_time += perf_timing;
+
+    } while(it < maxiter && (time_limit == 0 || total_time < time_limit));
+
+    if (dump) fout.close();
+
+    init = best_Q;
+    return perfs;
 }
 
 std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit) const {

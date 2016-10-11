@@ -28,14 +28,16 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
 
     MatrixXf Q;
     {
-        std::string path_to_subexp_results = path_to_results + "/" + method + "/";
+        std::string path_to_subexp_results = path_to_results + method + "/";
         std::string output_path = get_output_path(path_to_subexp_results, image_name);
+        make_dir(path_to_subexp_results);
         if (not file_exist(output_path)) {
             //clock_t start, end;
             time_t start, end;
             double timing;
             std::cout << image_path << std::endl;
             //start = clock();
+            std::vector<perf_measure> traced_perfs;
             start = time(NULL);
             Q = crf.unary_init();
             if (method == "mf5") {
@@ -62,14 +64,19 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
                 Q = crf.lp_inference_prox(Q, lp_params);
+            } else if (method == "tracing-prox_lp"){
+                Q = crf.qp_inference(Q);
+                Q = crf.concave_qp_cccp_inference(Q);
+                std::string out_file_name = output_path;
+                out_file_name.replace(out_file_name.end()-3, out_file_name.end(),"out");
+                traced_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, out_file_name);
             } else if (method == "unary"){
                 (void)0;
             } else{
-                std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
+                std::cout << "Unrecognised method: " << method << ".\n Proper error handling "
+                    "would do something but I won't." << '\n';
             }
 
-
-            make_dir(path_to_subexp_results);
             //end = clock();
             end = time(NULL);
             //timing = (double(end-start)/CLOCKS_PER_SEC);
@@ -79,9 +86,20 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             save_map(Q, size, output_path, dataset_name);
             std::string txt_output = output_path;
             txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
-            std::ofstream txt_file(txt_output.c_str());
-            txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+            std::ofstream txt_file(txt_output);
+
+            if(method.find("tracing")!=std::string::npos){
+                for (int it=0; it<traced_perfs.size(); it++) {
+                    txt_file << it << '\t' << traced_perfs[it].first << '\t' << traced_perfs[it].second << std::endl;
+                }
+            } else {
+                txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+            }
+            std::cout << "#PROX-LP: " << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
             txt_file.close();
+        } else {    // file already exists
+            std::cout << image_path << std::endl;
+            std::cout << "Output already exists! skipping... " << std::endl;
         }
     }
 }
@@ -137,7 +155,7 @@ int main(int argc, char *argv[])
     omp_set_num_threads(8);
 #pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
-    //for(int i=0; i< 10; ++i){
+    //for(int i=4; i< 5; ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params);
     }
