@@ -39,7 +39,8 @@
 #include <limits>
 #include <set>
 
-#define BRUTE_FORCE false	// used in LP-prox inference, brute-force subgraient computation
+#define BRUTE_FORCE false	// brute-force subgraient computation, used in lp_prox and energy computations
+#define VERBOSE false	    // print intermediate energy values and timings, used in lp_prox
 
 #define DCNEG_FASTAPPROX false
 /////////////////////////////
@@ -1649,16 +1650,16 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 
     MatrixXf Q = init;
     renormalize(Q);
-    if (not valid_probability(Q)) {
-        std::cout << "Bad probability" << '\n';
-    }
+    assert(valid_probability_debug(Q));
     best_Q = Q;
 
     // Compute the value of the energy
     double energy = 0, best_energy = std::numeric_limits<double>::max(), 
 		   best_int_energy = std::numeric_limits<double>::max();
     double int_energy = assignment_energy_true(currentMap(Q));
+#if VERBOSE    
     double kl = klDivergence(Q, max_rounding(Q));
+#endif
 	energy = compute_energy_LP(Q);
     if (energy > int_energy) {  // choose the best initialization 
         Q = max_rounding(Q);
@@ -1666,7 +1667,9 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     }
 	best_energy = energy;
 	best_int_energy = int_energy;
+#if VERBOSE    
     printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f\n", energy, int_energy, kl);
+#endif
 
 	const int maxiter = params.prox_max_iter;
     const bool best_int = params.best_int;
@@ -1689,7 +1692,9 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 	
 	MatrixXf cur_Q(M_, N_);		// current Q in prox step
 	MatrixXf rescaled_Q(M_, N_);// infeasible Q rescaled to be within [0,1]
+#if VERBOSE
 	MatrixXf int_Q(M_, N_);		// store integral Q
+#endif
 
     // accelerated prox_lp
 	MatrixXf prev_Q(M_, N_);	// Q resulted in prev prox step
@@ -1714,8 +1719,6 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 	C = pos_C - neg_C;	// C
 	abs_C = pos_C + neg_C;	// abs_C
     
-    //std::cout << "\n## C ##\n" << C << std::endl; exit(1);
-
     // multi-plane FW --> NO ADAPTIVE SELECTION OF WORKING-SET-SIZE AND APPROX-FW-ITER as of now
     const int work_set_size = 0;//params.work_set_size;
     const int approx_fw_iter = 0;//params.approx_fw_iter;
@@ -1773,7 +1776,9 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			qp_values.fill(0);
 		    //gamma.fill(1);	// initializing gamma here affects efficiency!
 			float qp_value = std::numeric_limits<float>::max();
+#if VERBOSE
             start = clock();
+#endif
 			do {
 				//solve for each pixel separately
 				for (int i = 0; i < N_; ++i) {
@@ -1799,8 +1804,10 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 				if (std::abs(qp_value - qp_value1) < qp_tol) break;
 				qp_value = qp_value1;
 			} while (qpit <= qp_maxiter);
+#if VERBOSE
             end = clock();
             printf("# Time-QP %d: %5.5f, %10.3f\t", qpit, (double)(end-start)/CLOCKS_PER_SEC, qp_value);
+#endif
 			// end-qp-gamma
 
 			// case-2: update beta -- gradient of dual wrt beta equals to zero
@@ -1830,7 +1837,9 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			// subgradient lower minus upper
 			// Pairwise
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+#if VERBOSE
                 start = clock();
+#endif
 #if BRUTE_FORCE
 				// brute-force computation
             	no_norm_pairwise_[k]->apply_upper_minus_lower_bf(tmp2, ind);
@@ -1846,13 +1855,16 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                 pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);	
 #endif
                 s_tQ += tmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
+#if VERBOSE
                 end = clock();
                 printf("# Time-%d: %5.5f\t", k, (double)(end-start)/CLOCKS_PER_SEC);
+#endif
             }
 			// find dual gap
 			tmp = alpha_tQ - s_tQ;	
 			dual_gap = dotProduct(tmp, Q, dot_tmp);
 
+#if VERBOSE
 			// dual-energy value
 			tmp2 = Q - cur_Q;
 			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
@@ -1867,71 +1879,16 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
             //    std::cout << "\nERROR: Dual-gap cannot be negative!\n";
             //    exit(1);
             //}
+#endif
 			if (dual_gap <= dual_gap_tol) break;	// stopping condition
 
 			// optimal fw step size
 			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
 			delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
 			assert(delta > 0);
+#if VERBOSE
 			printf("%1.10f]\n", delta);
-
-//            /////////////
-// 			// do line search for delta		
-// 			int sz = 10;		
-// 			float delta_ls = 0;		
-// 			double dual_energy1 = std::numeric_limits<double>::max(), primal_energy1 = primal_energy;		
-// 			for (int i = 0; i <= sz; ++i) {		
-// 				float d = (float)i/sz;		
-//                tmp = s_tQ - alpha_tQ;
-//                tmp *= d;
-// 				MatrixXf t1 = alpha_tQ + tmp;	// tmp = alpha_tQ + d * (s_tQ - alpha_tQ);		
-// 				t1 = lambda * (t1 + beta_mat + gamma - unary) + cur_Q;		
-// 				tmp2 = t1 - cur_Q;		
-// 				double de = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;		
-// 				de -= beta.sum();		
-// 				double pe = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
-//                MatrixXf rescaled_t1 = t1;
-//                MatrixXf s_t1 = t1;
-//                s_t1.fill(0);
-//#if BRUTE_FORCE
-//            	sortRows(t1, ind);
-//#else
-//    			// new PH implementation doesn't work with Q values outside [0,1] - or in fact truncates to be within [0,1]
-//    	    	// rescale Q to be within [0,1] -- order of Q values preserved!
-//    		    rescale(rescaled_t1, t1);
-//#endif
-//			    // subgradient lower minus upper
-//		    	// Pairwise
-//                for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-//#if BRUTE_FORCE
-//    				// brute-force computation
-//            	    no_norm_pairwise_[k]->apply_upper_minus_lower_bf(tmp2, ind);
-//                  	//no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp2, ind);
-//                	for(int ii=0; ii<tmp2.cols(); ++ii) {
-//                    	for(int j=0; j<tmp2.rows(); ++j) {
-//                        	tmp(j, ind(j, ii)) = tmp2(j, ii);
-//                    	}
-//                	}
-//#else
-//		    		// new PH implementation
-//	    			// rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
-//                    pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_t1);	
-//#endif
-//                    s_t1 += tmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
-//                }
-//		   	    pe += dotProduct(unary, t1, dot_tmp);   // unary
-//                pe -= dotProduct(s_t1, t1, dot_tmp);    // pairwise
-// 			    //printf("\ninside: (%10.3f, %10.3f, %1.10f)", -de, pe, d);
-// 				if (de < dual_energy1) {		
-// 					delta_ls = d;		
-// 					dual_energy1 = de;		
-// 					primal_energy1 = pe;		
-// 				}		
-// 			}	
-// 			printf("##%4d: (%10.3f, %10.3f, %1.10f) ", pit-1, -dual_energy1, primal_energy1, delta_ls);
-//            if (dual_energy < dual_energy1) std::cout << "\nERROR: step size is not optimal!";
-//            //////////////////////
-
+#endif
 			// update alpha_tQ
 			tmp = s_tQ - alpha_tQ;
 			tmp *= delta;
@@ -1958,7 +1915,9 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                 Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;
                 double maxe = 0;
                 MatrixXf& s_tQ_hat = working_set[0];
+#if VERBOSE
                 clock_t st = clock();
+#endif
                 for (int i = 0; i < working_set.size(); ++i) {
                     double e = dotProduct(working_set[i], Q, dot_tmp);
                     if (maxe < e) {
@@ -1966,13 +1925,16 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                         s_tQ_hat = working_set[i];
                     }
                 }
+#if VERBOSE
                 clock_t et = clock();
                 printf("#App-FW-Time: %5.5f\t", (double)(et-st)/CLOCKS_PER_SEC);
+#endif
 
                 // find dual gap
     			tmp = alpha_tQ - s_tQ_hat;	
     			dual_gap = dotProduct(tmp, Q, dot_tmp);
     
+#if VERBOSE
     			// dual-energy value
     			tmp2 = Q - cur_Q;
     			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
@@ -1983,13 +1945,16 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     			//assert(dual_gap == (dual_energy - primal_energy));
     			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", appit, dual_gap, primal_energy+dual_energy, 
                         -dual_energy, primal_energy);
+#endif
     			if (dual_gap <= dual_gap_tol) break;	// stopping condition
     
     			// optimal fw step size
     			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
     			delta = std::min(std::max(delta, (float)0.0), (float)1.0);
     			assert(delta > 0);
+#if VERBOSE
     			printf("%1.10f]\n", delta);
+#endif
 
                 // update alpha_tQ
 		    	tmp = s_tQ_hat - alpha_tQ;
@@ -2008,8 +1973,10 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
         double prev_energy = energy;
 		energy = compute_energy_LP(Q);
         int_energy = assignment_energy_true(currentMap(Q));
+#if VERBOSE
         int_Q = max_rounding(Q);
         kl = klDivergence(Q, int_Q);
+#endif
 
         if (abs(energy - prev_energy) < prox_tol) ++count;
         else count = 0;
@@ -2024,22 +1991,18 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                 best_Q = Q;
                 best_int_energy = int_energy;
             }
+#if VERBOSE
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_int_energy);
+#endif
         } else {
     		if( energy < best_energy) {
                 best_Q = Q;
                 best_energy = energy;
             }
+#if VERBOSE
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
+#endif
         }
-
-//        if (infiniteNorm(Q - int_Q) < 0.5) ++count; // doesn't apply for our objective
-//        else count = 0;
-//        if (count >= 50) {
-//            std::cout << "\n##CONV: Each label is chosen with probability > 0.5 for last " << count 
-//                << " iterations! terminating...\n";
-//            break;
-//        }
 
         if (energy < 0) {
             std::cout << "\n##ERROR: LP energy cannot be negative! aborting...\n";
@@ -2048,6 +2011,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 
     } while(it<maxiter);
 
+#if VERBOSE
     int_energy = assignment_energy_true(currentMap(Q));
 	std::cout <<"final projected energy: " << int_energy << "\n";
 
@@ -2058,6 +2022,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     std::cout << "gamma.cwiseProduct(Q)\t:: mean=" << tmp.mean() << ",\tmax=" << tmp.maxCoeff() << ",\tmin=" << tmp.minCoeff() << std::endl;
     std::cout << "beta_mat\t:: mean=" << beta_mat.mean() << ",\tmax=" << beta_mat.maxCoeff() << ",\tmin=" << beta_mat.minCoeff() << std::endl;
     std::cout << "alpha_tQ\t:: mean=" << alpha_tQ.mean() << ",\tmax=" << alpha_tQ.maxCoeff() << ",\tmin=" << alpha_tQ.minCoeff() << std::endl;
+#endif
 
     return best_Q;
 }
