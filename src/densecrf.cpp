@@ -1313,21 +1313,21 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
             } else {
                 // Add upper minus lower
                 // The divide and conquer way
-                /*start = clock();*/
-//                no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
-//                tmp2.fill(0);
-//                for(i=0; i<tmp.cols(); ++i) {
-//                    for(j=0; j<tmp.rows(); ++j) {
-//                        tmp2(j, ind(j, i)) = tmp(j, i);
-//                    }
-//                }
-                /*end = clock();
+                start = clock();
+                no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
+                tmp2.fill(0);
+                for(i=0; i<tmp.cols(); ++i) {
+                    for(j=0; j<tmp.rows(); ++j) {
+                        tmp2(j, ind(j, i)) = tmp(j, i);
+                    }
+                }
+                end = clock();
                 float perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-                printf("DC: It: %d | id: %d | time: %f\n", it, k, perf_timing);*/
+                printf("DC: It: %d | id: %d | time: %f\n", it, k, perf_timing);
 
                 // With the new discretized split computations
                 // start = clock();
-                pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
+                // pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
                 /*end = clock();
                 perf_timing = (double(end-start)/CLOCKS_PER_SEC);
                 printf("ORD: It: %d | id: %d | time: %f\n", it, k, perf_timing);*/
@@ -1465,18 +1465,6 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
     int i,j;
     int nb_pairwise = pairwise_.size();
 
-    // Create copies of the original pairwise since we don't want normalization
-    PairwisePotential** no_norm_pairwise;
-    no_norm_pairwise = (PairwisePotential**) malloc(pairwise_.size()*sizeof(PairwisePotential*));
-    for( unsigned int k=0; k<nb_pairwise; k++ ) {
-        no_norm_pairwise[k] = new PairwisePotential(
-            pairwise_[k]->features(),
-            new PottsCompatibility(pairwise_[k]->parameters()(0)),
-            pairwise_[k]->ktype(),
-            NO_NORMALIZATION
-            );
-    }
-
     best_Q = Q;
 
     // Compute the value of the energy
@@ -1509,14 +1497,14 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         sortRows(Q, ind);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
             // Add upper minus lower
-            /*no_norm_pairwise[k]->apply_upper_minus_lower_dc(tmp, ind);
+            no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp, ind);
             tmp2.fill(0);
             for(i=0; i<tmp.cols(); ++i) {
                 for(j=0; j<tmp.rows(); ++j) {
                     tmp2(j, ind(j, i)) = tmp(j, i);
                 }
-            }*/
-            pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
+            }
+            //pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
@@ -1609,13 +1597,8 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         int_energy = assignment_energy_true(currentMap(Q));
         renormalize(Q);
         assert(valid_probability_debug(Q));
-    } while(it<10);
+    } while(it<5);
     std::cout <<"final projected energy: " << int_energy << "\n";
-
-    for( unsigned int k=0; k<nb_pairwise; k++ ) {
-        delete no_norm_pairwise[k];
-    }
-    free(no_norm_pairwise);
 
     return best_Q;
 }
