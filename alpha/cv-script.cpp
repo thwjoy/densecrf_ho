@@ -28,7 +28,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
 
     MatrixXf Q;
     {
-        std::string path_to_subexp_results = path_to_results + method + "/";
+        std::string path_to_subexp_results = path_to_results + "/" + method + "/";
         std::string output_path = get_output_path(path_to_subexp_results, image_name);
         make_dir(path_to_subexp_results);
         if (not file_exist(output_path)) {
@@ -87,16 +87,20 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             std::string txt_output = output_path;
             txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
             std::ofstream txt_file(txt_output);
-
-            if(method.find("tracing")!=std::string::npos){
-                for (int it=0; it<traced_perfs.size(); it++) {
-                    txt_file << it << '\t' << traced_perfs[it].first << '\t' << traced_perfs[it].second << std::endl;
-                }
-            } else {
-                txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
-            }
+            txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
             std::cout << "#PROX-LP: " << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
             txt_file.close();
+
+            if(method.find("tracing")!=std::string::npos){
+                std::string trc_output = output_path;
+                trc_output.replace(trc_output.end()-3, trc_output.end(),"trc");
+                std::ofstream trc_file(trc_output);
+                for (int it=0; it<traced_perfs.size(); it++) {
+                    trc_file << it << '\t' << traced_perfs[it].first << '\t' << traced_perfs[it].second << std::endl;
+                }
+                trc_file.close();
+            }
+
         } else {    // file already exists
             std::cout << image_path << std::endl;
             std::cout << "Output already exists! skipping... " << std::endl;

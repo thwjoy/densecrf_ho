@@ -7,15 +7,27 @@ from collections import namedtuple
 Props = namedtuple("Props", ['image_id', 'timing', 'frac_energy', 'int_energy' ])
 
 def get_properties_per_images(folder_path):
+    method = folder_path.split('/')[-2]
+    tracing = False
+#    if method.find('tracing') >= 0:
+#        tracing = True
     all_txts = glob.glob(folder_path + '*.txt')
     props = []
     for txt_file in all_txts:
         with open(txt_file, 'r') as txt:
             image_id = os.path.basename(txt_file)[:-4]
-            content = txt.read().strip().split('\t');
-            timing = float(content[0])
-            frac_energy = float(content[1])
-            integer_energy = float(content[2])
+            if tracing:
+                content = txt.read().strip().split('\n')
+                last_line = content[-1].split('\t')
+                timing = float(last_line[1])
+                frac_energy = float(last_line[2])   # also int-energy
+                integer_energy = float(last_line[2])
+            else:
+                content = txt.read().strip().split('\t')
+                timing = float(content[0])
+                frac_energy = float(content[1])
+                integer_energy = float(content[2])
+
             props.append(Props(image_id, timing, frac_energy, integer_energy))
     props.sort()
 
@@ -26,7 +38,7 @@ def get_properties_per_images(folder_path):
 
 
 def main():
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print "Missing argument:"
         print "energies.py /path/to/results/folder/ /path/to/other/results/folder"
         return 1
