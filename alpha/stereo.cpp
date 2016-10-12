@@ -167,18 +167,42 @@ int main(int argc, char *argv[])
 #if RESCALED
 		crf.setPairwisePottsWeight(up_ratio, Q);
 #endif        
-        double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-        printf("Before QP: %lf\n", discretized_energy);
-        Q = crf.qp_inference(Q);
-        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-        printf("After QP: %lf\n", discretized_energy);
-        Q = crf.concave_qp_cccp_inference(Q);
-        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-        printf("After QP concave: %lf\n", discretized_energy);
+//        double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+//        printf("Before QP: %lf\n", discretized_energy);
+//        Q = crf.qp_inference(Q);
+//        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+//        printf("After QP: %lf\n", discretized_energy);
+//        Q = crf.concave_qp_cccp_inference(Q);
+//        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+//        printf("After QP concave: %lf\n", discretized_energy);
 
-        MatrixXf int_Q = crf.max_rounding(Q);
-        std::cout << "# QP: " << crf.compute_energy_true(int_Q) << ", LP: " << crf.compute_energy_LP(int_Q) 
-            << ", int: " << crf.assignment_energy_true(crf.currentMap(int_Q)) << std::endl;
+//        MatrixXf int_Q = crf.max_rounding(Q);
+//        std::cout << "# QP: " << crf.compute_energy_true(int_Q) << ", LP: " << crf.compute_energy_LP(int_Q) 
+//            << ", int: " << crf.assignment_energy_true(crf.currentMap(int_Q)) << std::endl;
+
+        std::srand(1337);
+        std::vector<perf_measure> perfs;
+        std::ofstream fout("stereo_lpsubgrad_timings.out");
+        int n = 10;
+        for (int k = 0; k < n; ++k) {
+            for (int i = 0; i < Q.cols(); ++i) {
+                for (int j = 0; j < Q.rows(); ++j) {
+                    int r = std::rand() % 100;
+                    Q(j, i) = float(r)/100.0;
+                }
+            }
+            perfs = crf.compare_lpsubgrad_timings(Q, 1);
+            fout << k << '\t';
+            std::cout << "# " <<  k << '\t';
+            for (int p = 0; p < perfs.size(); ++p) {
+                fout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << '\t';
+                std::cout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << '\t';
+            }
+            fout << std::endl;
+            std::cout << std::endl;
+        }
+        fout.close();
+        exit(1);
 
         //double ph_energy = 0, bf_energy = 0;
         //crf.compare_energies(int_Q, ph_energy, bf_energy, false, false, true);
@@ -187,9 +211,9 @@ int main(int argc, char *argv[])
         //Q = crf.lp_inference(Q,false);
         //Q = crf.lp_inference_new(Q);
 
-        Q = crf.lp_inference_prox(Q, lp_params);
-        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
-        printf("After LP: %lf\n", discretized_energy);
+        //Q = crf.lp_inference_prox(Q, lp_params);
+        //discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+        //printf("After LP: %lf\n", discretized_energy);
     } else if (method == "cg_lp"){
         Q = crf.qp_inference(Q);
         Q = crf.concave_qp_cccp_inference(Q);

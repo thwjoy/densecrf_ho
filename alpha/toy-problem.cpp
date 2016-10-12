@@ -291,9 +291,11 @@ void compare_old_new_ph(int argc, char *argv[]) {
         fout << k << '\t';
         std::cout << "# " <<  k << '\t';
         for (int p = 0; p < perfs.size(); ++p) {
-            fout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << std::endl;
-            std::cout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << std::endl;
+            fout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << '\t';
+            std::cout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << '\t';
         }
+        fout << std::endl;
+        std::cout << std::endl;
     }
     fout.close();
 

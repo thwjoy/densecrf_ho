@@ -1,5 +1,6 @@
 #include "eigen_utils.hpp"
 #include <iostream>
+#include <fstream>
 
 bool all_close_to_zero(const VectorXf & vec, float ref){
     for (int i = 0; i<vec.size() ; i++) {
@@ -118,9 +119,20 @@ float infiniteNorm(const MatrixXf & M) {
 // rescale Q to be within [0,1] -- order of Q values preserved!
 void rescale(MatrixXf & out, const MatrixXf & Q) {
 	out = Q;
-	float minval = out.minCoeff();
+    float minval, maxval;
+    // don't do label-wise rescaling -> introduces different error in each label!
+//    for (int i = 0; i < Q.rows(); ++i) {
+//	    minval = out.row(i).minCoeff();
+//	    out.row(i) = out.row(i).array() - minval;
+//	    maxval = out.row(i).maxCoeff();
+//        assert(maxval >= 0);
+//        if (maxval > 0)	out.row(i) /= maxval;
+//    }
+    // old-rescale- works better in segmentation?
+	minval = out.minCoeff();
 	out = out.array() - minval;
-	float maxval = out.maxCoeff();
-	out /= maxval;
+	maxval = out.maxCoeff();
+    assert(maxval >= 0);
+    if (maxval > 0) out /= maxval;
 }
 

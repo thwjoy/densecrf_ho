@@ -189,10 +189,46 @@ void check_pairwise_energies(){
 
 }
 
+void eigen_test() {
+    std::srand(1337); // Set the seed
+	MatrixXf m(3,4);
+    m << 1, 2, 3, 4,
+        4, 3, 2, 1,
+        2, 2, 4, 4;
+	VectorXf v(4);
+	std::cout << "#m#\n" << m << std::endl;
+	v = m.row(0);
+	std::cout << "#v#\n" << v << std::endl;
+	m.row(2) = v;
+	std::cout << "#m#\n" << m << std::endl;
+	std::cout << "#v#\n" << v << std::endl;
+	VectorXf v1 = m.colwise().sum();
+	std::cout << "#v1#\n" << v1 << std::endl;
 
+	MatrixXf sm(3, 4);
+	MatrixXi ind(3, 4);
+	sortRows(m, ind);
+	for(int i = 0; i < 4; ++i) {
+		for (int j= 0; j < 3; ++j) {
+			sm(j, i) = m(j, ind(j, i));
+		}
+	}
+	std::cout << "#sm#\n" << sm << std::endl;
+
+    MatrixXf q(3,5), qq(3,5);
+    for(int i = 0; i < q.cols(); ++i) {
+		for (int j= 0; j < q.rows(); ++j) {
+			q(j, i) = std::rand() % 10;
+		}
+	}
+    rescale(qq, q);
+    std::cout << "#q#\n" << q << std::endl;
+    std::cout << "#qq#\n" << qq << std::endl;
+}
 
 int main(int argc, char *argv[])
 {
-    check_pairwise_energies();
+    eigen_test();
     return 0;
 }
+
