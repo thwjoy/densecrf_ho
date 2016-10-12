@@ -2767,6 +2767,83 @@ void DenseCRF::compare_energies(MatrixXf & Q, double & ph_energy, double & bf_en
     }
 }
 
+// compare lp-subgrad computation times
+std::vector<perf_measure> DenseCRF::compare_lpsubgrad_timings(MatrixXf & Q, bool cmp_subgrad) const {
+    // ensure strict ordering by adding noise smaller than RESOLUTION of new PH-lattice
+    renormalize(Q);
+    for (int i = 0; i < Q.cols(); ++i) {
+        for (int j = 0; j < Q.rows(); ++j) {
+            int maxint = Q.cols()*Q.rows()*10;
+            int r = std::rand() % maxint;
+            Q(j, i) += float(r)/(RESOLUTION * maxint);  // add noise of magnitude < 1/RESOLUTION
+        }
+    }
+
+    renormalize(Q);
+	if (!valid_probability(Q)) {
+		std::cout << "Q is not a valid probability!" << std::endl;
+		exit(1);
+	}
+	
+    MatrixXf tmp(M_, N_), tmp2(M_, N_);
+	MatrixXi ind(M_, N_);
+	MatrixP dot_tmp;
+    MatrixXf old_grad(M_, N_), new_grad(M_, N_);
+    old_grad.fill(0);
+    new_grad.fill(0);
+
+    std::vector<perf_measure> perfs;
+
+	// old-ph
+    clock_t st, et;
+    st = clock();
+    sortRows(Q, ind);
+    et = clock();
+    double sort_time = (double)(et-st)/CLOCKS_PER_SEC;
+    for (int k = 0; k < pairwise_.size(); ++k) {
+        st = clock();
+        // old -ph
+        no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp2, ind);
+    	// need to sort before dot-product
+    	for(int i=0; i<tmp2.cols(); ++i) {
+        	for(int j=0; j<tmp2.rows(); ++j) {
+            	tmp(j, ind(j, i)) = tmp2(j, i);
+        	}
+        }
+        et = clock();
+        double old_timing = (double)(et-st)/CLOCKS_PER_SEC + sort_time;
+        old_grad -= tmp;
+        
+        st = clock();
+        // new ph
+        pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
+        et = clock();
+        double new_timing = (double)(et-st)/CLOCKS_PER_SEC;
+        new_grad -= tmp;
+
+        perfs.push_back(std::make_pair(old_timing, new_timing));
+    }
+    	
+    if (cmp_subgrad) {  // compare subgradients
+        // should be coliner 
+        MatrixXf diff = old_grad - new_grad;
+        double costh = dotProduct(old_grad, new_grad, dot_tmp)/
+            (sqrt(dotProduct(old_grad, old_grad, dot_tmp))*sqrt(dotProduct(new_grad, new_grad, dot_tmp)));
+        std::cout << "#cos-theta: " << costh << std::endl;
+        std::cout << "OLD   :: mean=" << old_grad.mean() << ",\tmax=" << old_grad.maxCoeff() << ",\tmin=" << old_grad.minCoeff() << std::endl;
+        std::cout << "NEW   :: mean=" << new_grad.mean() << ",\tmax=" << new_grad.maxCoeff() << ",\tmin=" << new_grad.minCoeff() << std::endl;
+        std::cout << "DIFF  :: mean=" << diff.mean() << ",\tmax=" << diff.maxCoeff() << ",\tmin=" << diff.minCoeff() << std::endl;
+
+        double old_e = 0, new_e = 0;
+        for (int k = 0; k < pairwise_.size(); ++k) {
+            old_e += dotProduct(old_grad, Q, dot_tmp);
+            new_e += dotProduct(new_grad, Q, dot_tmp);
+        }
+        std::cout << "old-energy: " << old_e << ", new-energy: " << new_e << std::endl;
+    }
+    return perfs;
+}
+
 MatrixXf DenseCRF::max_rounding(const MatrixXf &estimates) const {
     MatrixXf rounded = MatrixXf::Zero(estimates.rows(), estimates.cols());
     int argmax;

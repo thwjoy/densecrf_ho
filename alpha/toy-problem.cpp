@@ -250,11 +250,65 @@ void compare_bf_ph_energies(int argc, char *argv[]) {
     fout.close();
 }
 
+void compare_old_new_ph(int argc, char *argv[]) {
+    std::srand(1337); // Set the seed
+
+	if (argc < 6) {
+		printf("usage: %s w h l sigma runs cmp_subgrad", argv[0]);
+        exit(1);
+	}
+	int w = atoi(argv[1]);
+	int h = atoi(argv[2]);
+	int l = atoi(argv[3]);
+	int sigma = atoi(argv[4]);
+	int n = atoi(argv[5]);
+    bool cmp_subgrad = false;
+    if (argc > 6) cmp_subgrad = atoi(argv[6]);
+
+	printf("command: %s %d %d %d %d %d %d\n", argv[0], w, h, l, sigma, n, cmp_subgrad);
+
+    int nb_variables = w*h;
+    int nb_labels = l;    
+
+    MatrixXf unaries = get_unaries(nb_variables, nb_labels);
+    DenseCRF2D crf(w, h, unaries.rows());
+    crf.setUnaryEnergy(unaries);
+    crf.addPairwiseGaussian(sigma, sigma, new PottsCompatibility(1));
+    
+    // random 
+    std::vector<perf_measure> perfs;
+    MatrixXf Q = crf.unary_init();
+
+    std::ofstream fout("toy_lpsubgrad_timings.out");
+    for (int k = 0; k < n; ++k) {
+        for (int i = 0; i < Q.cols(); ++i) {
+            for (int j = 0; j < Q.rows(); ++j) {
+                int r = randint(100);
+                Q(j, i) = float(r)/100.0;
+            }
+        }
+        perfs = crf.compare_lpsubgrad_timings(Q, cmp_subgrad);
+        fout << k << '\t';
+        std::cout << "# " <<  k << '\t';
+        for (int p = 0; p < perfs.size(); ++p) {
+            fout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << std::endl;
+            std::cout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << std::endl;
+        }
+    }
+    fout.close();
+
+    std::ofstream fout1("q-dump.out");
+    fout1 << "#random-Q#\n" << Q << std::endl;
+    fout1.close();
+}
+
 int main(int argc, char *argv[])
 {
-    original_toy_problem(argc, argv);
+    //original_toy_problem(argc, argv);
 
     //compare_bf_ph_energies(argc, argv);
+
+    compare_old_new_ph(argc, argv);
 
     return 0;
 }
