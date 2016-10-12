@@ -204,6 +204,8 @@ void PairwisePotential::applyTranspose(MatrixXf & out, const MatrixXf & Q) const
 	compatibility_->applyTranspose( out, out );
 }
 void PairwisePotential::apply_upper_minus_lower_ord(MatrixXf & out, const MatrixXf & Q) {
+    // pass rescaled_Q to reduce the discretization error! ("rescale" function is in eigen_utils.cpp)
+    // when no of labels are high, each probabilty is small and all fall into one or two buckets!
 	assert(Q.maxCoeff() <= 1);
 	assert(Q.minCoeff() >= 0);  // values truncated to be [0,1], doesn't need to sum to 1
     out.fill(0);

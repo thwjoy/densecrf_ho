@@ -1260,6 +1260,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     MatrixXi ind(restricted_M, N_);
     VectorXi K(N_);
     VectorXd sum(N_);
+    MatrixXf rescaled_Q(M_, N_);
 
     // Create copies of the original pairwise since we don't want normalization
     int nb_pairwise = pairwise_.size();
@@ -1301,6 +1302,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
 
         // Pairwise
         sortRows(Q, ind);
+        rescale(rescaled_Q, Q);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
             // Special case for 2 labels (used mainly for alpha expansion)
             if(false && Q.rows()==2) {
@@ -1329,7 +1331,7 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
 
                 // With the new discretized split computations
                 // start = clock();
-                // pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
+                // pairwise_[k]->apply_upper_minus_lower_ord(tmp2, rescaled_Q);
                 /*end = clock();
                 perf_timing = (double(end-start)/CLOCKS_PER_SEC);
                 printf("ORD: It: %d | id: %d | time: %f\n", it, k, perf_timing);*/
@@ -1461,6 +1463,7 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
     VectorXi K(N_);
     VectorXd sum(N_);
     MatrixXf unary = unary_->get();
+    MatrixXf rescaled_Q(M_, N_);
 
     ones.fill(1);
 
@@ -1497,6 +1500,7 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
 
         // Pairwise
         sortRows(Q, ind);
+        //rescale(rescaled_Q, Q);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
             // Add upper minus lower
             no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp, ind);
@@ -1506,7 +1510,7 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
                     tmp2(j, ind(j, i)) = tmp(j, i);
                 }
             }
-            //pairwise_[k]->apply_upper_minus_lower_ord(tmp2, Q);
+            //pairwise_[k]->apply_upper_minus_lower_ord(tmp2, rescaled_Q);
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
@@ -1603,15 +1607,6 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
     std::cout <<"final projected energy: " << int_energy << "\n";
 
     return best_Q;
-}
-
-// rescale Q to be within [0,1]
-void rescale(MatrixXf & out, const MatrixXf & Q) {
-	out = Q;
-	float minval = out.minCoeff();
-	out = out.array() - minval;
-	float maxval = out.maxCoeff();
-	out /= maxval;
 }
 
 // Project current estimates on valid space
@@ -2673,7 +2668,7 @@ void DenseCRF::compare_energies(MatrixXf & Q, double & ph_energy, double & bf_en
             );
     }
 	
-    MatrixXf tmp(M_, N_), tmp2(M_, N_);
+    MatrixXf tmp(M_, N_), tmp2(M_, N_), rescaled_Q(M_, N_);
 	MatrixXi ind(M_, N_);
 	MatrixP dot_tmp;
 	double energy = 0;
@@ -2717,6 +2712,7 @@ void DenseCRF::compare_energies(MatrixXf & Q, double & ph_energy, double & bf_en
 		// ph-energy
 		energy = 0;
         if (ph_old) sortRows(Q, ind);
+        else rescale(rescaled_Q, Q);
         for (int k = 0; k < pairwise_.size(); ++k) {
     		// old-ph
     		if (ph_old) {
@@ -2729,7 +2725,7 @@ void DenseCRF::compare_energies(MatrixXf & Q, double & ph_energy, double & bf_en
                 }
     		} else {
             	// Add the upper minus the lower
-    	        pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
+    	        pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);
     		}
     		//
             if (subgrad) ph_grad -= tmp;
@@ -2785,7 +2781,7 @@ std::vector<perf_measure> DenseCRF::compare_lpsubgrad_timings(MatrixXf & Q, bool
 		exit(1);
 	}
 	
-    MatrixXf tmp(M_, N_), tmp2(M_, N_);
+    MatrixXf tmp(M_, N_), tmp2(M_, N_), rescaled_Q(M_, N_);
 	MatrixXi ind(M_, N_);
 	MatrixP dot_tmp;
     MatrixXf old_grad(M_, N_), new_grad(M_, N_);
@@ -2800,6 +2796,12 @@ std::vector<perf_measure> DenseCRF::compare_lpsubgrad_timings(MatrixXf & Q, bool
     sortRows(Q, ind);
     et = clock();
     double sort_time = (double)(et-st)/CLOCKS_PER_SEC;
+
+    st = clock();
+    rescale(rescaled_Q, Q);
+    et = clock();
+    double rescale_time = (double)(et-st)/CLOCKS_PER_SEC;
+
     for (int k = 0; k < pairwise_.size(); ++k) {
         st = clock();
         // old -ph
@@ -2816,9 +2818,9 @@ std::vector<perf_measure> DenseCRF::compare_lpsubgrad_timings(MatrixXf & Q, bool
         
         st = clock();
         // new ph
-        pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
+        pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);
         et = clock();
-        double new_timing = (double)(et-st)/CLOCKS_PER_SEC;
+        double new_timing = (double)(et-st)/CLOCKS_PER_SEC + rescale_time;
         new_grad -= tmp;
 
         perfs.push_back(std::make_pair(old_timing, new_timing));
@@ -3248,6 +3250,9 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
 #if BRUTE_FORCE
     MatrixXf tmp2(Q.rows(), Q.cols());
     sortRows(Q, ind);
+#else
+    MatrixXf rescaled_Q(Q.rows(), Q.cols());
+    rescale(rescaled_Q, Q);
 #endif
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         // Add the upper minus the lower
@@ -3261,7 +3266,7 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
         }
 #else             
         // new-PH
-        pairwise_[k]->apply_upper_minus_lower_ord(tmp, Q);
+        pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);
 #endif        
         energy -= dotProduct(Q, tmp, dot_tmp);
 		//std::cout << "\nph-pairwise[" << k << "]-energy: " << -dotProduct(Q, tmp, dot_tmp);

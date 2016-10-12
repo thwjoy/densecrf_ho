@@ -114,3 +114,13 @@ void sortCols(const MatrixXf & M, MatrixXi & ind) {
 float infiniteNorm(const MatrixXf & M) {
     return M.cwiseAbs().maxCoeff();
 }
+
+// rescale Q to be within [0,1] -- order of Q values preserved!
+void rescale(MatrixXf & out, const MatrixXf & Q) {
+	out = Q;
+	float minval = out.minCoeff();
+	out = out.array() - minval;
+	float maxval = out.maxCoeff();
+	out /= maxval;
+}
+
