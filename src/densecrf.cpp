@@ -32,6 +32,8 @@
 #include "permutohedral.h"
 #include "util.h"
 #include "pairwise.h"
+
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <ctime>
@@ -1721,9 +1723,12 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     const bool mp_fw = (work_set_size != 0 || approx_fw_iter != 0);
     std::vector<MatrixXf> working_set;    // stores conditional gradients (copied)
     double dual_prox_start = 0, dual_app_start = 0;
-    clock_t time_prox_start;
+    //clock_t time_prox_start;
+    typedef std::chrono::high_resolution_clock::time_point htime;
+    htime time_prox_start;
 
-    clock_t start, end;
+    //clock_t start, end;
+    htime start, end;
     int it=0;
     int count = 0;
     do {
@@ -1749,7 +1754,10 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		// prox step
 		do {	
 			++pit;
-            if (mp_fw) time_prox_start = clock();
+            if (mp_fw) {
+                //time_prox_start = clock();
+                time_prox_start = std::chrono::high_resolution_clock::now();
+            }
 			// initialization
 			s_tQ.fill(0);
 
@@ -1776,7 +1784,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		    //gamma.fill(1);	// initializing gamma here affects efficiency!
 			float qp_value = std::numeric_limits<float>::max();
 #if VERBOSE
-            start = clock();
+            //start = clock();
+            start = std::chrono::high_resolution_clock::now();
 #endif
 			do {
 				//solve for each pixel separately
@@ -1804,8 +1813,11 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 				qp_value = qp_value1;
 			} while (qpit <= qp_maxiter);
 #if VERBOSE
-            end = clock();
-            printf("# Time-QP %d: %5.5f, %10.3f\t", qpit, (double)(end-start)/CLOCKS_PER_SEC, qp_value);
+            //end = clock();
+            //double dt = (double)(end-start)/CLOCKS_PER_SEC
+            end = std::chrono::high_resolution_clock::now();
+            double dt = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count()/1000.0;
+            printf("# Time-QP %d: %5.5f, %10.3f\t", qpit, dt, qp_value);
 #endif
 			// end-qp-gamma
 
@@ -1837,7 +1849,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			// Pairwise
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 #if VERBOSE
-                start = clock();
+                //start = clock();
+                start = std::chrono::high_resolution_clock::now();
 #endif
 #if BRUTE_FORCE
 				// brute-force computation
@@ -1855,8 +1868,11 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #endif
                 s_tQ += tmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
 #if VERBOSE
-                end = clock();
-                printf("# Time-%d: %5.5f\t", k, (double)(end-start)/CLOCKS_PER_SEC);
+                //end = clock();
+                //double dt = (double)(end-start)/CLOCKS_PER_SEC;
+                end = std::chrono::high_resolution_clock::now();
+                double dt = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
+                printf("# Time-%d: %5.5f\t", k, dt);
 #endif
             }
 			// find dual gap
@@ -1916,7 +1932,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                 double maxe = 0;
                 MatrixXf& s_tQ_hat = working_set[0];
 #if VERBOSE
-                clock_t st = clock();
+                //clock_t st = clock();
+                htime st = std::chrono::high_resolution_clock::now();
 #endif
                 for (int i = 0; i < working_set.size(); ++i) {
                     double e = dotProduct(working_set[i], Q, dot_tmp);
@@ -1926,8 +1943,10 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                     }
                 }
 #if VERBOSE
-                clock_t et = clock();
-                double app_fw_time = (double)(et-st)/CLOCKS_PER_SEC;
+                //clock_t et = clock();
+                //double app_fw_time = (double)(et-st)/CLOCKS_PER_SEC;
+                htime et = std::chrono::high_resolution_clock::now();
+                double app_fw_time = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
                 printf("#App-FW-Time: %5.5f, size: %d\t", app_fw_time, (int)working_set.size());
 #endif
 
@@ -1947,7 +1966,9 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", appit, dual_gap, primal_energy+dual_energy, 
                         -dual_energy, primal_energy);
                 if (appit > 0) {
-                    double prox_tot_time = (double)(et-time_prox_start)/CLOCKS_PER_SEC;
+                    //double prox_tot_time = (double)(et-time_prox_start)/CLOCKS_PER_SEC;
+                    double prox_tot_time = std::chrono::duration_cast<std::chrono::duration<double>>
+                        (et-time_prox_start).count();
                     double avg_imp = (-dual_energy-dual_prox_start)/prox_tot_time;
                     double app_imp = (-dual_energy-dual_app_start)/app_fw_time;
                     printf("(%10.3f, %10.3f), ", avg_imp, app_imp);
