@@ -41,7 +41,7 @@
 #include <set>
 
 #define BRUTE_FORCE false	// brute-force subgraient computation, used in lp_prox and energy computations
-#define VERBOSE false	    // print intermediate energy values and timings, used in lp_prox
+#define VERBOSE true	    // print intermediate energy values and timings, used in lp_prox
 
 #define DCNEG_FASTAPPROX false
 /////////////////////////////
@@ -1716,10 +1716,12 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 	abs_C = pos_C + neg_C;	// abs_C
     
     // multi-plane FW --> NO ADAPTIVE SELECTION OF WORKING-SET-SIZE AND APPROX-FW-ITER as of now
-    const int work_set_size = 0;//params.work_set_size;
-    const int approx_fw_iter = 0;//params.approx_fw_iter;
+    const int work_set_size = params.work_set_size;
+    const int approx_fw_iter = params.approx_fw_iter;
     const bool mp_fw = (work_set_size != 0 || approx_fw_iter != 0);
     std::vector<MatrixXf> working_set;    // stores conditional gradients (copied)
+    double dual_prox_start = 0, dual_app_start = 0;
+    clock_t time_prox_start;
 
     clock_t start, end;
     int it=0;
@@ -1747,6 +1749,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		// prox step
 		do {	
 			++pit;
+            if (mp_fw) time_prox_start = clock();
 			// initialization
 			s_tQ.fill(0);
 
@@ -1871,6 +1874,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			//assert(dual_gap == (dual_energy - primal_energy));
 			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, primal_energy+dual_energy, 
                     -dual_energy, primal_energy);
+            if (mp_fw) dual_prox_start = -dual_energy;
             //if (dual_gap < 0) {   // may become negative due to PH approximations!
             //    std::cout << "\nERROR: Dual-gap cannot be negative!\n";
             //    exit(1);
@@ -1923,7 +1927,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                 }
 #if VERBOSE
                 clock_t et = clock();
-                printf("#App-FW-Time: %5.5f\t", (double)(et-st)/CLOCKS_PER_SEC);
+                double app_fw_time = (double)(et-st)/CLOCKS_PER_SEC;
+                printf("#App-FW-Time: %5.5f, size: %d\t", app_fw_time, (int)working_set.size());
 #endif
 
                 // find dual gap
@@ -1941,8 +1946,22 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
     			//assert(dual_gap == (dual_energy - primal_energy));
     			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", appit, dual_gap, primal_energy+dual_energy, 
                         -dual_energy, primal_energy);
+                if (appit > 0) {
+                    double prox_tot_time = (double)(et-time_prox_start)/CLOCKS_PER_SEC;
+                    double avg_imp = (-dual_energy-dual_prox_start)/prox_tot_time;
+                    double app_imp = (-dual_energy-dual_app_start)/app_fw_time;
+                    printf("(%10.3f, %10.3f), ", avg_imp, app_imp);
+                    if (avg_imp >= app_imp) {
+                        printf(" break: app_imp\n");
+                        break;
+                    }
+                }
+                dual_app_start = -dual_energy;
 #endif
-    			if (dual_gap <= dual_gap_tol) break;	// stopping condition
+    			if (dual_gap <= 10) {
+                    printf(" break: dual_gap\n");
+                    break;	// stopping condition
+                }
     
     			// optimal fw step size
     			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
