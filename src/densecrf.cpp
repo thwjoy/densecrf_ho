@@ -1494,6 +1494,7 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
     htime start, end;
 
     int it=0;
+    bool stop = false;
     do {
         ++it;
 
@@ -1607,7 +1608,7 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         Q = tmp;
 
         int_energy = assignment_energy_true(currentMap(Q));
-        bool stop = abs(best_int_energy-int_energy) < 1000;
+        stop = (abs(best_int_energy-int_energy) < 1000);
         if(int_energy < best_int_energy) {
             best_Q = Q;
             best_int_energy = int_energy;
