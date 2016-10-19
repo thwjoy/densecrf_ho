@@ -1929,18 +1929,20 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                 //
                 // case-3
                 Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;
-                double maxe = 0;
+
                 MatrixXf& s_tQ_hat = working_set[0];
+                double maxe = dotProduct(s_tQ_hat, Q, dot_tmp);
 #if VERBOSE
                 //clock_t st = clock();
                 htime st = std::chrono::high_resolution_clock::now();
 #endif
-                for (int i = 0; i < working_set.size(); ++i) {
+                for (int i = 1; i < working_set.size(); ++i) {
                     double e = dotProduct(working_set[i], Q, dot_tmp);
                     if (maxe < e) {
                         maxe = e;
                         s_tQ_hat = working_set[i];
                     }
+                    //std::cout << "##i: " << i << ", e: " << e << ", maxe: " << maxe << std::endl;
                 }
 #if VERBOSE
                 //clock_t et = clock();
