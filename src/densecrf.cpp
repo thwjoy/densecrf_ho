@@ -1478,7 +1478,8 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
     assert(valid_probability(Q));
     double energy = 0, best_energy = std::numeric_limits<double>::max(), best_int_energy = std::numeric_limits<double>::max();
     double int_energy = assignment_energy_true(currentMap(Q));
-    // printf("Initial int energy in the LP: %f\n", int_energy);
+    energy = compute_energy_LP(Q);
+    printf("Initial energy in the LP: %10.3f / %10.3f\n", energy, int_energy);
 
     bool adaptive = false;
 	float delta_k = 1e6;
@@ -1489,7 +1490,8 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
 	float alpha_k = 1;
 	double f_target = 0;
 
-    clock_t start, end;
+    typedef std::chrono::high_resolution_clock::time_point htime;
+    htime start, end;
 
     int it=0;
     do {
@@ -1501,23 +1503,25 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         grad = unary;
 
         // Pairwise
-        sortRows(Q, ind);
-        //rescale(rescaled_Q, Q);
+//        sortRows(Q, ind);
+        start = std::chrono::high_resolution_clock::now();
+        rescale(rescaled_Q, Q);
         for( unsigned int k=0; k<nb_pairwise; k++ ) {
             // Add upper minus lower
-            no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp, ind);
-            tmp2.fill(0);
-            for(i=0; i<tmp.cols(); ++i) {
-                for(j=0; j<tmp.rows(); ++j) {
-                    tmp2(j, ind(j, i)) = tmp(j, i);
-                }
-            }
-            //pairwise_[k]->apply_upper_minus_lower_ord(tmp2, rescaled_Q);
+//            no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp, ind);
+//            tmp2.fill(0);
+//            for(i=0; i<tmp.cols(); ++i) {
+//                for(j=0; j<tmp.rows(); ++j) {
+//                    tmp2(j, ind(j, i)) = tmp(j, i);
+//                }
+//            }
+            pairwise_[k]->apply_upper_minus_lower_ord(tmp2, rescaled_Q);
             energy -= dotProduct(Q, tmp2, dot_tmp);
             grad -= tmp2;
         }
-
-        // printf("%5d: %f\n", it-1, energy);
+        end = std::chrono::high_resolution_clock::now();
+        double dt = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
+        printf("# Time-PH: %f,\t", dt);
         
         if (adaptive) {
 			if (it == 1) delta_k = energy/1.1;
@@ -1544,8 +1548,9 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
             //Q -= grad/(it+1e5);
 
             // line-search
+            start = std::chrono::high_resolution_clock::now();
             float min = 0.0;
-            float max = 1e-3;
+            float max = 1e-1;
             double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
             int split = 0;
             min_int_energy = assignment_energy_true(currentMap(Q));
@@ -1567,11 +1572,10 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
                 }
             } while(max-min > 0.00001);
     		
-			if(int_energy < best_int_energy) {
-                best_Q = Q;
-                best_int_energy = int_energy;
-            }
-            printf("%3d: %f / %f / %f [%f, %f, %d]\n", it,energy, int_energy, best_int_energy, max,min, split);
+            end = std::chrono::high_resolution_clock::now();
+            double dt = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
+    
+            printf("#Time-LS: %f, [%f, %f, %d]\t", dt, max,min, split);
             
 			// sub-grad-step
 			Q -= 0.5*(max+min)*grad;
@@ -1603,9 +1607,16 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
         Q = tmp;
 
         int_energy = assignment_energy_true(currentMap(Q));
+        bool stop = abs(best_int_energy-int_energy) < 1000;
+        if(int_energy < best_int_energy) {
+            best_Q = Q;
+            best_int_energy = int_energy;
+        }
+        printf("#IT: %f / %f / %f\n", energy, int_energy, best_int_energy);
+
         renormalize(Q);
         assert(valid_probability_debug(Q));
-    } while(it<5);
+    } while(it<10 && !stop);
     std::cout <<"final projected energy: " << int_energy << "\n";
 
     return best_Q;
@@ -1812,7 +1823,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 				++qpit;
 				if (std::abs(qp_value - qp_value1) < qp_tol) break;
 				qp_value = qp_value1;
-			} while (qpit <= qp_maxiter);
+			} while (qpit < qp_maxiter);
 #if VERBOSE
             //end = clock();
             //double dt = (double)(end-start)/CLOCKS_PER_SEC
@@ -2001,7 +2012,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 //    			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ_hat - alpha_tQ);
 //            }
 
-		} while(pit<=fw_maxiter);
+		} while(pit<fw_maxiter);
 
 		// project Q back to feasible region
 		feasible_Q(tmp, ind, sum, K, Q);
@@ -2245,7 +2256,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 				++qpit;
 				if (std::abs(qp_value - qp_value1) < qp_tol) break;
 				qp_value = qp_value1;
-			} while (qpit <= qp_maxiter);
+			} while (qpit < qp_maxiter);
 #if VERBOSE
             //clock_t et = clock();
             htime et = std::chrono::high_resolution_clock::now();
@@ -2332,7 +2343,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 			tmp *= delta;
 			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
 
-		} while(pit<=fw_maxiter);
+		} while(pit<fw_maxiter);
 
 		// project Q back to feasible region
 		feasible_Q(tmp, ind, sum, K, Q);
