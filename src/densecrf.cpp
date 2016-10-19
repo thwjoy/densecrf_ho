@@ -1816,7 +1816,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
             //end = clock();
             //double dt = (double)(end-start)/CLOCKS_PER_SEC
             end = std::chrono::high_resolution_clock::now();
-            double dt = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count()/1000.0;
+            double dt = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
             printf("# Time-QP %d: %5.5f, %10.3f\t", qpit, dt, qp_value);
 #endif
 			// end-qp-gamma
@@ -2156,25 +2156,20 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 	C = pos_C - neg_C;	// C
 	abs_C = pos_C + neg_C;	// abs_C
     
-    // multi-plane FW --> NO ADAPTIVE SELECTION OF WORKING-SET-SIZE AND APPROX-FW-ITER as of now
-    const int work_set_size = 0;//params.work_set_size;
-    const int approx_fw_iter = 0;//params.approx_fw_iter;
-    const bool mp_fw = (work_set_size != 0 || approx_fw_iter != 0);
-    std::vector<MatrixXf> working_set;    // stores conditional gradients (copied)
-
     double perf_energy, perf_timing;
     double total_time = 0;
     perf_measure latest_perf;
     std::vector<perf_measure> perfs;
     //clock_t start, end;
-    time_t start, end;
+    typedef std::chrono::high_resolution_clock::time_point htime;
+    htime start, end;
     int it=0;
     int count = 0;
     do {
         ++it;
 
         //start = clock();
-        start = time(NULL);
+        start = std::chrono::high_resolution_clock::now();
 
 		// initialization
 		beta_mat.fill(0);
@@ -2223,7 +2218,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 			float qp_value = std::numeric_limits<float>::max();
 #if VERBOSE
             //clock_t st = clock();
-            time_t st = time(NULL);
+            htime st = std::chrono::high_resolution_clock::now();
 #endif
 			do {
 				//solve for each pixel separately
@@ -2252,9 +2247,9 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 			} while (qpit <= qp_maxiter);
 #if VERBOSE
             //clock_t et = clock();
-            time_t et = time(NULL);
+            htime et = std::chrono::high_resolution_clock::now();
             //double dt = (double)(et-st)/CLOCKS_PER_SEC;
-            double dt = difftime(et,st);
+            double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
             printf("\n# Time-QP %d: %5.5f, %10.3f\t", qpit, dt, qp_value);
             if (dump) fout << "\n# Time-QP " << qpit << ": " << dt << ", " << qp_value << '\t';
 #endif
@@ -2283,7 +2278,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
 #if VERBOSE
                 //st = clock();
-                st = time(NULL);
+                st = std::chrono::high_resolution_clock::now();
 #endif
 				// new PH implementation
 				// rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
@@ -2292,9 +2287,9 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
                 s_tQ += tmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
 #if VERBOSE
                 //et = clock();
-                et = time(NULL);
+                et = std::chrono::high_resolution_clock::now();
                 //dt = (double)(et-st)/CLOCKS_PER_SEC;
-                dt = difftime(et,st);
+                dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
                 printf("# Time-%d: %5.5f\t", k, dt);
                 if (dump) fout << "# Time-" << k << ": " << dt << '\t';
 #endif
@@ -2335,81 +2330,6 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 			tmp = s_tQ - alpha_tQ;
 			tmp *= delta;
 			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
-
-            if (mp_fw) {
-                if (working_set.size() == work_set_size) working_set.erase(working_set.begin());
-                working_set.push_back(s_tQ);
-            }
-
-            // multi-plane approximate iterations
-            for (int appit = 0; appit < approx_fw_iter; ++appit) {
-                // case-1: use the old-gamma
-                // case-2:
-                beta_mat = (alpha_tQ + gamma - unary);	// -B^T/l * (A * alpha + gamma - phi)
-			    beta = -beta_mat.colwise().sum();	
-			    beta /= M_;
-			    // repeat beta in each row of beta_mat - - B * beta
-			    for (int j = 0; j < M_; ++j) {
-				    beta_mat.row(j) = beta;
-			    }
-                //
-                // case-3
-                Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;
-                double maxe = 0;
-                MatrixXf& s_tQ_hat = working_set[0];
-#if VERBOSE
-                //st = clock();
-                st = time(NULL);
-#endif
-                for (int i = 0; i < working_set.size(); ++i) {
-                    double e = dotProduct(working_set[i], Q, dot_tmp);
-                    if (maxe < e) {
-                        maxe = e;
-                        s_tQ_hat = working_set[i];
-                    }
-                }
-#if VERBOSE
-                //et = clock();
-                et = time(NULL);
-                //dt = (double)(et-st)/CLOCKS_PER_SEC;
-                dt = difftime(et,st);
-                printf("#App-FW-Time: %5.5f\t", dt);
-                if (dump) fout << "#App-FW-Time: " << dt << '\t';
-#endif
-
-                // find dual gap
-    			tmp = alpha_tQ - s_tQ_hat;	
-    			dual_gap = dotProduct(tmp, Q, dot_tmp);
-    
-#if VERBOSE
-    			// dual-energy value
-    			tmp2 = Q - cur_Q;
-    			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
-    			dual_energy -= beta.sum();
-    			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
-    		   	primal_energy += dotProduct(unary, Q, dot_tmp);
-    			primal_energy -= dotProduct(s_tQ_hat, Q, dot_tmp);	// cancel the neg in s_tQ_hat
-    			//assert(dual_gap == (dual_energy - primal_energy));
-    			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", appit, dual_gap, primal_energy+dual_energy, 
-                        -dual_energy, primal_energy);
-			    if (dump) fout << appit << ": [" << dual_gap << " = " << primal_energy+dual_energy << ", "
-                        << -dual_energy << ", " << primal_energy << ", ";
-#endif
-    			if (dual_gap <= dual_gap_tol) break;	// stopping condition
-    
-    			// optimal fw step size
-    			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
-    			delta = std::min(std::max(delta, (float)0.0), (float)1.0);
-    			assert(delta > 0);
-#if VERBOSE
-    			printf("%1.10f]", delta);
-			    if (dump) fout << delta << "]";
-#endif
-                // update alpha_tQ
-		    	tmp = s_tQ_hat - alpha_tQ;
-	    		tmp *= delta;
-    			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ_hat - alpha_tQ);
-            }
 
 		} while(pit<=fw_maxiter);
 
@@ -2468,8 +2388,8 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
         }
         //end = clock();
         //perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        end = time(NULL);
-        perf_timing = difftime(end, start);
+        end = std::chrono::high_resolution_clock::now();
+        perf_timing = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
         perf_energy = int_energy;
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);

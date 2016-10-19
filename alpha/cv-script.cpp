@@ -1,3 +1,4 @@
+#include <chrono>
 #include <ctime>
 #include <fstream>
 #include <vector>
@@ -33,12 +34,13 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
         make_dir(path_to_subexp_results);
         if (not file_exist(output_path)) {
             //clock_t start, end;
-            time_t start, end;
+            typedef std::chrono::high_resolution_clock::time_point htime;
+            htime start, end;
             double timing;
             std::cout << image_path << std::endl;
             //start = clock();
             std::vector<perf_measure> traced_perfs;
-            start = time(NULL);
+            start = std::chrono::high_resolution_clock::now();
             Q = crf.unary_init();
             if (method == "mf5") {
                 Q = crf.inference(Q, 5);
@@ -78,9 +80,9 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             }
 
             //end = clock();
-            end = time(NULL);
+            end = std::chrono::high_resolution_clock::now();
             //timing = (double(end-start)/CLOCKS_PER_SEC);
-            timing = difftime(end, start);
+            timing = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
             double final_energy = crf.compute_energy_true(Q);
             double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
