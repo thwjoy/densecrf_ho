@@ -65,9 +65,10 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             } else if (method == "prox_lp"){
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
-                Q = crf.lp_inference_new(Q);
-                Q = crf.lp_inference_prox(Q, lp_params);
-                Q = crf.lp_inference_new(Q);
+                //Q = crf.lp_inference_new(Q);
+                Q = crf.lp_inference_prox_restricted(Q, lp_params);
+                //Q = crf.lp_inference_prox(Q, lp_params);
+                //Q = crf.lp_inference_new(Q);
             } else if (method == "tracing-prox_lp"){
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
@@ -162,8 +163,8 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
     omp_set_num_threads(1);
 #pragma omp parallel for
-    //for(int i=0; i< test_images.size(); ++i){
-    for(int i=2; i< 3; ++i){
+    for(int i=0; i< test_images.size(); ++i){
+    //for(int i=0; i< 3; ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params);
     }

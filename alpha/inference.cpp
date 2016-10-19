@@ -390,11 +390,11 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     //crf.compute_kl_divergence();
     MatrixXf Q = crf.unary_init();
     clock_t start, end;
-//    Q = crf.qp_inference(Q);
-//    start = clock();
-//    Q = crf.concave_qp_cccp_inference(Q);
-//    end = clock();
-//    std::cout << "DC-neg: " << (double(end-start)/CLOCKS_PER_SEC) << std::endl;
+    Q = crf.qp_inference(Q);
+    start = clock();
+    Q = crf.concave_qp_cccp_inference(Q);
+    end = clock();
+    std::cout << "DC-neg: " << (double(end-start)/CLOCKS_PER_SEC) << std::endl;
 
 
     double timing = -1;
@@ -426,6 +426,11 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
 
     std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
         << crf.compute_energy_true(int_Q) << std::endl;
+
+    std::ofstream fout1("q-dump.out");
+    fout1 << "#Q#\n" << Q << std::endl;
+    fout1.close();
+    exit(1);
 
 // std::cout << "Time taken: " << timing << '\n';
 // std::cout << "Done with inference"<< '\n';
