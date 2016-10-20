@@ -67,11 +67,17 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
                 Q = crf.lp_inference_prox(Q, lp_params);
+
+                // lp inference params
+            	LP_inf_params lp_params_rest = lp_params;
+                lp_params_rest.prox_max_iter = 20;
+            	lp_params_rest.prox_reg_const = 0.001;
                 htime st = std::chrono::high_resolution_clock::now();
-                Q = crf.lp_inference_prox_restricted(Q, lp_params);
+                Q = crf.lp_inference_prox_restricted(Q, lp_params_rest);
                 htime et = std::chrono::high_resolution_clock::now();
                 double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
                 std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
+
                 //Q = crf.lp_inference_prox(Q, lp_params);
                 //Q = crf.lp_inference_prox_restricted(Q, lp_params);
                 //Q = crf.lp_inference_prox(Q, lp_params);
@@ -168,10 +174,10 @@ int main(int argc, char *argv[])
 
     Dataset ds = get_dataset_by_name(dataset_name);
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-    //omp_set_num_threads(1);
-//#pragma omp parallel for
-    //for(int i=0; i< test_images.size(); ++i){
-    for(int i=2; i< 3; ++i){
+    omp_set_num_threads(1);
+#pragma omp parallel for
+    for(int i=0; i< test_images.size(); ++i){
+    //for(int i=0; i< 10; ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params);
     }

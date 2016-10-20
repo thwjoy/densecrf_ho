@@ -43,7 +43,7 @@
 #include <set>
 
 #define BRUTE_FORCE false	// brute-force subgraient computation, used in lp_prox and energy computations
-#define VERBOSE true	    // print intermediate energy values and timings, used in lp_prox
+#define VERBOSE false	    // print intermediate energy values and timings, used in lp_prox
 
 #define DCNEG_FASTAPPROX false
 /////////////////////////////
@@ -155,6 +155,21 @@ LP_inf_params::LP_inf_params() {
     accel_prox = true;
     work_set_size = 10;
     approx_fw_iter = 10;
+}
+
+LP_inf_params::LP_inf_params(const LP_inf_params& params) {
+	prox_reg_const = params.prox_reg_const;
+	dual_gap_tol = params.dual_gap_tol;		
+	prox_energy_tol = params.prox_energy_tol;		
+	prox_max_iter = params.prox_max_iter;		
+	fw_max_iter = params.fw_max_iter;		
+	qp_max_iter = params.qp_max_iter;		
+	qp_tol = params.qp_tol;			
+	qp_const = params.qp_const;			
+    best_int = params.best_int;
+    accel_prox = params.accel_prox;
+    work_set_size = params.work_set_size;
+    approx_fw_iter = params.approx_fw_iter;
 }
 
 MatrixXf DenseCRF::unary_init() const {
@@ -1734,47 +1749,91 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
     prev_Q.fill(0);
     float w_it = 1;             // momentum weight: eg. it/(it+3)
 
-    // matrix creations
-    less_confident_pixels(pI, Q);
-    int rN = pI.size();
-#if VERBOSE    
-    std::cout << "No of pixels with probability less than 0.99 is: " << pI.size() 
-        << " out of " << Q.cols() << ", percentage: " << double(pI.size())/double(Q.cols())*100 << "%" << std::endl;
-#endif
-    // dual variables
-    MatrixXf alpha_tQ(M_, rN);	// A * alpha, (t - tilde not iteration)
-    MatrixXf s_tQ(M_, rN);		// A * s, conditional gradient of FW == subgradient
-    VectorXf beta(rN);			// unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
-    MatrixXf beta_mat(M_, rN);	// beta_mat.row(i) == beta forall i --> N_ * M_ elements 
-    MatrixXf gamma(M_, rN);		// nonnegative
-    
-    MatrixXf cur_rQ(M_, rN);		// current Q in prox step
-    MatrixXf rescaled_rQ(M_, rN);   // infeasible Q rescaled to be within [0,1]
-    MatrixXf rtmp(M_, rN), rtmp2(M_, rN);
-    MatrixP rdot_tmp(M_, rN);
-
-    MatrixXf rQ(M_, rN);		    // restricted Q in prox step
-    update_restricted_matrix(rQ, Q, pI);
-    MatrixXf runary(M_, rN);        // restricted unary
-    update_restricted_matrix(runary, unary, pI);
-    
-    MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
-    VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_);
-    MatrixXf Y(M_, rN), neg_H(M_, rN), pos_H(M_, rN);
-    VectorXf qp_values(rN);
-    
-    pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/M_);				      
-    pos_C *= lambda;	// pos_C
-    neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
-    neg_C /= M_;													      
-    neg_C *= lambda; 	// neg_C
-    C = pos_C - neg_C;	// C
-    abs_C = pos_C + neg_C;	// abs_C
+//    // matrix creations
+//    float confidence_tol = 0.95;
+//    less_confident_pixels(pI, Q, confidence_tol);
+//    int rN = pI.size();
+//#if VERBOSE    
+//    std::cout << "No of pixels with probability less than " << confidence_tol << " is: " << pI.size() 
+//        << " out of " << Q.cols() << ", percentage: " << double(pI.size())/double(Q.cols())*100 << "%" << std::endl;
+//#endif
+//    // dual variables
+//    MatrixXf alpha_tQ(M_, rN);	// A * alpha, (t - tilde not iteration)
+//    MatrixXf s_tQ(M_, rN);		// A * s, conditional gradient of FW == subgradient
+//    VectorXf beta(rN);			// unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
+//    MatrixXf beta_mat(M_, rN);	// beta_mat.row(i) == beta forall i --> N_ * M_ elements 
+//    MatrixXf gamma(M_, rN);		// nonnegative
+//    
+//    MatrixXf cur_rQ(M_, rN);		// current Q in prox step
+//    MatrixXf rescaled_rQ(M_, rN);   // infeasible Q rescaled to be within [0,1]
+//    MatrixXf rtmp(M_, rN), rtmp2(M_, rN);
+//    MatrixP rdot_tmp(M_, rN);
+//
+//    MatrixXf rQ(M_, rN);		    // restricted Q in prox step
+//    update_restricted_matrix(rQ, Q, pI);
+//    MatrixXf runary(M_, rN);        // restricted unary
+//    update_restricted_matrix(runary, unary, pI);
+//    
+//    MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
+//    VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_);
+//    MatrixXf Y(M_, rN), neg_H(M_, rN), pos_H(M_, rN);
+//    VectorXf qp_values(rN);
+//    
+//    pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/M_);				      
+//    pos_C *= lambda;	// pos_C
+//    neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
+//    neg_C /= M_;													      
+//    neg_C *= lambda; 	// neg_C
+//    C = pos_C - neg_C;	// C
+//    abs_C = pos_C + neg_C;	// abs_C
 
     int it=0;
     int count = 0;
     do {
         ++it;
+
+        // matrix creations
+        float confidence_tol = 0.95;
+        less_confident_pixels(pI, Q, confidence_tol);
+        int rN = pI.size();
+        double percent = double(rN)/double(Q.cols())*100;
+        if (percent < 1.0) {
+            std::cout << "#CONV: Less confident pixels are less than 1%, exiting...\n";
+            break;
+        }
+#if VERBOSE    
+        std::cout << "No of pixels with probability less than " << confidence_tol << " is: " << pI.size() 
+            << " out of " << Q.cols() << ", percentage: " << double(pI.size())/double(Q.cols())*100 << "%" << std::endl;
+#endif
+        // dual variables
+        MatrixXf alpha_tQ(M_, rN);	// A * alpha, (t - tilde not iteration)
+        MatrixXf s_tQ(M_, rN);		// A * s, conditional gradient of FW == subgradient
+        VectorXf beta(rN);			// unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
+        MatrixXf beta_mat(M_, rN);	// beta_mat.row(i) == beta forall i --> N_ * M_ elements 
+        MatrixXf gamma(M_, rN);		// nonnegative
+        
+        MatrixXf cur_rQ(M_, rN);		// current Q in prox step
+        MatrixXf rescaled_rQ(M_, rN);   // infeasible Q rescaled to be within [0,1]
+        MatrixXf rtmp(M_, rN), rtmp2(M_, rN);
+        MatrixP rdot_tmp(M_, rN);
+    
+        MatrixXf rQ(M_, rN);		    // restricted Q in prox step
+        update_restricted_matrix(rQ, Q, pI);
+        MatrixXf runary(M_, rN);        // restricted unary
+        update_restricted_matrix(runary, unary, pI);
+        
+        MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
+        VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_);
+        MatrixXf Y(M_, rN), neg_H(M_, rN), pos_H(M_, rN);
+        VectorXf qp_values(rN);
+        
+        pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/M_);				      
+        pos_C *= lambda;	// pos_C
+        neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
+        neg_C /= M_;													      
+        neg_C *= lambda; 	// neg_C
+        C = pos_C - neg_C;	// C
+        abs_C = pos_C + neg_C;	// abs_C
 
 		// initialization
 		cur_Q = Q;
@@ -1886,7 +1945,7 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 #endif
 				// new PH implementation
 				// rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
-                bool store = (pit == 1);
+                bool store = (pit == 1); // store only at the first iteration
                 pairwise_[k]->apply_upper_minus_lower_ord_restricted(rtmp, rescaled_rQ, pI, Q, store);	
 
                 s_tQ += rtmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
@@ -1937,26 +1996,25 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 		renormalize(Q);
         assert(valid_probability_debug(Q));
 
+        double prev_int_energy = int_energy;
         int_energy = assignment_energy_true(currentMap(Q));
-//#if VERBOSE 
-//        double prev_energy = energy;
-//		energy = compute_energy_LP(Q);
-////#if VERBOSE
-//        int_Q = max_rounding(Q);
-//        kl = klDivergence(Q, int_Q);
-////#endif
-//
-//        if (abs(energy - prev_energy) < prox_tol) ++count;
-//        else count = 0;
-//        if (count >= 5) {
-//            std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
-//                << " iterations! terminating...\n";
-//            //break;
-//        }
+#if VERBOSE
+        double prev_energy = energy;
+		energy = compute_energy_LP(Q);
+//#if VERBOSE
+        int_Q = max_rounding(Q);
+        kl = klDivergence(Q, int_Q);
 //#endif
-
+#endif
         if (best_int) {
-		    if( int_energy < best_int_energy) {
+            if ((best_int_energy - int_energy) < prox_tol) ++count; // may also increase!
+            else count = 0;
+            if (count >= 5) {
+                std::cout << "\n##CONV: best_int_energy - int_energy < " << prox_tol << " for last " << count 
+                    << " iterations! terminating...\n";
+                break;
+            }
+		    if(int_energy < best_int_energy) {
                 best_Q = Q;
                 best_int_energy = int_energy;
             }
@@ -1964,6 +2022,17 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_int_energy);
 #endif
         } else {
+#if VERBOSE == false
+            double prev_energy = energy;
+    		energy = compute_energy_LP(Q);
+#endif
+            if (abs(energy - prev_energy) < prox_tol) ++count;
+            else count = 0;
+            if (count >= 5) {
+                std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
+                    << " iterations! terminating...\n";
+                break;
+            }
     		if( energy < best_energy) {
                 best_Q = Q;
                 best_energy = energy;
@@ -1971,11 +2040,6 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 #if VERBOSE
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
 #endif
-        }
-
-        if (energy < 0) {
-            std::cout << "\n##ERROR: LP energy cannot be negative! aborting...\n";
-            break;
         }
 
     } while(it<maxiter);
@@ -2356,24 +2420,25 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 		renormalize(Q);
         assert(valid_probability_debug(Q));
 
-        double prev_energy = energy;
-		energy = compute_energy_LP(Q);
+        double prev_int_energy = int_energy;
         int_energy = assignment_energy_true(currentMap(Q));
 #if VERBOSE
+        double prev_energy = energy;
+		energy = compute_energy_LP(Q);
+//#if VERBOSE
         int_Q = max_rounding(Q);
         kl = klDivergence(Q, int_Q);
+//#endif
 #endif
-
-        if (abs(energy - prev_energy) < prox_tol) ++count;
-        else count = 0;
-        if (count >= 5) {
-            std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
-                << " iterations! terminating...\n";
-            break;
-        }
-
         if (best_int) {
-		    if( int_energy < best_int_energy) {
+            if (abs(int_energy - prev_int_energy) < prox_tol) ++count;
+            else count = 0;
+            if (count >= 10) {
+                std::cout << "\n##CONV: int_energy - prev_int_energy < " << prox_tol << " for last " << count 
+                    << " iterations! terminating...\n";
+                break;
+            }
+		    if(int_energy < best_int_energy) {
                 best_Q = Q;
                 best_int_energy = int_energy;
             }
@@ -2381,6 +2446,17 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_int_energy);
 #endif
         } else {
+#if VERBOSE == false
+            double prev_energy = energy;
+    		energy = compute_energy_LP(Q);
+#endif
+            if (abs(energy - prev_energy) < prox_tol) ++count;
+            else count = 0;
+            if (count >= 5) {
+                std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
+                    << " iterations! terminating...\n";
+                break;
+            }
     		if( energy < best_energy) {
                 best_Q = Q;
                 best_energy = energy;
@@ -2388,11 +2464,6 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #if VERBOSE
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
 #endif
-        }
-
-        if (energy < 0) {
-            std::cout << "\n##ERROR: LP energy cannot be negative! aborting...\n";
-            break;
         }
 
     } while(it<maxiter);

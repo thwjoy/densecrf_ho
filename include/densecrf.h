@@ -60,6 +60,7 @@ public:
         bool best_int, bool accel_prox, 
         int work_set_size, int approx_fw_iter);
 	LP_inf_params();	// default values
+    LP_inf_params(const LP_inf_params& params); // copy constructor
 };
 
 
