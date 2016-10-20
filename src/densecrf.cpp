@@ -1930,12 +1930,12 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, primal_energy+dual_energy, 
                     -dual_energy, primal_energy);
 #endif
-			//if (dual_gap <= dual_gap_tol) break;	// stopping condition
+			if (dual_gap <= dual_gap_tol) break;	// stopping condition
 
 			// optimal fw step size
 			delta = (float)(dual_gap / (lambda * dotProduct(rtmp, rtmp, rdot_tmp)));
 			delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
-			assert(delta > 0);
+			assert(delta >= 0);
 #if VERBOSE
 			printf("%1.10f]\n", delta);
 #endif

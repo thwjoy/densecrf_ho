@@ -143,10 +143,10 @@ Permutohedral::~Permutohedral() {
     if (L_ != 0) {
         delete[] values_;
         delete[] new_values_;
-        if(stored_values_l_) delete[] stored_values_l_;
-        if(stored_values_u_) delete[] stored_values_u_;
         L_ = 0;
     }
+    if(stored_values_l_) delete[] stored_values_l_;
+    if(stored_values_u_) delete[] stored_values_u_;
 }
 #ifdef SSE_PERMUTOHEDRAL
 void Permutohedral::init ( const MatrixXf & feature )
@@ -708,6 +708,8 @@ void Permutohedral::seqCompute_upper_minus_lower_ord_restricted (float* out, con
         L_ = value_size;
         values_ = new split_array[ tot_value_size ];
         new_values_ = new split_array[ tot_value_size ];
+    }
+    if (stored_values_l_ == 0 && stored_values_u_ == 0) {
         stored_values_l_ = new split_array[ tot_value_size ];
         stored_values_u_ = new split_array[ tot_value_size ];
     }
