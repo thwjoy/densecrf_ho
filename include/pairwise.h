@@ -50,6 +50,8 @@ public:
 	virtual void applyTranspose( MatrixXf & out, const MatrixXf & Q ) const = 0;
     virtual void apply_upper_minus_lower_dc( MatrixXf & out, int low, int middle_low, int middle_high, int high) const = 0;
     virtual void apply_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) = 0;
+    virtual void apply_upper_minus_lower_ord_restricted(MatrixXf & rout, const MatrixXf & rQ, 
+        const std::vector<int> & pI, const MatrixXf & Q, const bool store) = 0;
 	virtual VectorXf parameters() const = 0;
 	virtual void setParameters( const VectorXf & p ) = 0;
 	virtual VectorXf gradient( const MatrixXf & b, const MatrixXf & Q ) const = 0;
@@ -73,6 +75,8 @@ public:
     void apply_upper_minus_lower_dc(MatrixXf & out, const MatrixXi & ind) const;
     void apply_upper_minus_lower_bf(MatrixXf & out, const MatrixXi & ind) const;	// brute-force
     void apply_upper_minus_lower_bf_ord(MatrixXf & out, const MatrixXi & ind, const MatrixXf & Q) const;	// brute-force in the same was as new PH
+    void apply_upper_minus_lower_ord_restricted(MatrixXf & rout, const MatrixXf & rQ,  
+        const std::vector<int> & pI, const MatrixXf & Q, const bool store);
 	void applyTranspose(MatrixXf & out, const MatrixXf & Q) const;
     void apply_upper_minus_lower_sorted_slice(MatrixXf & out, int min, int max) const;
 	

@@ -226,9 +226,56 @@ void eigen_test() {
     std::cout << "#qq#\n" << qq << std::endl;
 }
 
+void ph_test() {        
+    std::srand(1337); // Set the seed
+    int s = 5;
+    split_array* values = new split_array[ s ];
+    split_array* new_values = new split_array[ s ];
+    
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = values + i;
+        for (float& v : sp->data) v = std::rand()%100;
+    }
+	memset(new_values, 0, s*sizeof(split_array));
+    
+    std::cout << "\n#values#\n";
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = values + i;
+        for (float v : sp->data) std::cout << v << ", ";
+        std::cout << std::endl;
+    }
+    std::cout << "\n#new_values#\n";
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = new_values + i;
+        for (float v : sp->data) std::cout << v << ", ";
+        std::cout << std::endl;
+    }
+
+    split_array* tmp = new split_array[ s ];
+    delete[] tmp;
+    bool* t = new bool[10];
+    delete[] t;
+
+    memcpy(new_values, values, s*sizeof(split_array));
+    std::cout << "\nafter-memcpy\n";
+
+    std::cout << "\n#values#\n";
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = values + i;
+        for (float v : sp->data) std::cout << v << ", ";
+        std::cout << std::endl;
+    }
+    std::cout << "\n#new_values#\n";
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = new_values + i;
+        for (float v : sp->data) std::cout << v << ", ";
+        std::cout << std::endl;
+    }
+}
 int main(int argc, char *argv[])
 {
-    eigen_test();
+    //eigen_test();
+    ph_test();
     return 0;
 }
 

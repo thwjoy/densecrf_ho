@@ -1233,7 +1233,30 @@ void less_confident_pixels(std::vector<int> & indices, const MatrixXf & Q, float
     indices.clear();
     for (int i = 0; i < Q.cols(); ++i) {
         float max_prob = Q.col(i).maxCoeff();
-        if (max_prob <= tol) indices.push_back(i);
+        if (max_prob <= tol) indices.push_back(i);  // indices are in ascending order! (used later!!)
+    }
+}
+
+void update_restricted_matrix(MatrixXf & out, const MatrixXf & in, const std::vector<int> & pindices, 
+        const std::vector<int> & lindices) {
+    assert(out.rows() == lindices.size() && out.cols() == pindices.size());
+    out.fill(0);
+
+    for(int i=0; i<pindices.size(); i++) {
+        for(int j=0; j<lindices.size(); j++) {
+            out(j,i) = in(lindices[j], pindices[i]);
+        }
+    }
+}
+
+void update_extended_matrix(MatrixXf & out, const MatrixXf & in, const std::vector<int> & pindices, 
+        const std::vector<int> & lindices) {
+    assert(in.rows() == lindices.size() && in.cols() == pindices.size());
+
+    for(int i=0; i<pindices.size(); i++) {
+        for(int j=0; j<lindices.size(); j++) {
+            out(lindices[j], pindices[i]) = in(j, i);
+        }
     }
 }
 
@@ -1672,20 +1695,6 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
     assert(valid_probability_debug(Q));
     best_Q = Q;
 
-    // see pixel probabilities
-    std::vector<int> indices;
-    float tol = 0.99;
-    less_confident_pixels(indices, Q, tol);
-    std::cout << "\n##### pixel probability debug #####\n";
-    std::cout << "No of pixels with probability less than " << tol << " is: " << indices.size() 
-        << " out of " << Q.cols() << ", percentage: " << double(indices.size())/double(Q.cols())*100 << "%" << std::endl;
-    get_limited_indices(Q, indices);
-    std::cout << "No of labels after limited: " << indices.size()
-        << " out of " << Q.rows() << ", percentage: " << double(indices.size())/double(Q.rows())*100 << "%" << std::endl;
-    std::cout << std::endl;
-    return Q;
-    //
-
     // Compute the value of the energy
     double energy = 0, best_energy = std::numeric_limits<double>::max(), 
 		   best_int_energy = std::numeric_limits<double>::max();
@@ -1694,10 +1703,6 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
     double kl = klDivergence(Q, max_rounding(Q));
 #endif
 	energy = compute_energy_LP(Q);
-    if (energy > int_energy) {  // choose the best initialization 
-        Q = max_rounding(Q);
-    	energy = compute_energy_LP(Q);
-    }
 	best_energy = energy;
 	best_int_energy = int_energy;
 #if VERBOSE    
@@ -1716,66 +1721,79 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 	float delta = 1;						// FW step size
 	double dual_gap = 0, dual_energy = 0;
 
-	// dual variables
-	MatrixXf alpha_tQ(M_, N_);	// A * alpha, (t - tilde not iteration)
-	MatrixXf s_tQ(M_, N_);		// A * s, conditional gradient of FW == subgradient
-	VectorXf beta(N_);			// unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
-	MatrixXf beta_mat(M_, N_);	// beta_mat.row(i) == beta forall i --> N_ * M_ elements 
-	MatrixXf gamma(M_, N_);		// nonnegative
-	
-	MatrixXf cur_Q(M_, N_);		// current Q in prox step
-	MatrixXf rescaled_Q(M_, N_);// infeasible Q rescaled to be within [0,1]
-#if VERBOSE
-	MatrixXf int_Q(M_, N_);		// store integral Q
-#endif
+    // gamma-qp variables
+    const float qp_delta = params.qp_const;	// constant used in qp-gamma
+    const float qp_tol = params.qp_tol;		// qp-gamma tolernace
+    const int qp_maxiter = params.qp_max_iter;
 
-    // accelerated prox_lp
-	MatrixXf prev_Q(M_, N_);	// Q resulted in prev prox step
-    prev_Q.fill(0);
-    float w_it = 1;             // momentum weight: eg. it/(it+3)
-
-	// gamma-qp variables
-	const float qp_delta = params.qp_const;	// constant used in qp-gamma
-	const float qp_tol = params.qp_tol;		// qp-gamma tolernace
-	const int qp_maxiter = params.qp_max_iter;
-
-	MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
-	VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_);
-	MatrixXf Y(M_, N_), neg_H(M_, N_), pos_H(M_, N_);
-	VectorXf qp_values(N_);
-
-	pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/M_);				      
-	pos_C *= lambda;	// pos_C
-	neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
-	neg_C /= M_;													      
-	neg_C *= lambda; 	// neg_C
-	C = pos_C - neg_C;	// C
-	abs_C = pos_C + neg_C;	// abs_C
-
-    //clock_t start, end;
     typedef std::chrono::high_resolution_clock::time_point htime;
     htime start, end;
     
-//    // multi-plane FW --> NO ADAPTIVE SELECTION OF WORKING-SET-SIZE AND APPROX-FW-ITER as of now
-//    const int work_set_size = params.work_set_size;
-//    const int approx_fw_iter = params.approx_fw_iter;
-//    const bool mp_fw = (work_set_size != 0 || approx_fw_iter != 0);
-//    std::vector<MatrixXf> working_set;    // stores conditional gradients (copied)
-//    double dual_prox_start = 0, dual_app_start = 0;
-//    //clock_t time_prox_start;
-//    htime time_prox_start;
+    std::vector<int> pI, lI;    // restricted pixels and labels
+
+    MatrixXf cur_Q(M_, N_);		// current Q in prox step
+#if VERBOSE
+  	MatrixXf int_Q(M_, N_);		// store integral Q
+#endif
+    // accelerated prox_lp
+    MatrixXf prev_Q(M_, N_);	// Q resulted in prev prox step
+    prev_Q.fill(0);
+    float w_it = 1;             // momentum weight: eg. it/(it+3)
 
     int it=0;
     int count = 0;
     do {
         ++it;
+        
+        // matrix creations
+        less_confident_pixels(pI, Q);
+        //get_limited_indices(Q, lI);
+        lI.clear();
+        for (int i = 0; i < M_; ++i) lI.push_back(i);
+        int rN = pI.size();
+        int rM = lI.size();     
+        if (rM != M_) { // restricting over labels is an issue in qp-gamma (handle later!)
+            std::cout << rM << " != " << M_ << " exiting...!" << std::endl;
+            exit(1);
+        }
+#if VERBOSE    
+        std::cout << "No of pixels with probability less than 0.99 is: " << pI.size() 
+            << " out of " << Q.cols() << ", percentage: " << double(pI.size())/double(Q.cols())*100 << "%" << std::endl;
+        std::cout << "No of labels after limited: " << lI.size()
+            << " out of " << Q.rows() << ", percentage: " << double(lI.size())/double(Q.rows())*100 << "%" << std::endl;
+#endif
+        // dual variables
+    	MatrixXf alpha_tQ(rM, rN);	// A * alpha, (t - tilde not iteration)
+    	MatrixXf s_tQ(rM, rN);		// A * s, conditional gradient of FW == subgradient
+    	VectorXf beta(rN);			// unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
+    	MatrixXf beta_mat(rM, rN);	// beta_mat.row(i) == beta forall i --> N_ * M_ elements 
+    	MatrixXf gamma(rM, rN);		// nonnegative
+    	
+    	MatrixXf cur_rQ(rM, rN);		// current Q in prox step
+    	MatrixXf rescaled_rQ(rM, rN);   // infeasible Q rescaled to be within [0,1]
+        MatrixXf rtmp(rM, rN), rtmp2(rM, rN);
+        MatrixP rdot_tmp(rM, rN);
+
+    	MatrixXf rQ(rM, rN);		    // restricted Q in prox step
+        update_restricted_matrix(rQ, Q, pI, lI);
+        MatrixXf runary(rM, rN);        // restricted unary
+        update_restricted_matrix(runary, unary, pI, lI);
+    
+    	MatrixXf C(rM, rM), neg_C(rM, rM), pos_C(rM, rM), abs_C(rM, rM);
+    	VectorXf v_gamma(rM), v_y(rM), v_pos_h(rM), v_neg_h(rM), v_step(rM), v_tmp(rM);
+    	MatrixXf Y(rM, rN), neg_H(rM, rN), pos_H(rM, rN);
+    	VectorXf qp_values(rN);
+    
+    	pos_C = MatrixXf::Identity(rM, rM) * (1-1.0/rM);				      
+    	pos_C *= lambda;	// pos_C
+    	neg_C = MatrixXf::Ones(rM, rM) - MatrixXf::Identity(rM, rM);	
+    	neg_C /= rM;													      
+    	neg_C *= lambda; 	// neg_C
+    	C = pos_C - neg_C;	// C
+    	abs_C = pos_C + neg_C;	// abs_C
 
 		// initialization
-		beta_mat.fill(0);
-		beta.fill(0);
-		gamma.fill(1);	// all zero is a fixed point of QP iteration!
 		cur_Q = Q;
-        
         if (accel_prox) {   // accelerated prox
             w_it = float(it)/(it+3.0);  // simplest choice
             tmp = Q - prev_Q;
@@ -1786,14 +1804,14 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
         
 		int pit = 0;
 		alpha_tQ.fill(0);	// all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
+		beta_mat.fill(0);
+		beta.fill(0);
+		gamma.fill(1);	// all zero is a fixed point of QP iteration!
+        update_restricted_matrix(cur_rQ, cur_Q, pI, lI);
 		
 		// prox step
 		do {	
 			++pit;
-//            if (mp_fw) {
-//                //time_prox_start = clock();
-//                time_prox_start = std::chrono::high_resolution_clock::now();
-//            }
 			// initialization
 			s_tQ.fill(0);
 
@@ -1802,14 +1820,14 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 			// case-1: solve for gamma using qp solver! 
 			// 1/2 * gamma^T * C * gamma - gamma^T * H
 			// populate Y matrix
-			tmp = alpha_tQ - unary;
-			for (int i = 0; i < N_; ++i) {
-				v_y = C * tmp.col(i);
+			rtmp = alpha_tQ - runary;
+			for (int i = 0; i < rN; ++i) {
+				v_y = C * rtmp.col(i);
 				Y.col(i) = v_y;
 			}	
-			Y += cur_Q;		// H = -Y
-			for (int i = 0; i < N_; ++i) {
-				for (int j = 0; j < M_; ++j) {	
+			Y += cur_rQ;		// H = -Y
+			for (int i = 0; i < rN; ++i) {
+				for (int j = 0; j < rM; ++j) {	
 					pos_H(j, i) = std::max(-Y(j, i), (float)0);		// pos_H 
 					neg_H(j, i) = std::max(Y(j, i), (float)0);		// neg_H
 				}
@@ -1825,7 +1843,7 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 #endif
 			do {
 				//solve for each pixel separately
-				for (int i = 0; i < N_; ++i) {
+				for (int i = 0; i < rN; ++i) {
 					v_gamma = gamma.col(i);
 					v_pos_h = pos_H.col(i);
 					v_neg_h = neg_H.col(i);
@@ -1858,29 +1876,23 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 			// end-qp-gamma
 
 			// case-2: update beta -- gradient of dual wrt beta equals to zero
-			beta_mat = (alpha_tQ + gamma - unary);	// -B^T/l * (A * alpha + gamma - phi)
+			beta_mat = (alpha_tQ + gamma - runary);	// -B^T/l * (A * alpha + gamma - phi)
 			// DON'T DO IT AT ONCE!! (RETURNS A SCALAR???)--> do it in two steps
 			beta = -beta_mat.colwise().sum();	
-			beta /= M_;
+			beta /= rM;
 			// repeat beta in each row of beta_mat - - B * beta
-			for (int j = 0; j < M_; ++j) {
+			for (int j = 0; j < rM; ++j) {
 				beta_mat.row(j) = beta;
 			}
             //}
 
 			// case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
-			Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;	// Q may be infeasible --> but no problem
-#if BRUTE_FORCE
-        	sortRows(Q, ind);
-#else
+			rQ = lambda * (alpha_tQ + beta_mat + gamma - runary) + cur_rQ;	// Q may be infeasible --> but no problem
+
 			// new PH implementation doesn't work with Q values outside [0,1] - or in fact truncates to be within [0,1]
     		// rescale Q to be within [0,1] -- order of Q values preserved!
-    		rescale(rescaled_Q, Q);
-//            // check colinearity of subgradients
-//            double ph_e = 0, bf_e = 0;
-//            compare_energies(rescaled_Q, ph_e, bf_e, false, false, true);
-//            //
-#endif
+    		rescale(rescaled_rQ, rQ);
+
 			// subgradient lower minus upper
 			// Pairwise
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -1888,21 +1900,12 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
                 //start = clock();
                 start = std::chrono::high_resolution_clock::now();
 #endif
-#if BRUTE_FORCE
-				// brute-force computation
-            	no_norm_pairwise_[k]->apply_upper_minus_lower_bf(tmp2, ind);
-            	//no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp2, ind);
-            	for(int i=0; i<tmp2.cols(); ++i) {
-                	for(int j=0; j<tmp2.rows(); ++j) {
-                    	tmp(j, ind(j, i)) = tmp2(j, i);
-                	}
-            	}
-#else
 				// new PH implementation
 				// rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
-                pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);	
-#endif
-                s_tQ += tmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
+                bool store = (pit == 1);
+                pairwise_[k]->apply_upper_minus_lower_ord_restricted(rtmp, rescaled_rQ, pI, Q, store);	
+
+                s_tQ += rtmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
 #if VERBOSE
                 //end = clock();
                 //double dt = (double)(end-start)/CLOCKS_PER_SEC;
@@ -1912,132 +1915,38 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 #endif
             }
 			// find dual gap
-			tmp = alpha_tQ - s_tQ;	
-			dual_gap = dotProduct(tmp, Q, dot_tmp);
+			rtmp = alpha_tQ - s_tQ;	
+			dual_gap = dotProduct(rtmp, rQ, rdot_tmp);
 
 #if VERBOSE
 			// dual-energy value
-			tmp2 = Q - cur_Q;
-			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
+			rtmp2 = rQ - cur_rQ;
+			dual_energy = dotProduct(rtmp2, rtmp2, rdot_tmp) / (2* lambda) + dotProduct(rtmp2, cur_rQ, rdot_tmp) / lambda;
 			dual_energy -= beta.sum();
-			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
-		   	primal_energy += dotProduct(unary, Q, dot_tmp);
-			primal_energy -= dotProduct(s_tQ, Q, dot_tmp);	// cancel the neg in s_tQ
+			double primal_energy = dotProduct(rtmp2, rtmp2, rdot_tmp) / (2* lambda);
+		   	primal_energy += dotProduct(runary, rQ, rdot_tmp);
+			primal_energy -= dotProduct(s_tQ, rQ, rdot_tmp);	// cancel the neg in s_tQ
 			//assert(dual_gap == (dual_energy - primal_energy));
 			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, primal_energy+dual_energy, 
                     -dual_energy, primal_energy);
-//            if (mp_fw) dual_prox_start = -dual_energy;
-            //if (dual_gap < 0) {   // may become negative due to PH approximations!
-            //    std::cout << "\nERROR: Dual-gap cannot be negative!\n";
-            //    exit(1);
-            //}
 #endif
-			if (dual_gap <= dual_gap_tol) break;	// stopping condition
+			//if (dual_gap <= dual_gap_tol) break;	// stopping condition
 
 			// optimal fw step size
-			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+			delta = (float)(dual_gap / (lambda * dotProduct(rtmp, rtmp, rdot_tmp)));
 			delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
 			assert(delta > 0);
 #if VERBOSE
 			printf("%1.10f]\n", delta);
 #endif
 			// update alpha_tQ
-			tmp = s_tQ - alpha_tQ;
-			tmp *= delta;
-			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
-
-//            if (mp_fw) {
-//                if (working_set.size() == work_set_size) working_set.erase(working_set.begin());
-//                working_set.push_back(s_tQ);
-//            }
-//
-//            // multi-plane approximate iterations
-//            for (int appit = 0; appit < approx_fw_iter; ++appit) {
-//                // case-1: use the old-gamma
-//                // case-2:
-//                beta_mat = (alpha_tQ + gamma - unary);	// -B^T/l * (A * alpha + gamma - phi)
-//			    beta = -beta_mat.colwise().sum();	
-//			    beta /= M_;
-//			    // repeat beta in each row of beta_mat - - B * beta
-//			    for (int j = 0; j < M_; ++j) {
-//				    beta_mat.row(j) = beta;
-//			    }
-//                //
-//                // case-3
-//                Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;
-//
-//                MatrixXf& s_tQ_hat = working_set[0];
-//                double maxe = dotProduct(s_tQ_hat, Q, dot_tmp);
-//#if VERBOSE
-//                //clock_t st = clock();
-//                htime st = std::chrono::high_resolution_clock::now();
-//#endif
-//                for (int i = 1; i < working_set.size(); ++i) {
-//                    double e = dotProduct(working_set[i], Q, dot_tmp);
-//                    if (maxe < e) {
-//                        maxe = e;
-//                        s_tQ_hat = working_set[i];
-//                    }
-//                    //std::cout << "##i: " << i << ", e: " << e << ", maxe: " << maxe << std::endl;
-//                }
-//#if VERBOSE
-//                //clock_t et = clock();
-//                //double app_fw_time = (double)(et-st)/CLOCKS_PER_SEC;
-//                htime et = std::chrono::high_resolution_clock::now();
-//                double app_fw_time = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
-//                printf("#App-FW-Time: %5.5f, size: %d\t", app_fw_time, (int)working_set.size());
-//#endif
-//
-//                // find dual gap
-//    			tmp = alpha_tQ - s_tQ_hat;	
-//    			dual_gap = dotProduct(tmp, Q, dot_tmp);
-//    
-//#if VERBOSE
-//    			// dual-energy value
-//    			tmp2 = Q - cur_Q;
-//    			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
-//    			dual_energy -= beta.sum();
-//    			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
-//    		   	primal_energy += dotProduct(unary, Q, dot_tmp);
-//    			primal_energy -= dotProduct(s_tQ_hat, Q, dot_tmp);	// cancel the neg in s_tQ_hat
-//    			//assert(dual_gap == (dual_energy - primal_energy));
-//    			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", appit, dual_gap, primal_energy+dual_energy, 
-//                        -dual_energy, primal_energy);
-//                if (appit > 0) {
-//                    //double prox_tot_time = (double)(et-time_prox_start)/CLOCKS_PER_SEC;
-//                    double prox_tot_time = std::chrono::duration_cast<std::chrono::duration<double>>
-//                        (et-time_prox_start).count();
-//                    double avg_imp = (-dual_energy-dual_prox_start)/prox_tot_time;
-//                    double app_imp = (-dual_energy-dual_app_start)/app_fw_time;
-//                    printf("(%10.3f, %10.3f), ", avg_imp, app_imp);
-//                    if (avg_imp >= app_imp) {
-//                        printf(" break: app_imp\n");
-//                        break;
-//                    }
-//                }
-//                dual_app_start = -dual_energy;
-//#endif
-//    			if (dual_gap <= 10) {
-//                    printf(" break: dual_gap\n");
-//                    break;	// stopping condition
-//                }
-//    
-//    			// optimal fw step size
-//    			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
-//    			delta = std::min(std::max(delta, (float)0.0), (float)1.0);
-//    			assert(delta > 0);
-//#if VERBOSE
-//    			printf("%1.10f]\n", delta);
-//#endif
-//
-//                // update alpha_tQ
-//		    	tmp = s_tQ_hat - alpha_tQ;
-//	    		tmp *= delta;
-//    			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ_hat - alpha_tQ);
-//            }
+			rtmp = s_tQ - alpha_tQ;
+			rtmp *= delta;
+			alpha_tQ += rtmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
 
 		} while(pit<fw_maxiter);
 
+        update_extended_matrix(Q, rQ, pI, lI);
 		// project Q back to feasible region
 		feasible_Q(tmp, ind, sum, K, Q);
 		Q = tmp;
@@ -2057,7 +1966,7 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
         if (count >= 5) {
             std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
                 << " iterations! terminating...\n";
-            break;
+            //break;
         }
 
         if (best_int) {
@@ -2084,19 +1993,6 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
         }
 
     } while(it<maxiter);
-
-#if VERBOSE
-    int_energy = assignment_energy_true(currentMap(Q));
-	std::cout <<"final projected energy: " << int_energy << "\n";
-
-    // verify KKT conditions
-    // gamma
-    tmp = gamma.cwiseProduct(Q);
-    std::cout << "gamma\t:: mean=" << gamma.mean() << ",\tmax=" << gamma.maxCoeff() << ",\tmin=" << gamma.minCoeff() << std::endl;
-    std::cout << "gamma.cwiseProduct(Q)\t:: mean=" << tmp.mean() << ",\tmax=" << tmp.maxCoeff() << ",\tmin=" << tmp.minCoeff() << std::endl;
-    std::cout << "beta_mat\t:: mean=" << beta_mat.mean() << ",\tmax=" << beta_mat.maxCoeff() << ",\tmin=" << beta_mat.minCoeff() << std::endl;
-    std::cout << "alpha_tQ\t:: mean=" << alpha_tQ.mean() << ",\tmax=" << alpha_tQ.maxCoeff() << ",\tmin=" << alpha_tQ.minCoeff() << std::endl;
-#endif
 
     return best_Q;
 }

@@ -58,6 +58,10 @@ protected:
     int L_;             // number of labels set in "seqCompute_upper_minus_lower_ord"
     split_array * values_;       // allocated once in "seqCompute_upper_minus_lower_ord", dealocate in destructor
     split_array * new_values_;   // allocated once in "seqCompute_upper_minus_lower_ord", dealocate in destructor
+    split_array * stored_values_l_; // lower: allocated once in "seqCompute_upper_minus_lower_ord_restricted", dealocate in destructor
+    split_array * stored_values_u_; // upper: allocated once in "seqCompute_upper_minus_lower_ord_restricted", dealocate in destructor
+    std::vector<int> stored_active_list_; // stored active lattice points, used in "seqCompute_upper_minus_lower_ord_restricted"
+
 	std::vector<int> offset_, rank_;
 	std::vector<float> barycentric_;
 	std::vector<Neighbors> blur_neighbors_;
@@ -67,6 +71,8 @@ protected:
     void seqCompute ( float* out, const float* in, int value_size, bool reverse=false ) const;
     void seqCompute_upper_minus_lower_dc ( float* out, int low, int middle_low, int middle_high, int high ) const;
     void seqCompute_upper_minus_lower_ord ( float* out, const float* in, int value_size ); 
+    void seqCompute_upper_minus_lower_ord_restricted ( float* out, const float* in, int value_size, 
+        const std::vector<int> & pI, const float* extIn, const bool store );
 public:
 	Permutohedral();
 	~Permutohedral();
@@ -75,6 +81,8 @@ public:
     void compute ( MatrixXf & out, const MatrixXf & in, bool reverse=false ) const;
     void compute_upper_minus_lower_dc ( MatrixXf & out, int low, int middle_low, int middle_high, int high ) const;
     void compute_upper_minus_lower_ord ( MatrixXf & out, const MatrixXf & Q );
+    void compute_upper_minus_lower_ord_restricted ( MatrixXf & rout, const MatrixXf & rQ,  
+        const std::vector<int> & pI, const MatrixXf & Q, const bool store );
 	// Compute the gradient of a^T K b
 	void gradient ( float* df, const float * a, const float* b, int value_size ) const;
 };

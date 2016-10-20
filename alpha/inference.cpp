@@ -401,7 +401,8 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     start = clock();
     srand(start);
     
-    Q = crf.lp_inference_prox(Q, lp_params);
+    //Q = crf.lp_inference_prox(Q, lp_params);
+    Q = crf.lp_inference_prox_restricted(Q, lp_params);
     end = clock();
     timing = (double(end-start)/CLOCKS_PER_SEC);
     std::cout << "PROX-LP: " << timing << std::endl;

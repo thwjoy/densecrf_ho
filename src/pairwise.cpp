@@ -82,6 +82,10 @@ protected:
 	void filter_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) {
 		lattice_.compute_upper_minus_lower_ord( out, Q );
 	}
+	void filter_upper_minus_lower_ord_restricted(MatrixXf & rout, const MatrixXf & rQ, 
+        const std::vector<int> & pI, const MatrixXf & Q, const bool store) {
+		lattice_.compute_upper_minus_lower_ord_restricted(rout, rQ, pI, Q, store);
+	}
 	// Compute d/df a^T*K*b
 	MatrixXf kernelGradient( const MatrixXf & a, const MatrixXf & b ) const {
 		MatrixXf g = 0*f_;
@@ -130,6 +134,10 @@ public:
 	virtual void apply_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) {
 		filter_upper_minus_lower_ord(out, Q);
 	}
+    virtual void apply_upper_minus_lower_ord_restricted(MatrixXf & rout, const MatrixXf & rQ, 
+        const std::vector<int> & pI, const MatrixXf & Q, const bool store) {
+		filter_upper_minus_lower_ord_restricted(rout, rQ, pI, Q, store);
+    }
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const {
 		filter( out, Q, false );
 	}
@@ -217,6 +225,18 @@ void PairwisePotential::apply_upper_minus_lower_ord(MatrixXf & out, const Matrix
 	// Apply the compatibility
 	compatibility_->apply( out, out );
 }	
+void PairwisePotential::apply_upper_minus_lower_ord_restricted(MatrixXf & rout, const MatrixXf & rQ, 
+    const std::vector<int> & pI, const MatrixXf & Q, const bool store) {
+    // pass rescaled_Q to reduce the discretization error! ("rescale" function is in eigen_utils.cpp)
+    // when no of labels are high, each probabilty is small and all fall into one or two buckets!
+    assert(rQ.maxCoeff() <= 1);
+	assert(rQ.minCoeff() >= 0);  // values truncated to be [0,1], doesn't need to sum to 1
+    rout.fill(0);
+	kernel_->apply_upper_minus_lower_ord_restricted(rout, rQ, pI, Q, store);
+	
+	// Apply the compatibility
+	compatibility_->apply( rout, rout );
+}    
 void PairwisePotential::apply_upper_minus_lower_dc(MatrixXf & out, const MatrixXi & ind) const {
 	MatrixXf const & features = kernel_->features();
 	MatrixXf sorted_features = features;
