@@ -66,6 +66,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
+                Q = crf.lp_inference_prox(Q, lp_params);
                 htime st = std::chrono::high_resolution_clock::now();
                 Q = crf.lp_inference_prox_restricted(Q, lp_params);
                 htime et = std::chrono::high_resolution_clock::now();
@@ -170,7 +171,7 @@ int main(int argc, char *argv[])
     //omp_set_num_threads(1);
 //#pragma omp parallel for
     //for(int i=0; i< test_images.size(); ++i){
-    for(int i=1; i< 2; ++i){
+    for(int i=2; i< 3; ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params);
     }
