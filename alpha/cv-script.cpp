@@ -34,13 +34,17 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
         make_dir(path_to_subexp_results);
         if (not file_exist(output_path)) {
             //clock_t start, end;
-            typedef std::chrono::high_resolution_clock::time_point htime;
-            htime start, end;
+            //typedef std::chrono::high_resolution_clock::time_point htime;
+            //htime start, end;
+            //time_t start, end;
+            double start, end;
             double timing;
             std::cout << image_path << std::endl;
             //start = clock();
             std::vector<perf_measure> traced_perfs;
-            start = std::chrono::high_resolution_clock::now();
+            //start = std::chrono::high_resolution_clock::now();
+            //start = time(NULL);
+            start = omp_get_wtime();
             Q = crf.unary_init();
             if (method == "mf5") {
                 Q = crf.inference(Q, 5);
@@ -72,10 +76,16 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             	LP_inf_params lp_params_rest = lp_params;
                 lp_params_rest.prox_max_iter = 20;
             	lp_params_rest.prox_reg_const = 0.001;
-                htime st = std::chrono::high_resolution_clock::now();
+                //htime st = std::chrono::high_resolution_clock::now();
+                //time_t st = time(NULL);
+                double st = omp_get_wtime();
                 Q = crf.lp_inference_prox_restricted(Q, lp_params_rest);
-                htime et = std::chrono::high_resolution_clock::now();
-                double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
+                //htime et = std::chrono::high_resolution_clock::now();
+                //time_t et = time(NULL);
+                double et = omp_get_wtime();
+                //double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
+                //double dt = difftime(et, st);
+                double dt = et - st;
                 std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
 
                 //Q = crf.lp_inference_prox(Q, lp_params);
@@ -96,9 +106,13 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             }
 
             //end = clock();
-            end = std::chrono::high_resolution_clock::now();
+            //end = std::chrono::high_resolution_clock::now();
+            //end = time(NULL);
+            end = omp_get_wtime();
             //timing = (double(end-start)/CLOCKS_PER_SEC);
-            timing = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
+            //timing = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
+            //timing = difftime(end, start);
+            timing = end - start;
             double final_energy = crf.compute_energy_true(Q);
             double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
@@ -176,8 +190,8 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
     omp_set_num_threads(1);
 #pragma omp parallel for
-    for(int i=0; i< test_images.size(); ++i){
-    //for(int i=0; i< 10; ++i){
+    //for(int i=0; i< test_images.size(); ++i){
+    for(int i=0; i< 10; ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params);
     }

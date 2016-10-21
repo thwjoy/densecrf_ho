@@ -43,7 +43,7 @@
 #include <set>
 
 #define BRUTE_FORCE false	// brute-force subgraient computation, used in lp_prox and energy computations
-#define VERBOSE false	    // print intermediate energy values and timings, used in lp_prox
+#define VERBOSE true	    // print intermediate energy values and timings, used in lp_prox
 
 #define DCNEG_FASTAPPROX false
 /////////////////////////////
@@ -2464,6 +2464,14 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #if VERBOSE
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
 #endif
+        }
+        float confidence_tol = 0.95;
+        std::vector<int> pI;
+        less_confident_pixels(pI, best_Q, confidence_tol);
+        double percent = double(pI.size())/double(Q.cols())*100;
+        if (percent > 10) {
+            std::cout << "\n##CONV: Less confident pixels are greater than 10%, terminating...\n";
+            break;
         }
 
     } while(it<maxiter);

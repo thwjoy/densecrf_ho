@@ -65,6 +65,7 @@ def main():
     total_frac_energy_1 = total_frac_energy_2 = 0
     total_int_energy_1 = total_int_energy_2 = 0
     for prop1, prop2 in zip(first, second):
+        #print(str(prop1) + " # " + str(prop2))
         if prop1.timing < prop2.timing:
             faster_1 += 1
         elif prop1.timing == prop2.timing:

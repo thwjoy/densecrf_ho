@@ -1,3 +1,4 @@
+#include <chrono>
 #include <ctime>
 #include <fstream>
 #include <iostream>
@@ -388,24 +389,36 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     //crf.compute_kl_divergence();
-    MatrixXf Q = crf.unary_init();
     clock_t start, end;
-    Q = crf.qp_inference(Q);
     start = clock();
+    MatrixXf Q = crf.unary_init();
+    Q = crf.qp_inference(Q);
     Q = crf.concave_qp_cccp_inference(Q);
     end = clock();
-    std::cout << "DC-neg: " << (double(end-start)/CLOCKS_PER_SEC) << std::endl;
+    std::cout << "Upto DC-neg: " << (double(end-start)/CLOCKS_PER_SEC) << " seconds" << std::endl;
 
 
     double timing = -1;
-    start = clock();
+    //start = clock();
     srand(start);
     
-    //Q = crf.lp_inference_prox(Q, lp_params);
-    Q = crf.lp_inference_prox_restricted(Q, lp_params);
+    Q = crf.lp_inference_prox(Q, lp_params);
+
+    //Q = crf.lp_inference_prox_restricted(Q, lp_params);
+    typedef std::chrono::high_resolution_clock::time_point htime;
+    // lp inference params
+    LP_inf_params lp_params_rest = lp_params;
+    lp_params_rest.prox_max_iter = 20;
+    lp_params_rest.prox_reg_const = 0.001;
+    htime st = std::chrono::high_resolution_clock::now();
+    Q = crf.lp_inference_prox_restricted(Q, lp_params_rest);
+    htime et = std::chrono::high_resolution_clock::now();
+    double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
+    std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
+
     end = clock();
     timing = (double(end-start)/CLOCKS_PER_SEC);
-    std::cout << "PROX-LP: " << timing << std::endl;
+    std::cout << "TOT-PROX-LP: " << timing << " seconds" << std::endl;
     double final_energy = crf.compute_energy(Q);
     double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
     write_down_perf(timing, final_energy, discretized_energy, path_to_output);
