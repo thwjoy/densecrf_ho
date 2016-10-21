@@ -1252,6 +1252,22 @@ void less_confident_pixels(std::vector<int> & indices, const MatrixXf & Q, float
     }
 }
 
+// return the least confident (maximum probability of any label) k% of pixels
+void less_confident_pixels2(std::vector<int> & indices, const MatrixXf & Q, float k = 10) {
+    indices.clear();
+    MatrixXf maxProb(1, Q.cols());
+    MatrixXi ind(1, Q.cols());
+    for (int i = 0; i < Q.cols(); ++i) {
+        maxProb(1, i) = Q.col(i).maxCoeff();
+    }
+    sortRows(maxProb, ind);
+    int rN = Q.cols() * k / 100;
+    for (int i = Q.cols() - rN; i < Q.cols(); ++i) {
+        indices.push_back(ind(1, i));    
+    }
+    std::sort(indices.begin(), indices.end());  // indices are in ascending order! (used later!!)
+}
+
 void update_restricted_matrix(MatrixXf & out, const MatrixXf & in, const std::vector<int> & pindices) {
     assert(out.cols() == pindices.size());
     out.fill(0);
@@ -1794,9 +1810,11 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 
         // matrix creations
         float confidence_tol = 0.95;
-        less_confident_pixels(pI, Q, confidence_tol);
+        float percent = 10;
+        //less_confident_pixels(pI, Q, confidence_tol);
+        less_confident_pixels2(pI, Q, percent);
         int rN = pI.size();
-        double percent = double(rN)/double(Q.cols())*100;
+        //double percent = double(rN)/double(Q.cols())*100;
         if (percent < 1.0) {
             std::cout << "#CONV: Less confident pixels are less than 1%, exiting...\n";
             break;

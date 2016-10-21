@@ -402,14 +402,14 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     //start = clock();
     srand(start);
     
-    Q = crf.lp_inference_prox(Q, lp_params);
+    //Q = crf.lp_inference_prox(Q, lp_params);
 
     //Q = crf.lp_inference_prox_restricted(Q, lp_params);
     typedef std::chrono::high_resolution_clock::time_point htime;
     // lp inference params
     LP_inf_params lp_params_rest = lp_params;
-    lp_params_rest.prox_max_iter = 20;
-    lp_params_rest.prox_reg_const = 0.001;
+    //lp_params_rest.prox_max_iter = 20;
+    //lp_params_rest.prox_reg_const = 0.001;
     htime st = std::chrono::high_resolution_clock::now();
     Q = crf.lp_inference_prox_restricted(Q, lp_params_rest);
     htime et = std::chrono::high_resolution_clock::now();
