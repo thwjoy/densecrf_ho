@@ -1707,7 +1707,10 @@ void feasible_Q(MatrixXf & tmp, MatrixXi & ind, VectorXd & sum, VectorXi & K, co
 
 // make a step of qp_gamma: -- \cite{NNQP solver Xiao and Chen 2014} - O(n) implementation!!
 void qp_gamma_step(VectorXf & v_gamma, const VectorXf & v_pos_h, const VectorXf & v_neg_h, const float qp_delta, 
-    const int M, const float lambda, VectorXf & v_step, VectorXf & v_tmp, VectorXf & v_tmp2) {
+        const int M, const float lambda, VectorXf & v_step, VectorXf & v_tmp, VectorXf & v_tmp2) {
+    // C: lambda*I - (lambda/m)*ones
+    // neg_C: max(-C, 0)- elementwise
+    // abs_C: abs(C)- elementwise
     float sum = v_gamma.sum();
     v_tmp2.fill(sum);
     
@@ -1726,6 +1729,7 @@ void qp_gamma_step(VectorXf & v_gamma, const VectorXf & v_pos_h, const VectorXf 
 
 // multiply by C in linear time!
 void qp_gamma_multiplyC(VectorXf & v_out, const VectorXf & v_in, const int M, const float lambda) {
+    // C: lambda*I - (lambda/m)*ones
     float sum = v_in.sum();
     v_out.fill(sum);
     v_out = (-1.0/float(M)) * v_out + v_in;
@@ -1867,18 +1871,9 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
         MatrixXf runary(M_, rN);        // restricted unary
         update_restricted_matrix(runary, unary, pI);
         
-        //MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
         VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_), v_tmp2(M_);
         MatrixXf Y(M_, rN), neg_H(M_, rN), pos_H(M_, rN);
         VectorXf qp_values(rN);
-        
-//        pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/M_);				      
-//        pos_C *= lambda;	// pos_C
-//        neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
-//        neg_C /= M_;													      
-//        neg_C *= lambda; 	// neg_C
-//        C = pos_C - neg_C;	// C
-//        abs_C = pos_C + neg_C;	// abs_C
 
 		// initialization
 		cur_Q = Q;
@@ -1910,8 +1905,6 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 			// populate Y matrix
 			rtmp = alpha_tQ - runary;
 			for (int i = 0; i < rN; ++i) {
-                //
-//				v_y = C * rtmp.col(i);
                 // do it in linear time
                 v_tmp2 = rtmp.col(i);
                 qp_gamma_multiplyC(v_y, v_tmp2, M_, lambda);
@@ -1939,19 +1932,11 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 					v_gamma = gamma.col(i);
 					v_pos_h = pos_H.col(i);
 					v_neg_h = neg_H.col(i);
-                    //
-//					v_step = 2 * neg_C * v_gamma + v_pos_h;
-//					v_step = v_step.array() + qp_delta;
-//					v_tmp = abs_C * v_gamma + v_neg_h;
-//				    v_tmp = v_tmp.array() + qp_delta;
-//					v_step = v_step.cwiseQuotient(v_tmp);
-//					v_gamma = v_gamma.cwiseProduct(v_step);
                     // do it in linear time
                     qp_gamma_step(v_gamma, v_pos_h, v_neg_h, qp_delta, M_, lambda, v_step, v_tmp, v_tmp2);
 					gamma.col(i) = v_gamma;
 
 					// qp value
-//					v_tmp = C * v_gamma;
                     // do it in linear time
                     qp_gamma_multiplyC(v_tmp, v_gamma, M_, lambda);
 					v_y = Y.col(i);
@@ -2234,8 +2219,6 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			// populate Y matrix
 			tmp = alpha_tQ - unary;
 			for (int i = 0; i < N_; ++i) {
-                //
-//				v_y = C * tmp.col(i);
                 // do it in linear time
                 v_tmp2 = tmp.col(i);
                 qp_gamma_multiplyC(v_y, v_tmp2, M_, lambda);
@@ -2263,19 +2246,11 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 					v_gamma = gamma.col(i);
 					v_pos_h = pos_H.col(i);
 					v_neg_h = neg_H.col(i);
-                    //
-//					v_step = 2 * neg_C * v_gamma + v_pos_h;
-//					v_step = v_step.array() + qp_delta;
-//					v_tmp = abs_C * v_gamma + v_neg_h;
-//				    v_tmp = v_tmp.array() + qp_delta;
-//					v_step = v_step.cwiseQuotient(v_tmp);
-//					v_gamma = v_gamma.cwiseProduct(v_step);
                     // do it linear time
                     qp_gamma_step(v_gamma, v_pos_h, v_neg_h, qp_delta, M_, lambda, v_step, v_tmp, v_tmp2);
 					gamma.col(i) = v_gamma;
 
 					// qp value
-//					v_tmp = C * v_gamma;
                     // do it in linear time
                     qp_gamma_multiplyC(v_tmp, v_gamma, M_, lambda);
 					v_y = Y.col(i);
