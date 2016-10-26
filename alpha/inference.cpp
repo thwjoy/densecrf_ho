@@ -455,6 +455,54 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     delete[] img;
 }
 
+void minimize_old_new_ph(std::string path_to_image, std::string path_to_unaries,
+                      Potts_weight_set parameters, std::string path_to_output,
+                      std::string dataset_name, int argc, char* argv[]) {
+
+    int n = 10;
+
+    img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
+    // Load the unaries potentials for our image.
+    MatrixXf unaries = load_unary(path_to_unaries, size);
+    unsigned char * img = load_image(path_to_image, size);
+
+    // Load a crf
+    DenseCRF2D crf(size.width, size.height, unaries.rows());
+    std::cout << "CRF: W = " << size.width << ", H = " << size.height << ", L = " << unaries.rows() << std::endl;
+
+    crf.setUnaryEnergy(unaries);
+    crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
+                            new PottsCompatibility(parameters.spatial_potts_weight));
+    crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
+                             parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
+                             img, new PottsCompatibility(parameters.bilat_potts_weight));
+    MatrixXf Q = crf.unary_init();
+
+    std::srand(1337);
+    std::vector<perf_measure> perfs;
+    std::ofstream fout("seg_lpsubgrad_timings.out");
+    for (int k = 0; k < n; ++k) {
+        for (int i = 0; i < Q.cols(); ++i) {
+            for (int j = 0; j < Q.rows(); ++j) {
+                int r = std::rand() % 100;
+                Q(j, i) = float(r)/100.0;
+            }
+        }
+        perfs = crf.compare_lpsubgrad_timings(Q, 1);
+        fout << k << '\t';
+        std::cout << "# " <<  k << '\t';
+        for (int p = 0; p < perfs.size(); ++p) {
+            fout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << '\t';
+            std::cout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << '\t';
+        }
+        fout << std::endl;
+        std::cout << std::endl;
+    }
+    fout.close();
+
+    delete[] img;
+}
+
 void gradually_minimize_mean_field(std::string path_to_image, std::string path_to_unaries,
                                    Potts_weight_set parameters, std::string path_to_output,
                                    std::string dataset_name) {

@@ -62,6 +62,9 @@ int main(int argc, char* argv[]) {
     //minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_sg_line_output, dataset_name, false);
     // std::cout << "LP CG line search" << '\n';
     // minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_cg_line_output, dataset_name, true);
-    std::cout << "PROX LP" << '\n';
-    minimize_prox_LP(path_to_image, path_to_unaries, params, path_to_prox_lp_output, dataset_name, argc, argv);
+    //std::cout << "PROX LP" << '\n';
+    //minimize_prox_LP(path_to_image, path_to_unaries, params, path_to_prox_lp_output, dataset_name, argc, argv);
+
+    std::cout << "CMP-OLD-NEW-PH" << '\n';
+    minimize_old_new_ph(path_to_image, path_to_unaries, params, path_to_prox_lp_output, dataset_name, argc, argv);
 }

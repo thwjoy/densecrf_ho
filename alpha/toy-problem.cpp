@@ -299,9 +299,9 @@ void compare_old_new_ph(int argc, char *argv[]) {
     }
     fout.close();
 
-    std::ofstream fout1("q-dump.out");
-    fout1 << "#random-Q#\n" << Q << std::endl;
-    fout1.close();
+//    std::ofstream fout1("q-dump.out");
+//    fout1 << "#random-Q#\n" << Q << std::endl;
+//    fout1.close();
 }
 
 int main(int argc, char *argv[])
