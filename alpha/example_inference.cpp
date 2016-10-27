@@ -8,13 +8,13 @@ int main(int argc, char* argv[]) {
     if (dataset_name=="MSRC") {
         //path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/5_14_s.c_unary";
         //path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/18_21_s.c_unary";
-        path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/20_14_s.c_unary";
+        path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/10_16_s.c_unary";
         
         //path_to_unaries = "/media/ajanthan/sheep/Ajanthan/data/MSRC/texton_unaries/20_14_s.c_unary";
         
         //path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/5_14_s.bmp";
         //path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/18_21_s.bmp";
-        path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/20_14_s.bmp";
+        path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/10_16_s.bmp";
 
         //path_to_image = "/media/ajanthan/sheep/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/20_14_s.bmp";
     } else if(dataset_name == "Pascal2010"){
@@ -62,9 +62,9 @@ int main(int argc, char* argv[]) {
     //minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_sg_line_output, dataset_name, false);
     // std::cout << "LP CG line search" << '\n';
     // minimize_LP(path_to_image, path_to_unaries, params, path_to_lp_cg_line_output, dataset_name, true);
-    //std::cout << "PROX LP" << '\n';
-    //minimize_prox_LP(path_to_image, path_to_unaries, params, path_to_prox_lp_output, dataset_name, argc, argv);
+    std::cout << "PROX LP" << '\n';
+    minimize_prox_LP(path_to_image, path_to_unaries, params, path_to_prox_lp_output, dataset_name, argc, argv);
 
-    std::cout << "CMP-OLD-NEW-PH" << '\n';
-    minimize_old_new_ph(path_to_image, path_to_unaries, params, path_to_prox_lp_output, dataset_name, argc, argv);
+    //std::cout << "CMP-OLD-NEW-PH" << '\n';
+    //minimize_old_new_ph(path_to_image, path_to_unaries, params, path_to_prox_lp_output, dataset_name, argc, argv);
 }

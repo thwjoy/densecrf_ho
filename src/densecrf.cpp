@@ -43,7 +43,7 @@
 #include <set>
 
 #define BRUTE_FORCE false	// brute-force subgraient computation, used in lp_prox and energy computations
-#define VERBOSE false	    // print intermediate energy values and timings, used in lp_prox
+#define VERBOSE true	    // print intermediate energy values and timings, used in lp_prox
 
 #define DCNEG_FASTAPPROX false
 /////////////////////////////
@@ -1871,9 +1871,18 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
         MatrixXf runary(M_, rN);        // restricted unary
         update_restricted_matrix(runary, unary, pI);
         
+	    MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
         VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_), v_tmp2(M_);
         MatrixXf Y(M_, rN), neg_H(M_, rN), pos_H(M_, rN);
         VectorXf qp_values(rN);
+
+        pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/float(M_));				      
+        pos_C *= lambda;	// pos_C
+        neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
+        neg_C /= float(M_);													      
+        neg_C *= lambda; 	// neg_C
+        C = pos_C - neg_C;	// C
+        abs_C = pos_C + neg_C;	// abs_C
 
 		// initialization
 		cur_Q = Q;
@@ -1905,6 +1914,7 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 			// populate Y matrix
 			rtmp = alpha_tQ - runary;
 			for (int i = 0; i < rN; ++i) {
+//                v_y = C * rtmp.col(i);
                 // do it in linear time
                 v_tmp2 = rtmp.col(i);
                 qp_gamma_multiplyC(v_y, v_tmp2, M_, lambda);
@@ -1932,11 +1942,19 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
 					v_gamma = gamma.col(i);
 					v_pos_h = pos_H.col(i);
 					v_neg_h = neg_H.col(i);
+                    //
+//                    v_step = 2 * neg_C * v_gamma + v_pos_h;
+//					v_step = v_step.array() + qp_delta;
+//					v_tmp = abs_C * v_gamma + v_neg_h;
+//				    v_tmp = v_tmp.array() + qp_delta;
+//					v_step = v_step.cwiseQuotient(v_tmp);
+//					v_gamma = v_gamma.cwiseProduct(v_step);
                     // do it in linear time
                     qp_gamma_step(v_gamma, v_pos_h, v_neg_h, qp_delta, M_, lambda, v_step, v_tmp, v_tmp2);
 					gamma.col(i) = v_gamma;
 
 					// qp value
+//                    v_tmp = C * v_gamma;
                     // do it in linear time
                     qp_gamma_multiplyC(v_tmp, v_gamma, M_, lambda);
 					v_y = Y.col(i);
@@ -2154,18 +2172,18 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 	const float qp_tol = params.qp_tol;		// qp-gamma tolernace
 	const int qp_maxiter = params.qp_max_iter;
 
-	//MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
+	MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
 	VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_), v_tmp2(M_);
 	MatrixXf Y(M_, N_), neg_H(M_, N_), pos_H(M_, N_);
 	VectorXf qp_values(N_);
 
-//	pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/float(M_));				      
-//	pos_C *= lambda;	// pos_C
-//	neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
-//	neg_C /= float(M_);													      
-//	neg_C *= lambda; 	// neg_C
-//	C = pos_C - neg_C;	// C
-//	abs_C = pos_C + neg_C;	// abs_C
+	pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/float(M_));				      
+	pos_C *= lambda;	// pos_C
+	neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
+	neg_C /= float(M_);													      
+	neg_C *= lambda; 	// neg_C
+	C = pos_C - neg_C;	// C
+	abs_C = pos_C + neg_C;	// abs_C
 
     //clock_t start, end;
     typedef std::chrono::high_resolution_clock::time_point htime;
@@ -2219,6 +2237,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			// populate Y matrix
 			tmp = alpha_tQ - unary;
 			for (int i = 0; i < N_; ++i) {
+//                v_y = C * tmp.col(i);
                 // do it in linear time
                 v_tmp2 = tmp.col(i);
                 qp_gamma_multiplyC(v_y, v_tmp2, M_, lambda);
@@ -2246,11 +2265,19 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 					v_gamma = gamma.col(i);
 					v_pos_h = pos_H.col(i);
 					v_neg_h = neg_H.col(i);
+                    //
+//                    v_step = 2 * neg_C * v_gamma + v_pos_h;
+//					v_step = v_step.array() + qp_delta;
+//					v_tmp = abs_C * v_gamma + v_neg_h;
+//				    v_tmp = v_tmp.array() + qp_delta;
+//					v_step = v_step.cwiseQuotient(v_tmp);
+//					v_gamma = v_gamma.cwiseProduct(v_step);
                     // do it linear time
                     qp_gamma_step(v_gamma, v_pos_h, v_neg_h, qp_delta, M_, lambda, v_step, v_tmp, v_tmp2);
 					gamma.col(i) = v_gamma;
 
 					// qp value
+//                    v_tmp = C * v_gamma;
                     // do it in linear time
                     qp_gamma_multiplyC(v_tmp, v_gamma, M_, lambda);
 					v_y = Y.col(i);

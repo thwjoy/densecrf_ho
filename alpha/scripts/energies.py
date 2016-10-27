@@ -81,10 +81,12 @@ def main():
             frac_better_2 += 1
 
         if prop1.int_energy < prop2.int_energy:
+            print("prop1 is better: " + str(prop1) + " # " + str(prop2))
             int_better_1 += 1
         elif prop1.int_energy == prop2.int_energy:
             int_better_same += 1
         else:
+            print("prop2 is better: " + str(prop1) + " # " + str(prop2))
             int_better_2 += 1
 
         total_timing_1 += prop1.timing
