@@ -71,6 +71,12 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
                 Q = crf.lp_inference_prox(Q, lp_params);
+            } else if (method == "prox_lp_rest"){
+                Q = crf.qp_inference(Q);
+                Q = crf.concave_qp_cccp_inference(Q);
+                //Q = crf.lp_inference_new(Q);
+                lp_params.less_confident_percent = 10;
+                Q = crf.lp_inference_prox(Q, lp_params);
 
                 // lp inference params
             	LP_inf_params lp_params_rest = lp_params;
@@ -87,11 +93,6 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 //double dt = difftime(et, st);
                 //double dt = et - st;
                 std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
-
-                //Q = crf.lp_inference_prox(Q, lp_params);
-                //Q = crf.lp_inference_prox_restricted(Q, lp_params);
-                //Q = crf.lp_inference_prox(Q, lp_params);
-                //Q = crf.lp_inference_new(Q);
             } else if (method == "tracing-prox_lp"){
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);

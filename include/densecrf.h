@@ -54,11 +54,14 @@ public:
     // multi-plane FW params (work_set_size==0 && approx_fw_iter==0 ==> standard FW)
     int work_set_size;      // working set size 
     int approx_fw_iter;     // approximate FW iterations
+    // less-confident switch
+    float less_confident_percent;   // percentage of less confident pixels to break
 	LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, 
         int prox_max_iter, int fw_max_iter, 
         int qp_max_iter, float qp_tol, float qp_const, 
         bool best_int, bool accel_prox, 
-        int work_set_size, int approx_fw_iter);
+        int work_set_size, int approx_fw_iter, 
+        float less_confident_percent);
 	LP_inf_params();	// default values
     LP_inf_params(const LP_inf_params& params); // copy constructor
 };

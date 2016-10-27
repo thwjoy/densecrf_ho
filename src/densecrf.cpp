@@ -135,12 +135,14 @@ LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, float pro
         int prox_max_iter, int fw_max_iter, 
         int qp_max_iter, float qp_tol, float qp_const, 
         bool best_int, bool accel_prox, 
-        int work_set_size, int approx_fw_iter):
+        int work_set_size, int approx_fw_iter,
+        float less_confident_percent):
         prox_reg_const(prox_reg_const),	dual_gap_tol(dual_gap_tol), prox_energy_tol(prox_energy_tol), 
         prox_max_iter(prox_max_iter), fw_max_iter(fw_max_iter), 
         qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const), 
         best_int(best_int), accel_prox(accel_prox),
-        work_set_size(work_set_size), approx_fw_iter(approx_fw_iter) {}
+        work_set_size(work_set_size), approx_fw_iter(approx_fw_iter),
+        less_confident_percent(less_confident_percent) {}
 
 LP_inf_params::LP_inf_params() {
 	prox_reg_const = 1e-2;	
@@ -155,6 +157,7 @@ LP_inf_params::LP_inf_params() {
     accel_prox = true;
     work_set_size = 10;
     approx_fw_iter = 10;
+    less_confident_percent = 0;  // don't check for less confident pixels
 }
 
 LP_inf_params::LP_inf_params(const LP_inf_params& params) {
@@ -170,6 +173,7 @@ LP_inf_params::LP_inf_params(const LP_inf_params& params) {
     accel_prox = params.accel_prox;
     work_set_size = params.work_set_size;
     approx_fw_iter = params.approx_fw_iter;
+    less_confident_percent = params.less_confident_percent;
 }
 
 MatrixXf DenseCRF::unary_init() const {
@@ -2530,13 +2534,16 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
             printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
 #endif
         }
-        float confidence_tol = 0.95;
-        std::vector<int> pI;
-        less_confident_pixels(pI, best_Q, confidence_tol);
-        double percent = double(pI.size())/double(Q.cols())*100;
-        if (percent > 10) {
-            std::cout << "\n##CONV: Less confident pixels are greater than 10%, terminating...\n";
-            break;
+        if (params.less_confident_percent > 0) {
+            float confidence_tol = 0.95;
+            std::vector<int> pI;
+            less_confident_pixels(pI, best_Q, confidence_tol);
+            double percent = double(pI.size())/double(Q.cols())*100;
+            if (percent > params.less_confident_percent) {
+                std::cout << "\n##CONV: Less confident pixels are greater than " << params.less_confident_percent 
+                    << "%, terminating...\n";
+                break;
+            }
         }
 
     } while(it<maxiter);
