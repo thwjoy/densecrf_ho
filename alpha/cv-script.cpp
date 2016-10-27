@@ -76,6 +76,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
                 lp_params.less_confident_percent = 10;
+                lp_params.confidence_tol = 0.99;
                 Q = crf.lp_inference_prox(Q, lp_params);
 
                 // lp inference params

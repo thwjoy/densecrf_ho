@@ -56,12 +56,13 @@ public:
     int approx_fw_iter;     // approximate FW iterations
     // less-confident switch
     float less_confident_percent;   // percentage of less confident pixels to break
+    float confidence_tol;           // tolerance to decide a pixel to be less-confident
 	LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, 
         int prox_max_iter, int fw_max_iter, 
         int qp_max_iter, float qp_tol, float qp_const, 
         bool best_int, bool accel_prox, 
         int work_set_size, int approx_fw_iter, 
-        float less_confident_percent);
+        float less_confident_percent, float confident_tol);
 	LP_inf_params();	// default values
     LP_inf_params(const LP_inf_params& params); // copy constructor
 };

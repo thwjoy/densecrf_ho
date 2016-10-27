@@ -43,7 +43,7 @@
 #include <set>
 
 #define BRUTE_FORCE false	// brute-force subgraient computation, used in lp_prox and energy computations
-#define VERBOSE true	    // print intermediate energy values and timings, used in lp_prox
+#define VERBOSE false	    // print intermediate energy values and timings, used in lp_prox
 
 #define DCNEG_FASTAPPROX false
 /////////////////////////////
@@ -136,13 +136,13 @@ LP_inf_params::LP_inf_params(float prox_reg_const, float dual_gap_tol, float pro
         int qp_max_iter, float qp_tol, float qp_const, 
         bool best_int, bool accel_prox, 
         int work_set_size, int approx_fw_iter,
-        float less_confident_percent):
+        float less_confident_percent, float confidence_tol):
         prox_reg_const(prox_reg_const),	dual_gap_tol(dual_gap_tol), prox_energy_tol(prox_energy_tol), 
         prox_max_iter(prox_max_iter), fw_max_iter(fw_max_iter), 
         qp_max_iter(qp_max_iter), qp_tol(qp_tol), qp_const(qp_const), 
         best_int(best_int), accel_prox(accel_prox),
         work_set_size(work_set_size), approx_fw_iter(approx_fw_iter),
-        less_confident_percent(less_confident_percent) {}
+        less_confident_percent(less_confident_percent), confidence_tol(confidence_tol) {}
 
 LP_inf_params::LP_inf_params() {
 	prox_reg_const = 1e-2;	
@@ -158,6 +158,7 @@ LP_inf_params::LP_inf_params() {
     work_set_size = 10;
     approx_fw_iter = 10;
     less_confident_percent = 0;  // don't check for less confident pixels
+    confidence_tol = 0.95;
 }
 
 LP_inf_params::LP_inf_params(const LP_inf_params& params) {
@@ -1773,6 +1774,7 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
     const bool best_int = params.best_int;
     const bool accel_prox = params.accel_prox;
 	const float prox_tol = params.prox_energy_tol;		// proximal energy tolerance
+    const float confidence_tol = params.confidence_tol;
 
 	// dual Frank-Wolfe variables
 	const float dual_gap_tol = params.dual_gap_tol;		// dual gap tolerance
@@ -1800,51 +1802,12 @@ MatrixXf DenseCRF::lp_inference_prox_restricted(MatrixXf & init, LP_inf_params &
     prev_Q.fill(0);
     float w_it = 1;             // momentum weight: eg. it/(it+3)
 
-//    // matrix creations
-//    float confidence_tol = 0.95;
-//    less_confident_pixels(pI, Q, confidence_tol);
-//    int rN = pI.size();
-//#if VERBOSE    
-//    std::cout << "No of pixels with probability less than " << confidence_tol << " is: " << pI.size() 
-//        << " out of " << Q.cols() << ", percentage: " << double(pI.size())/double(Q.cols())*100 << "%" << std::endl;
-//#endif
-//    // dual variables
-//    MatrixXf alpha_tQ(M_, rN);	// A * alpha, (t - tilde not iteration)
-//    MatrixXf s_tQ(M_, rN);		// A * s, conditional gradient of FW == subgradient
-//    VectorXf beta(rN);			// unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
-//    MatrixXf beta_mat(M_, rN);	// beta_mat.row(i) == beta forall i --> N_ * M_ elements 
-//    MatrixXf gamma(M_, rN);		// nonnegative
-//    
-//    MatrixXf cur_rQ(M_, rN);		// current Q in prox step
-//    MatrixXf rescaled_rQ(M_, rN);   // infeasible Q rescaled to be within [0,1]
-//    MatrixXf rtmp(M_, rN), rtmp2(M_, rN);
-//    MatrixP rdot_tmp(M_, rN);
-//
-//    MatrixXf rQ(M_, rN);		    // restricted Q in prox step
-//    update_restricted_matrix(rQ, Q, pI);
-//    MatrixXf runary(M_, rN);        // restricted unary
-//    update_restricted_matrix(runary, unary, pI);
-//    
-//    MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
-//    VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_), v_tmp2(M_);
-//    MatrixXf Y(M_, rN), neg_H(M_, rN), pos_H(M_, rN);
-//    VectorXf qp_values(rN);
-//    
-//    pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/M_);				      
-//    pos_C *= lambda;	// pos_C
-//    neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
-//    neg_C /= M_;													      
-//    neg_C *= lambda; 	// neg_C
-//    C = pos_C - neg_C;	// C
-//    abs_C = pos_C + neg_C;	// abs_C
-
     int it=0;
     int count = 0;
     do {
         ++it;
 
         // matrix creations
-        float confidence_tol = 0.95;
         less_confident_pixels(pI, Q, confidence_tol);
         //float percent = 10;
         //less_confident_pixels2(pI, Q, percent);
@@ -2535,7 +2498,7 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #endif
         }
         if (params.less_confident_percent > 0) {
-            float confidence_tol = 0.95;
+            float confidence_tol = params.confidence_tol;
             std::vector<int> pI;
             less_confident_pixels(pI, best_Q, confidence_tol);
             double percent = double(pI.size())/double(Q.cols())*100;
