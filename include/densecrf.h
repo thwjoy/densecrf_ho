@@ -139,7 +139,10 @@ public:
     MatrixXf lp_inference_prox(MatrixXf & init, LP_inf_params & params) const;
     MatrixXf lp_inference_prox_restricted(MatrixXf & init, LP_inf_params & params) const;
 	std::vector<perf_measure> tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit = 0) const;
-	std::vector<perf_measure> tracing_lp_inference_prox(MatrixXf & init, LP_inf_params & params, double time_limit = 0, std::string out_file_name = "") const;
+	std::vector<perf_measure> tracing_lp_inference_prox(MatrixXf & init, LP_inf_params & params, 
+            double time_limit = 0, std::string out_file_name = "") const;
+    std::vector<perf_measure> tracing_lp_inference_prox_restricted(MatrixXf & init, LP_inf_params & params, 
+            double time_limit = 0) const;
 
 	// compare permutohedral and bruteforce energies (testing code only)
     void compare_energies(MatrixXf & Q, double & ph_energy, double & bf_energy, 

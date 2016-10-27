@@ -42,6 +42,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             std::cout << image_path << std::endl;
             //start = clock();
             std::vector<perf_measure> traced_perfs;
+            std::vector<perf_measure> new_perfs;
             start = std::chrono::high_resolution_clock::now();
             //start = time(NULL);
             //start = omp_get_wtime();
@@ -95,11 +96,31 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 //double dt = et - st;
                 std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
             } else if (method == "tracing-prox_lp"){
-                Q = crf.qp_inference(Q);
-                Q = crf.concave_qp_cccp_inference(Q);
-                std::string out_file_name = output_path;
-                out_file_name.replace(out_file_name.end()-3, out_file_name.end(),"out");
-                traced_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, out_file_name);
+                //std::string out_file_name = output_path;
+                //out_file_name.replace(out_file_name.end()-3, out_file_name.end(),"out");
+                //traced_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, out_file_name);
+                traced_perfs = crf.tracing_qp_inference(Q);
+                new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                new_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, "");
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+            } else if (method == "tracing-prox_lp_rest"){
+                traced_perfs = crf.tracing_qp_inference(Q);
+                new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+
+                lp_params.less_confident_percent = 10;
+                lp_params.confidence_tol = 0.95;
+                new_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, "");
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+
+                // lp inference params
+            	LP_inf_params lp_params_rest = lp_params;
+                lp_params_rest.prox_max_iter = 20;
+            	lp_params_rest.prox_reg_const = 0.001;
+                new_perfs = crf.tracing_lp_inference_prox_restricted(Q, lp_params_rest, 0);
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+
             } else if (method == "unary"){
                 (void)0;
             } else{
@@ -122,7 +143,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
             std::ofstream txt_file(txt_output);
             txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
-            std::cout << "#PROX-LP: " << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+            std::cout << "#" << method << ": " << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
             txt_file.close();
 
             if(method.find("tracing")!=std::string::npos){
@@ -192,8 +213,8 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
     //omp_set_num_threads(1);
 //#pragma omp parallel for
-    for(int i=0; i< test_images.size(); ++i){
-    //for(int i=0; i< 10; ++i){
+    //for(int i=0; i< test_images.size(); ++i){
+    for(int i=0; i< 10; ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params);
     }
