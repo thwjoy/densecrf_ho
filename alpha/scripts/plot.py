@@ -27,6 +27,9 @@ def main():
 
 
     path_to_folder = sys.argv[1]
+    
+    if len(sys.argv) >= 2:
+        fname = sys.argv[2]
 
     #path_to_qp_trace = os.path.join(path_to_folder, "out_tracing-qp.txt")
     #path_to_mf_trace = os.path.join(path_to_folder, "out_tracing-mf.txt")
@@ -35,9 +38,10 @@ def main():
     #path_to_lp_trace = os.path.join(path_to_folder, "out_tracing-sg_lp.txt")
     #path_to_ccv_trace = os.path.join(path_to_folder, "out_tracing-only-ccv.txt")
 
-    path_to_fixed_dc_ccv_trace = os.path.join(path_to_folder, "tracing-fixedDC-CCV/18_21_s.trc")
-    path_to_prox_lp_trace = os.path.join(path_to_folder, "tracing-prox_lp/18_21_s.trc")
-    path_to_prox_lp_rest_trace = os.path.join(path_to_folder, "tracing-prox_lp_rest/18_21_s.trc")
+    path_to_fixed_dc_ccv_trace = os.path.join(path_to_folder, "tracing-fixedDC-CCV/" + fname + ".trc")
+    path_to_prox_lp_trace = os.path.join(path_to_folder, "tracing-prox_lp/" + fname + ".trc")
+    path_to_prox_lp01_trace = os.path.join(path_to_folder, "tracing-prox_lp0.1/" + fname + ".trc")
+    path_to_prox_lp_rest_trace = os.path.join(path_to_folder, "tracing-prox_lp_rest/" + fname + ".trc")
 
 
     #qp_trace = load_trace(path_to_qp_trace)
@@ -49,6 +53,7 @@ def main():
 
     dc_neg_trace = load_trace(path_to_fixed_dc_ccv_trace)
     prox_lp_trace = load_trace(path_to_prox_lp_trace)
+    prox_lp01_trace = load_trace(path_to_prox_lp01_trace)
     prox_lp_rest_trace = load_trace(path_to_prox_lp_rest_trace)
 
     plt.rc('text', usetex=True)
@@ -60,9 +65,10 @@ def main():
     #plt.semilogx(qpcccp_cv_trace[0], qpcccp_cv_trace[1], 'g-', label="QP-DC_{neg}")
     #plt.semilogx(qpcccp_trace[0], qpcccp_trace[1], 'm-', label="QP-CCCP")
     #plt.semilogx(lp_trace[0], lp_trace[1], 'y-', label="QP-DC_{neg}-LP")
-    plt.semilogx(dc_neg_trace[0], dc_neg_trace[1], 'r-', label="QP-DC_{neg}")
-    plt.semilogx(prox_lp_trace[0], prox_lp_trace[1], 'g-', label="QP-DC_{neg}-PROX-LP")
-    plt.semilogx(prox_lp_rest_trace[0], prox_lp_rest_trace[1], 'b-', label="QP-DC_{neg}-PROX-LP-rest")
+    plt.plot(dc_neg_trace[0], dc_neg_trace[1], 'r-', label="QP-DC_{neg}")
+    plt.plot(prox_lp_trace[0], prox_lp_trace[1], 'g-', label="QP-DC_{neg}-PROX-LP")
+    plt.plot(prox_lp01_trace[0], prox_lp01_trace[1], 'y-', label="QP-DC_{neg}-PROX-LP-0.1")
+    plt.plot(prox_lp_rest_trace[0], prox_lp_rest_trace[1], 'b-', label="QP-DC_{neg}-PROX-LP-rest")
     #plt.xlim([0.1, 300])
     plt.legend()
 
