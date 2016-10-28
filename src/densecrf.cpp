@@ -605,7 +605,7 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference(MatrixXf & init, double
 
     end = clock();
     perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-    perf_energy = assignment_energy(currentMap(Q));
+    perf_energy = assignment_energy_true(currentMap(Q));
     latest_perf = std::make_pair(perf_timing, perf_energy);
     perfs.push_back(latest_perf);
     total_time += perf_timing;
@@ -664,7 +664,7 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference(MatrixXf & init, double
         // performance measurement
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = assignment_energy(currentMap(Q));
+        perf_energy = assignment_energy_true(currentMap(Q));
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;
@@ -931,7 +931,7 @@ std::vector<perf_measure> DenseCRF::tracing_concave_qp_cccp_inference(MatrixXf &
         // Compute our current value of the energy;
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = assignment_energy(currentMap(Q));
+        perf_energy = assignment_energy_true(currentMap(Q));
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;
@@ -1166,7 +1166,7 @@ std::vector<perf_measure> DenseCRF::tracing_qp_cccp_inference(MatrixXf & init, d
 
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = assignment_energy(currentMap(Q));
+        perf_energy = assignment_energy_true(currentMap(Q));
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;
