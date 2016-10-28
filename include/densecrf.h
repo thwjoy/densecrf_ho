@@ -39,6 +39,10 @@ void expAndNormalize( MatrixXf & out, const MatrixXf & in);
 void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q);
 void normalize(MatrixXf & out, const MatrixXf & in);
 
+void get_limited_indices(MatrixXf const & Q, std::vector<int> & indices);
+MatrixXf get_restricted_matrix(MatrixXf const & in, std::vector<int> const & indices);
+MatrixXf get_extended_matrix(MatrixXf const & in, std::vector<int> const & indices, int max_rows);
+
 class LP_inf_params {
 public: 
 	float prox_reg_const;	// proximal regularization constant

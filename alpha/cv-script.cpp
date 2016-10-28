@@ -71,30 +71,59 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
-                Q = crf.lp_inference_prox(Q, lp_params);
+
+                htime st = std::chrono::high_resolution_clock::now();
+                std::vector<int> indices;
+                get_limited_indices(Q, indices);
+                if (indices.size() > 1) {
+                    MatrixXf runaries = get_restricted_matrix(unaries, indices);
+                    MatrixXf rQ = get_restricted_matrix(Q, indices);
+                    DenseCRF2D rcrf(size.width, size.height, runaries.rows());
+                    rcrf.setUnaryEnergy(runaries);
+                    rcrf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
+                    rcrf.addPairwiseBilateral(bil_spcstd, bil_spcstd,
+                                 bil_colstd, bil_colstd, bil_colstd,
+                                 img, new PottsCompatibility(bil_potts));
+                    htime et = std::chrono::high_resolution_clock::now();
+                    double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
+                    std::cout << "#rcrf construction: " << dt << " seconds" << std::endl;
+    
+                    rQ = rcrf.lp_inference_prox(rQ, lp_params);
+                    
+                    Q = get_extended_matrix(rQ, indices, unaries.rows());
+                }
             } else if (method == "prox_lp_rest"){
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
-                //Q = crf.lp_inference_new(Q);
-                lp_params.less_confident_percent = 10;
-                lp_params.confidence_tol = 0.99;
-                Q = crf.lp_inference_prox(Q, lp_params);
 
-                // lp inference params
-            	LP_inf_params lp_params_rest = lp_params;
-                lp_params_rest.prox_max_iter = 20;
-            	lp_params_rest.prox_reg_const = 0.001;
                 htime st = std::chrono::high_resolution_clock::now();
-                //time_t st = time(NULL);
-                //double st = omp_get_wtime();
-                Q = crf.lp_inference_prox_restricted(Q, lp_params_rest);
-                htime et = std::chrono::high_resolution_clock::now();
-                //time_t et = time(NULL);
-                //double et = omp_get_wtime();
-                double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
-                //double dt = difftime(et, st);
-                //double dt = et - st;
-                std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
+                std::vector<int> indices;
+                get_limited_indices(Q, indices);
+                if (indices.size() > 1) {
+                    MatrixXf runaries = get_restricted_matrix(unaries, indices);
+                    MatrixXf rQ = get_restricted_matrix(Q, indices);
+                    DenseCRF2D rcrf(size.width, size.height, runaries.rows());
+                    rcrf.setUnaryEnergy(runaries);
+                    rcrf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
+                    rcrf.addPairwiseBilateral(bil_spcstd, bil_spcstd,
+                                 bil_colstd, bil_colstd, bil_colstd,
+                                 img, new PottsCompatibility(bil_potts));
+                    htime et = std::chrono::high_resolution_clock::now();
+                    double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
+                    std::cout << "#rcrf construction: " << dt << " seconds" << std::endl;
+    
+                    lp_params.less_confident_percent = 10;
+                    lp_params.confidence_tol = 0.95;
+                    rQ = rcrf.lp_inference_prox(rQ, lp_params);
+    
+                    // lp inference params
+                	LP_inf_params lp_params_rest = lp_params;
+                    lp_params_rest.prox_max_iter = 20;
+                    lp_params_rest.prox_reg_const = 0.001;
+                    rQ = rcrf.lp_inference_prox_restricted(rQ, lp_params_rest);
+                    
+                    Q = get_extended_matrix(rQ, indices, unaries.rows());
+                }
             } else if (method == "tracing-prox_lp"){
                 //std::string out_file_name = output_path;
                 //out_file_name.replace(out_file_name.end()-3, out_file_name.end(),"out");
@@ -102,24 +131,64 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 traced_perfs = crf.tracing_qp_inference(Q);
                 new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
                 traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
-                new_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, "");
-                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+
+                htime st = std::chrono::high_resolution_clock::now();
+                std::vector<int> indices;
+                get_limited_indices(Q, indices);
+                if (indices.size() > 1) {
+                    MatrixXf runaries = get_restricted_matrix(unaries, indices);
+                    MatrixXf rQ = get_restricted_matrix(Q, indices);
+                    DenseCRF2D rcrf(size.width, size.height, runaries.rows());
+                    rcrf.setUnaryEnergy(runaries);
+                    rcrf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
+                    rcrf.addPairwiseBilateral(bil_spcstd, bil_spcstd,
+                                 bil_colstd, bil_colstd, bil_colstd,
+                                 img, new PottsCompatibility(bil_potts));
+                    htime et = std::chrono::high_resolution_clock::now();
+                    double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
+                    std::cout << "#rcrf construction: " << dt << " seconds" << std::endl;
+    
+                    new_perfs = rcrf.tracing_lp_inference_prox(rQ, lp_params, 0, "");
+                    traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                    
+                    Q = get_extended_matrix(rQ, indices, unaries.rows());
+                }
+                
             } else if (method == "tracing-prox_lp_rest"){
                 traced_perfs = crf.tracing_qp_inference(Q);
                 new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
                 traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
 
-                lp_params.less_confident_percent = 10;
-                lp_params.confidence_tol = 0.95;
-                new_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, "");
-                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
-
-                // lp inference params
-            	LP_inf_params lp_params_rest = lp_params;
-                lp_params_rest.prox_max_iter = 20;
-            	lp_params_rest.prox_reg_const = 0.001;
-                new_perfs = crf.tracing_lp_inference_prox_restricted(Q, lp_params_rest, 0);
-                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                htime st = std::chrono::high_resolution_clock::now();
+                std::vector<int> indices;
+                get_limited_indices(Q, indices);
+                if (indices.size() > 1) {
+                    MatrixXf runaries = get_restricted_matrix(unaries, indices);
+                    MatrixXf rQ = get_restricted_matrix(Q, indices);
+                    DenseCRF2D rcrf(size.width, size.height, runaries.rows());
+                    rcrf.setUnaryEnergy(runaries);
+                    rcrf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
+                    rcrf.addPairwiseBilateral(bil_spcstd, bil_spcstd,
+                                 bil_colstd, bil_colstd, bil_colstd,
+                                 img, new PottsCompatibility(bil_potts));
+                    htime et = std::chrono::high_resolution_clock::now();
+                    double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
+                    std::cout << "#rcrf construction: " << dt << " seconds" << std::endl;
+    
+                    lp_params.less_confident_percent = 10;
+                    lp_params.confidence_tol = 0.95;
+                    new_perfs = rcrf.tracing_lp_inference_prox(rQ, lp_params, 0, "");
+                    traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+    
+                    // lp inference params
+                	LP_inf_params lp_params_rest = lp_params;
+                    lp_params_rest.prox_max_iter = 20;
+                    lp_params_rest.prox_reg_const = 0.001;
+                    new_perfs = rcrf.tracing_lp_inference_prox_restricted(rQ, lp_params_rest, 0);
+                    traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                    
+                    Q = get_extended_matrix(rQ, indices, unaries.rows());
+                }
 
             } else if (method == "unary"){
                 (void)0;
