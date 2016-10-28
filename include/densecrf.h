@@ -42,6 +42,7 @@ void normalize(MatrixXf & out, const MatrixXf & in);
 void get_limited_indices(MatrixXf const & Q, std::vector<int> & indices);
 MatrixXf get_restricted_matrix(MatrixXf const & in, std::vector<int> const & indices);
 MatrixXf get_extended_matrix(MatrixXf const & in, std::vector<int> const & indices, int max_rows);
+void less_confident_pixels(std::vector<int> & indices, const MatrixXf & Q, float tol = 0.99);
 
 class LP_inf_params {
 public: 

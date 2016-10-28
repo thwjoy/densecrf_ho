@@ -43,6 +43,8 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             //start = clock();
             std::vector<perf_measure> traced_perfs;
             std::vector<perf_measure> new_perfs;
+            std::vector<int> pixel_ids;
+
             start = std::chrono::high_resolution_clock::now();
             //start = time(NULL);
             //start = omp_get_wtime();
@@ -154,6 +156,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     
                     new_perfs = rcrf.tracing_lp_inference_prox(rQ, lp_params, 0, "");
                     traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                    less_confident_pixels(pixel_ids, rQ, lp_params.confidence_tol);                    
                     
                     Q = get_extended_matrix(rQ, indices, unaries.rows());
                 }
@@ -183,6 +186,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                     lp_params.confidence_tol = 0.95;
                     new_perfs = rcrf.tracing_lp_inference_prox(rQ, lp_params, 0, "");
                     traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                    less_confident_pixels(pixel_ids, rQ, lp_params.confidence_tol);                    
     
                     // lp inference params
                 	LP_inf_params lp_params_rest = lp_params;
@@ -212,6 +216,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             double final_energy = crf.compute_energy_true(Q);
             double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
+            if (!pixel_ids.empty()) save_less_confident_pixels(Q, pixel_ids, size, output_path, dataset_name);
             std::string txt_output = output_path;
             txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
             std::ofstream txt_file(txt_output);
@@ -284,10 +289,10 @@ int main(int argc, char *argv[])
 
     Dataset ds = get_dataset_by_name(dataset_name);
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-    omp_set_num_threads(11);
-#pragma omp parallel for
+    //omp_set_num_threads(1);
+//#pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
-    //for(int i=0; i< 10; ++i){
+    //for(int i=1; i< 2; ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params);
     }

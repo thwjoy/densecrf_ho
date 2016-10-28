@@ -307,6 +307,73 @@ void save_map(const MatrixXf & estimates, const img_size & size, const std::stri
     cv::imwrite(path_to_output, img);
 }
 
+void save_less_confident_pixels(const MatrixXf & estimates, const std::vector<int> & pI, const img_size & size, 
+        const std::string & path_to_output, const std::string & dataset_name) {
+    std::vector<short> labeling(estimates.cols());
+
+    std::string out_file_name = path_to_output;
+    out_file_name.replace(out_file_name.end()-4, out_file_name.end(),"_lcf.png");
+    // MAP estimation
+    for(int i=0; i<estimates.cols(); ++i) {
+        int lbl;
+        estimates.col(i).maxCoeff( &lbl);
+        labeling[i] = lbl;
+    }
+    cv::Mat img(size.height, size.width, CV_8UC3);
+    cv::Vec3b intensity;
+    if(dataset_name == "Stereo_special") {
+        // Make the image
+        int max_label = *std::max_element(labeling.begin(), labeling.end());
+        int ii = 0;
+        for(int i=0; i<estimates.cols(); ++i) {
+             if (i == pI[ii]) {
+                intensity[2] = 255;
+                intensity[1] = 0;
+                intensity[0] = 0;
+                ++ii;
+            } else {
+                intensity[2] = 255.0*labeling[i]/max_label;
+                intensity[1] = 255.0*labeling[i]/max_label;
+                intensity[0] = 255.0*labeling[i]/max_label;
+            }
+
+            int col = i % size.width;
+            int row = (i - col)/size.width;
+            img.at<cv::Vec3b>(row, col) = intensity;
+        }
+    } else {
+        const unsigned char*  legend;
+        if (dataset_name == "MSRC") {
+            legend = MSRC_legend;
+        } else if (dataset_name == "Pascal2010") {
+            legend = Pascal_legend;
+        } else {
+            legend = Stereo_legend;
+        }
+
+        // Make the image
+        int ii = 0;
+        for(int i=0; i<estimates.cols(); ++i) {
+            if (i == pI[ii]) {
+                intensity[2] = 255;
+                intensity[1] = 255;
+                intensity[0] = 255;
+                ++ii;
+            } else {
+                intensity[2] = legend[3*labeling[i]];
+                intensity[1] = legend[3*labeling[i] + 1];
+                intensity[0] = legend[3*labeling[i] + 2];
+            }
+
+            int col = i % size.width;
+            int row = (i - col)/size.width;
+            img.at<cv::Vec3b>(row, col) = intensity;
+        }
+    }
+
+    cv::imwrite(out_file_name, img);
+}
+
 MatrixXf load_matrix(std::string path_to_matrix){
     std::ifstream infile(path_to_matrix.c_str());
 

@@ -114,6 +114,9 @@ MatrixXf load_unary(const std::string & path_to_unary, img_size& size, int max_l
 void save_map(const MatrixXf & estimates, const img_size &  size,
               const std::string & path_to_output, const std::string & dataset_name);
 
+void save_less_confident_pixels(const MatrixXf & estimates, const std::vector<int> & pI, const img_size &  size,
+              const std::string & path_to_output, const std::string & dataset_name);
+
 label_matrix load_label_matrix(const std::string & path_to_labels, const std::string & dataset_name);
 label_matrix get_label_matrix(const MatrixXf & estimates, const img_size & size);
 

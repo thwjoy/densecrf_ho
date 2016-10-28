@@ -1274,7 +1274,7 @@ void renormalize(MatrixXf & Q) {
 }
 
 // return the indices of pixels for a label cannot be determined with probability tol
-void less_confident_pixels(std::vector<int> & indices, const MatrixXf & Q, float tol = 0.99) {
+void less_confident_pixels(std::vector<int> & indices, const MatrixXf & Q, float tol) {
     indices.clear();
     for (int i = 0; i < Q.cols(); ++i) {
         float max_prob = Q.col(i).maxCoeff();
