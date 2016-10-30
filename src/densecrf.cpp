@@ -241,6 +241,10 @@ std::vector<perf_measure> DenseCRF::tracing_inference(MatrixXf & init, double ti
     double total_time = 0;
     perf_measure latest_perf;
     std::vector<perf_measure> perfs;
+    
+    MatrixXf best_Q = Q;
+    double best_int_energy = std::numeric_limits<double>::max();
+    double int_energy = 0;
 
     unary.fill(0);
     if( unary_ ){
@@ -281,7 +285,12 @@ std::vector<perf_measure> DenseCRF::tracing_inference(MatrixXf & init, double ti
 
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = assignment_energy(currentMap(Q));
+        int_energy = assignment_energy_true(currentMap(Q));
+        if (best_int_energy > int_energy) {
+            best_int_energy = int_energy;
+            best_Q = Q;
+        }
+        perf_energy = best_int_energy;
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;
@@ -1083,6 +1092,9 @@ std::vector<perf_measure> DenseCRF::tracing_qp_cccp_inference(MatrixXf & init, d
     std::vector<perf_measure> perfs;
 
     Q = init;
+    MatrixXf best_Q = Q;
+    double best_int_energy = std::numeric_limits<double>::max();
+    double int_energy = 0;
     start = clock();
     {
         // Compute the smallest eigenvalues, that we need to make bigger
@@ -1098,7 +1110,12 @@ std::vector<perf_measure> DenseCRF::tracing_qp_cccp_inference(MatrixXf & init, d
     }
     end = clock();
     perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-    perf_energy = assignment_energy(currentMap(Q));
+    int_energy = assignment_energy_true(currentMap(Q));
+    if (best_int_energy > int_energy) {
+        best_int_energy = int_energy;
+        best_Q = Q;
+    }
+    perf_energy = best_int_energy;
     latest_perf = std::make_pair(perf_timing, perf_energy);
     perfs.push_back(latest_perf);
     // Get parameters
@@ -1111,9 +1128,6 @@ std::vector<perf_measure> DenseCRF::tracing_qp_cccp_inference(MatrixXf & init, d
     double old_energy;
     double energy = compute_energy(Q);
     int outer_rounds = 0;
-    MatrixXf best_Q = Q;
-    double best_int_energy = std::numeric_limits<double>::max();
-    double int_energy = 0;
     do {
         start = clock();
         // New value of the linearization point.
@@ -1190,7 +1204,12 @@ std::vector<perf_measure> DenseCRF::tracing_qp_cccp_inference(MatrixXf & init, d
 
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = assignment_energy(currentMap(Q));
+        int_energy = assignment_energy_true(currentMap(Q));
+        if (best_int_energy > int_energy) {
+            best_int_energy = int_energy;
+            best_Q = Q;
+        }
+        perf_energy = best_int_energy;
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;
@@ -3302,7 +3321,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
     int i,j;
 
     best_Q = Q;
-    double best_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
+    double best_int_energy = assignment_energy_true(get_original_label(currentMap(Q), indices));
 
     // Compute the value of the energy
     double old_energy;
@@ -3359,14 +3378,14 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
             float max = 1.0;
             double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
             int split = 0;
-            min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
-            max_int_energy = assignment_energy(get_original_label(currentMap(desc), indices));
+            min_int_energy = assignment_energy_true(get_original_label(currentMap(Q), indices));
+            max_int_energy = assignment_energy_true(get_original_label(currentMap(desc), indices));
             do {
                 split++;
                 double left_third = (2*min + max)/3.0;
                 double right_third = (min + 2*max)/3.0;
-                left_third_int_energy = assignment_energy(get_original_label(currentMap(Q+(desc-Q)*left_third), indices));
-                right_third_int_energy = assignment_energy(get_original_label(currentMap(Q+(desc-Q)*right_third), indices));
+                left_third_int_energy = assignment_energy_true(get_original_label(currentMap(Q+(desc-Q)*left_third), indices));
+                right_third_int_energy = assignment_energy_true(get_original_label(currentMap(Q+(desc-Q)*right_third), indices));
                 if(left_third_int_energy < right_third_int_energy) {
                     max = right_third;
                     max_int_energy = right_third_int_energy;
@@ -3385,14 +3404,14 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
             float max = 1e-3;
             double min_int_energy, max_int_energy, left_third_int_energy, right_third_int_energy;
             int split = 0;
-            min_int_energy = assignment_energy(get_original_label(currentMap(Q), indices));
-            max_int_energy = assignment_energy(get_original_label(currentMap(Q-max*grad), indices));
+            min_int_energy = assignment_energy_true(get_original_label(currentMap(Q), indices));
+            max_int_energy = assignment_energy_true(get_original_label(currentMap(Q-max*grad), indices));
             do {
                 split++;
                 double left_third = (2*min + max)/3.0;
                 double right_third = (min + 2*max)/3.0;
-                left_third_int_energy = assignment_energy(get_original_label(currentMap(Q-left_third*grad), indices));
-                right_third_int_energy = assignment_energy(get_original_label(currentMap(Q-right_third*grad), indices));
+                left_third_int_energy = assignment_energy_true(get_original_label(currentMap(Q-left_third*grad), indices));
+                right_third_int_energy = assignment_energy_true(get_original_label(currentMap(Q-right_third*grad), indices));
                 if(left_third_int_energy < right_third_int_energy) {
                     max = right_third;
                     max_int_energy = right_third_int_energy;
@@ -3438,7 +3457,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool u
 
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = assignment_energy(currentMap(get_extended_matrix(best_Q, indices, M_)));
+        perf_energy = best_int_energy;
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;

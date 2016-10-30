@@ -44,6 +44,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             std::vector<perf_measure> traced_perfs;
             std::vector<perf_measure> new_perfs;
             std::vector<int> pixel_ids;
+            double time_budget = 30;    // seconds
 
             start = std::chrono::high_resolution_clock::now();
             //start = time(NULL);
@@ -126,9 +127,17 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                     
                     Q = get_extended_matrix(rQ, indices, unaries.rows());
                 }
+            } else if (method == "tracing-mf"){
+                traced_perfs = crf.tracing_inference(Q, time_budget);
             } else if (method == "tracing-fixedDC-CCV"){
                 traced_perfs = crf.tracing_qp_inference(Q);
                 new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+            } else if (method == "tracing-sg_lp"){
+                traced_perfs = crf.tracing_qp_inference(Q);
+                new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                new_perfs = crf.tracing_lp_inference(Q, false, time_budget);
                 traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
             } else if (method == "tracing-prox_lp"){
                 //std::string out_file_name = output_path;
@@ -288,7 +297,10 @@ int main(int argc, char *argv[])
     make_dir(path_to_results);
 
     Dataset ds = get_dataset_by_name(dataset_name);
-    std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
+    //std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
+    std::vector<std::string> test_images;
+    test_images.push_back("2007_000559");
+    test_images.push_back("2007_000676");
     //omp_set_num_threads(1);
 //#pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
