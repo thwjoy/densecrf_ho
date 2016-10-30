@@ -456,28 +456,56 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
 }
 
 void minimize_old_new_ph(std::string path_to_image, std::string path_to_unaries,
-                      Potts_weight_set parameters, std::string path_to_output,
+                      Potts_weight_set params, std::string path_to_output,
                       std::string dataset_name, int argc, char* argv[]) {
 
-    int n = 10;
+    int n = 1;
 
     img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
     // Load the unaries potentials for our image.
-    MatrixXf unaries = load_unary(path_to_unaries, size);
-    unsigned char * img = load_image(path_to_image, size);
+    MatrixXf unaries = load_unary(path_to_unaries, size);   // unaries are only used to get the number of labels!
+
+    int d = 2;
+    if (argc > 1) d = atoi(argv[1]);
+    if (d != 2 && d != 5) {
+        std::cout << "we only handle d == 2 or d == 5";
+        exit(1);
+    }
+    float sigma = 1;
+    if (d == 2) sigma = params.spatial_std;
+    else sigma = params.bilat_color_std;
+    if (argc > 2) sigma = atof(argv[2]);
+    int imskip = 1;
+    if (argc > 3) imskip = atoi(argv[3]);
+    int nlabels = unaries.rows();
+    if (argc > 4) nlabels = atoi(argv[4]);
+    
+    if (imskip < 1) {
+        std::cout << "imskip cannot be less than 1. e.g, imskip = 2 ==> rescale factor = 0.5";
+        exit(1);
+    }
+    unsigned char * img = load_rescaled_image(path_to_image, size, imskip);
+    Potts_weight_set parameters(params.spatial_potts_weight, sigma, params.bilat_potts_weight, sigma, sigma);
+
+    std::vector<int> lI;
+    for (int i = 0; i < nlabels; ++i) lI.push_back(i);
+    int npixels = size.width * size.height;
 
     // Load a crf
-    DenseCRF2D crf(size.width, size.height, unaries.rows());
-    std::cout << "CRF: W = " << size.width << ", H = " << size.height << ", L = " << unaries.rows() << std::endl;
+    DenseCRF2D crf(size.width, size.height, nlabels);
+    std::cout << "CRF: W = " << size.width << ", H = " << size.height << ", L = " << nlabels << std::endl;
 
     crf.setUnaryEnergy(unaries);
-    crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
+    if (d == 2) {
+        crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
                             new PottsCompatibility(parameters.spatial_potts_weight));
-    crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
+    } else {
+        crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
-    MatrixXf Q = crf.unary_init();
+    }
 
+    MatrixXf Q(nlabels, npixels);
     std::srand(1337);
     std::vector<perf_measure> perfs;
     std::ofstream fout("seg_lpsubgrad_timings.out");

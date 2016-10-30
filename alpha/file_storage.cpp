@@ -189,6 +189,43 @@ unsigned char * load_image( const std::string & path_to_image, img_size & size){
     return char_img;
 }
 
+unsigned char * load_rescaled_image( const std::string & path_to_image, img_size & size, int imskip){
+    assert(imskip > 1);
+    if (imskip < 1) imskip = 1;
+    cv::Mat img = cv::imread(path_to_image);
+
+    img_size size2 = {-1, -1};
+    if(size2.height != img.rows || size2.width != img.cols) {
+        std::cout << "Dimension doesn't correspond to unaries" << std::endl;
+        if (size2.height == -1) {
+            size2.height = img.rows;
+            std::cout << "Adjusting height because was undefined" << '\n';
+        }
+        if (size2.width == -1) {
+            size2.width = img.cols;
+            std::cout << "Adjusting width because was undefined" << '\n';
+        }
+    }
+    size.width = size2.width / imskip;
+    size.height = size2.height / imskip;
+
+    unsigned char * char_img = new unsigned char[size.width*size.height*3]();
+    for (int j=0; j < size.height; j++) {
+        if (j % imskip != 0) continue;
+        for (int i=0; i < size.width; i++) {
+            if (i % imskip != 0) continue;
+            cv::Vec3b intensity = img.at<cv::Vec3b>(j,i); // this comes in BGR
+            int ii = i/imskip; 
+            int jj = j/imskip;
+            char_img[(ii+jj*size.width)*3+0] = intensity.val[2];
+            char_img[(ii+jj*size.width)*3+1] = intensity.val[1];
+            char_img[(ii+jj*size.width)*3+2] = intensity.val[0];
+        }
+    }
+
+    return char_img;
+}
+
 MatrixXf load_unary( const std::string & path_to_unary, img_size& size, int max_label) {
 
     ProbImage texton;
