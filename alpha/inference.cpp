@@ -479,11 +479,13 @@ void minimize_old_new_ph(std::string path_to_image, std::string path_to_unaries,
     if (argc > 3) imskip = atoi(argv[3]);
     int nlabels = unaries.rows();
     if (argc > 4) nlabels = atoi(argv[4]);
-    
     if (imskip < 1) {
         std::cout << "imskip cannot be less than 1. e.g, imskip = 2 ==> rescale factor = 0.5";
         exit(1);
     }
+    std::cout << "#COMMAND: " << argv[0] << " " << d << " " << sigma << " " << imskip << " " << nlabels << std::endl;
+
+
     unsigned char * img = load_rescaled_image(path_to_image, size, imskip);
     Potts_weight_set parameters(params.spatial_potts_weight, sigma, params.bilat_potts_weight, sigma, sigma);
 
