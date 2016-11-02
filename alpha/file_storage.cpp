@@ -154,6 +154,24 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "_GT.bmp",
                        "MSRC");
     }
+    else if (dataset_name == "Pascal2010_4") {
+        return Dataset("/Ajanthan/data/PascalVOC2010/JPEGImages/",
+                       "/Ajanthan/data/PascalVOC2010/logit_unaries/",
+                       "/Ajanthan/data/PascalVOC2010/SegmentationClass/",
+                       "/Ajanthan/data/PascalVOC2010/",
+                       ".jpg",
+                       ".png",
+                       "Pascal2010");
+    }
+    else if (dataset_name == "MSRC_4") {
+        return Dataset("/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
+                       "/Ajanthan/data/MSRC/texton_unaries/",
+                       "/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
+                       "/Ajanthan/data/MSRC/",
+                       ".bmp",
+                       "_GT.bmp",
+                       "MSRC");
+    }
 }
 
 std::string get_output_path(const std::string & path_to_results_folder, const std::string & image_name){

@@ -459,7 +459,7 @@ void minimize_old_new_ph(std::string path_to_image, std::string path_to_unaries,
                       Potts_weight_set params, std::string path_to_output,
                       std::string dataset_name, int argc, char* argv[]) {
 
-    int n = 1;
+    int n = 10;
 
     img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
     // Load the unaries potentials for our image.

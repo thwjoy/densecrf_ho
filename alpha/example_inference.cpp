@@ -2,19 +2,19 @@
 #include "inference.hpp"
 
 int main(int argc, char* argv[]) {
-    std::string dataset_name = "Pascal2010";
+    std::string dataset_name = "MSRC";
     std::string path_to_unaries;
     std::string path_to_image;
     if (dataset_name=="MSRC") {
         //path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/5_14_s.c_unary";
         //path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/18_21_s.c_unary";
-        path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/10_16_s.c_unary";
+        path_to_unaries = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/2_14_s.c_unary";
         
         //path_to_unaries = "/media/ajanthan/sheep/Ajanthan/data/MSRC/texton_unaries/20_14_s.c_unary";
         
         //path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/5_14_s.bmp";
         //path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/18_21_s.bmp";
-        path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/10_16_s.bmp";
+        path_to_image = "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/2_14_s.bmp";
 
         //path_to_image = "/media/ajanthan/sheep/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/20_14_s.bmp";
     } else if(dataset_name == "Pascal2010"){
@@ -41,7 +41,8 @@ int main(int argc, char* argv[]) {
     // the image that we are using is from the validation set.
 
     //Potts_weight_set params(3, 2, 50, 15, 30);
-    Potts_weight_set params(3, 0.5, 50, 1, 1);
+    //Potts_weight_set params(3, 0.5, 50, 1, 1);    // Pascal,DC-neg
+    Potts_weight_set params(3.5, 2.25, 31, 8, 1.7);      // MSRC, Dc-neg
 
     // minimize_dense_alpha_divergence(path_to_image, path_to_unaries, path_to_alpha_output, path_to_parameters, 5);n
     // std::cout << "Unaries" << '\n';

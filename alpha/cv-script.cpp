@@ -207,6 +207,43 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                     Q = get_extended_matrix(rQ, indices, unaries.rows());
                 }
 
+            } else if (method == "tracing-prox_lp_rest2"){
+                //traced_perfs = crf.tracing_qp_inference(Q);
+                new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+
+                htime st = std::chrono::high_resolution_clock::now();
+                std::vector<int> indices;
+                get_limited_indices(Q, indices);
+                if (indices.size() > 1) {
+                    MatrixXf runaries = get_restricted_matrix(unaries, indices);
+                    MatrixXf rQ = get_restricted_matrix(Q, indices);
+                    DenseCRF2D rcrf(size.width, size.height, runaries.rows());
+                    rcrf.setUnaryEnergy(runaries);
+                    rcrf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
+                    rcrf.addPairwiseBilateral(bil_spcstd, bil_spcstd,
+                                 bil_colstd, bil_colstd, bil_colstd,
+                                 img, new PottsCompatibility(bil_potts));
+                    htime et = std::chrono::high_resolution_clock::now();
+                    double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
+                    std::cout << "#rcrf construction: " << dt << " seconds" << std::endl;
+    
+                    lp_params.less_confident_percent = 10;
+                    lp_params.confidence_tol = 0.95;
+                    new_perfs = rcrf.tracing_lp_inference_prox(rQ, lp_params, 0, "");
+                    traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                    less_confident_pixels(pixel_ids, rQ, lp_params.confidence_tol);                    
+    
+                    // lp inference params
+                	LP_inf_params lp_params_rest = lp_params;
+                    lp_params_rest.prox_max_iter = 20;
+                    lp_params_rest.prox_reg_const = 0.001;
+                    new_perfs = rcrf.tracing_lp_inference_prox_restricted(rQ, lp_params_rest, 0);
+                    traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                    
+                    Q = get_extended_matrix(rQ, indices, unaries.rows());
+                }
+
             } else if (method == "unary"){
                 (void)0;
             } else{
@@ -297,12 +334,15 @@ int main(int argc, char *argv[])
     make_dir(path_to_results);
 
     Dataset ds = get_dataset_by_name(dataset_name);
-    //std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-    std::vector<std::string> test_images;
-    test_images.push_back("2007_000559");
-    test_images.push_back("2007_000676");
-    //omp_set_num_threads(1);
-//#pragma omp parallel for
+    std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
+    //std::vector<std::string> test_images;
+    //test_images.push_back("2007_000559");
+    //test_images.push_back("2007_000676");
+    //test_images.push_back("2_14_s");
+    //test_images.push_back("1_9_s");
+    //test_images.push_back("1_23_s");
+    omp_set_num_threads(11);
+#pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
     //for(int i=1; i< 2; ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,

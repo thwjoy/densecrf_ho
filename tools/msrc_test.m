@@ -1,5 +1,5 @@
 function score = msrc_test(path, dataset_split)
-%addpath('/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/VOCdevkit/VOCcode');
+addpath('/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/lp_densecrf/densecrf/tools/');
 
 dpath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/';
 
@@ -8,7 +8,8 @@ testset = dataset_split;
 
 
 %gtimgpath0= [datadir 'MSRC_ObjCategImageDatabase_v2/GroundTruth/%s_GT.bmp'];
-gtimgpath= [datadir 'MSRC_ObjCategImageDatabase_v2/GroundTruth/%s_GT.png'];
+%gtimgpath= [datadir 'MSRC_ObjCategImageDatabase_v2/GroundTruth/%s_GT.png'];
+gtimgpath= [datadir 'fine_annot/%s_GT.bmp'];
 respath_tmpl=[path '/%s.png'];
 
 path_to_test_set = [datadir '/split/' dataset_split '.txt'];
@@ -25,7 +26,7 @@ for i=1:length(gtids)
     imname = gtids{i};
     toks = strsplit(imname, '.');
     imname = toks{1};
-
+     try
     % ground truth label file
     gtfile = sprintf(gtimgpath,imname);
 %     break;
@@ -33,7 +34,7 @@ for i=1:length(gtids)
     gtim = rgb2ind(gtim, cmap);
     gtim = double(gtim);
 
-%     try
+
     % results file
     resfile = sprintf(respath_tmpl, imname);
     [resim,map] = imread(resfile);
@@ -63,8 +64,8 @@ for i=1:length(gtids)
     count = count + numel(find(locs));
     confcounts(:) = confcounts(:) + hs(:);
 
-%     catch
-%     end
+     catch
+     end
 end
 
 % confusion matrix - first index is true label, second is inferred label
