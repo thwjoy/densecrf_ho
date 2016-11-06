@@ -341,8 +341,8 @@ int main(int argc, char *argv[])
     //test_images.push_back("2_14_s");
     //test_images.push_back("1_9_s");
     //test_images.push_back("1_23_s");
-    omp_set_num_threads(11);
-#pragma omp parallel for
+//    omp_set_num_threads(10);
+//#pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
     //for(int i=1; i< 2; ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,

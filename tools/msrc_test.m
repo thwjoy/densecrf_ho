@@ -1,5 +1,4 @@
-function score = msrc_test(path, dataset_split)
-addpath('/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/lp_densecrf/densecrf/tools/');
+function [score, overall_acc] = msrc_test(path, dataset_split)
 
 dpath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/';
 
