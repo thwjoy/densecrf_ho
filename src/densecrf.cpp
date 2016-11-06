@@ -1342,7 +1342,7 @@ VectorXs get_original_label(VectorXs const & restricted_labels, std::vector<int>
     return extended_labels;
 }
 
-MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
+MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad, bool full_mat) const {
     // Random init to prevent too many elements to be 0
     // init.setRandom();
     // MatrixXf uns(init.rows(), init.cols());
@@ -1353,7 +1353,11 @@ MatrixXf DenseCRF::lp_inference(MatrixXf & init, bool use_cond_grad) const {
     // Restrict number of labels in the computation
     std::vector<int> indices;
     renormalize(init);
-    get_limited_indices(init, indices);
+    if (full_mat) { // hack
+        for(int i = 0; i < M_; ++i) indices.push_back(i);
+    } else {
+        get_limited_indices(init, indices);
+    }
     int restricted_M = indices.size();
     MatrixXf unary = get_restricted_matrix(unary_->get(), indices);
     MatrixXf Q = get_restricted_matrix(init, indices);
@@ -1723,7 +1727,7 @@ MatrixXf DenseCRF::lp_inference_new(MatrixXf & init) const {
 
         renormalize(Q);
         assert(valid_probability_debug(Q));
-    } while(it<10 && !stop);
+    } while(it<5 && !stop);
     std::cout <<"final projected energy: " << int_energy << "\n";
 
     return best_Q;
@@ -3278,10 +3282,14 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
     return perfs;
 }
 
-std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit) const {
+std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit, bool full_mat) const {
     // Restrict number of labels in the computation
     std::vector<int> indices;
-    get_limited_indices(init, indices);
+    if (full_mat) { // hack
+        for(int i = 0; i < M_; ++i) indices.push_back(i);
+    } else {
+        get_limited_indices(init, indices);
+    }
     int restricted_M = indices.size();
     MatrixXf unary = get_restricted_matrix(unary_->get(), indices);
     MatrixXf Q = get_restricted_matrix(init, indices);

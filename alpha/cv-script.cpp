@@ -70,7 +70,16 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
                 Q = crf.lp_inference(Q, true);
-            } else if (method == "prox_lp"){
+            } else if (method == "sg_lp_std"){  // sg-lp not limited labels
+                Q = crf.qp_inference(Q);
+                Q = crf.concave_qp_cccp_inference(Q);
+                Q = crf.lp_inference(Q, false, true);
+            } else if (method == "prox_lp"){    // standard prox_lp
+                Q = crf.qp_inference(Q);
+                Q = crf.concave_qp_cccp_inference(Q);
+                //Q = crf.lp_inference_new(Q);
+                Q = crf.lp_inference_prox(Q, lp_params);    
+            } else if (method == "prox_lp_acc_l"){  // standard prox_lp with limited labels
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
@@ -95,7 +104,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                     
                     Q = get_extended_matrix(rQ, indices, unaries.rows());
                 }
-            } else if (method == "prox_lp_rest"){
+            } else if (method == "prox_lp_acc"){    // fully accelerated prox_lp
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
 
@@ -139,7 +148,21 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
                 new_perfs = crf.tracing_lp_inference(Q, false, time_budget);
                 traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
-            } else if (method == "tracing-prox_lp"){
+            } else if (method == "tracing-sg_lp_std"){  // sg_lp not limited labels
+                traced_perfs = crf.tracing_qp_inference(Q);
+                new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                new_perfs = crf.tracing_lp_inference(Q, false, time_budget, true);
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+            } else if (method == "tracing-prox_lp"){    // standard prox_lp 
+                traced_perfs = crf.tracing_qp_inference(Q);
+                new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                
+                new_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, "");
+                traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+                
+            } else if (method == "tracing-prox_lp_l"){    // standard prox_lp with limited indices
                 //std::string out_file_name = output_path;
                 //out_file_name.replace(out_file_name.end()-3, out_file_name.end(),"out");
                 //traced_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, out_file_name);
@@ -170,7 +193,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                     Q = get_extended_matrix(rQ, indices, unaries.rows());
                 }
                 
-            } else if (method == "tracing-prox_lp_rest"){
+            } else if (method == "tracing-prox_lp_acc"){
                 traced_perfs = crf.tracing_qp_inference(Q);
                 new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
                 traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
@@ -207,7 +230,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                     Q = get_extended_matrix(rQ, indices, unaries.rows());
                 }
 
-            } else if (method == "tracing-prox_lp_rest2"){
+            } else if (method == "tracing-prox_lp_rest2"){  // testing method!
                 //traced_perfs = crf.tracing_qp_inference(Q);
                 new_perfs = crf.tracing_concave_qp_cccp_inference(Q);
                 traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
