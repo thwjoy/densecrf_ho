@@ -133,6 +133,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                     lp_params_rest.prox_max_iter = 20;
                     lp_params_rest.prox_reg_const = 0.001;
                     rQ = rcrf.lp_inference_prox_restricted(rQ, lp_params_rest);
+                    less_confident_pixels(pixel_ids, rQ, lp_params.confidence_tol);                    
                     
                     Q = get_extended_matrix(rQ, indices, unaries.rows());
                 }
@@ -162,7 +163,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 new_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, "");
                 traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
                 
-            } else if (method == "tracing-prox_lp_l"){    // standard prox_lp with limited indices
+            } else if (method == "tracing-prox_lp_acc_l"){    // standard prox_lp with limited indices
                 //std::string out_file_name = output_path;
                 //out_file_name.replace(out_file_name.end()-3, out_file_name.end(),"out");
                 //traced_perfs = crf.tracing_lp_inference_prox(Q, lp_params, 0, out_file_name);
@@ -357,11 +358,11 @@ int main(int argc, char *argv[])
     make_dir(path_to_results);
 
     Dataset ds = get_dataset_by_name(dataset_name);
-    std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-    //std::vector<std::string> test_images;
+    //std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
+    std::vector<std::string> test_images;
     //test_images.push_back("2007_000559");
     //test_images.push_back("2007_000676");
-    //test_images.push_back("2_14_s");
+    test_images.push_back("2_14_s");
     //test_images.push_back("1_9_s");
     //test_images.push_back("1_23_s");
 //    omp_set_num_threads(10);

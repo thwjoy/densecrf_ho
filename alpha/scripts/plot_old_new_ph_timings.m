@@ -1,18 +1,20 @@
 %% Plot speed up (old-time/new-time) by varying sigma, pixels and labels for each kernel
 
-fpath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/densecrf/old_new_ph/2_14_s/';%2007_000676/';
-paperfpath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_docs/lp_densecrf/lp-densecrf-paper/images/msrc/old_new_ph/2_14_s/';
+fpath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/densecrf/old_new_ph/2007_000676/';%2_14_s/';%
+paperfpath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_docs/lp_densecrf/lp-densecrf-paper/images/pascal/dc_params/old_new_ph/2007_000676/';
 
+pixels = 500*375;
+% pixels = 213*320;
 dim=[2,5];
 sigma=[1,2,5,10,15,20];
-imskip=[1, 2, 3, 4, 5];
-labels=[2, 5, 10, 15, 22];
+imskip=[5, 4, 3, 2, 1];
+labels=[2, 5, 10, 15, 21];
 
 fname = [fpath '/timings_%u_%u_%u_%u.out'];
 
 % speedup vs sigma
 ims = 1;
-l = 22;
+l = 21;
 epsname = [fpath '/timings_%u_%u_%u_sigma.eps'];
 pdfname = [fpath '/timings_%u_%u_%u_sigma.pdf'];
 paperpdfname = [paperfpath '/timings_%u_%u_%u_sigma.pdf'];
@@ -29,15 +31,17 @@ for i = 1 : length(dim)
             'MarkerEdgeColor','r',...
             'MarkerFaceColor','r',...
             'MarkerSize',6);
-  xlabel('Standard-deviation', 'FontSize', 22);
-  ylabel('Speed-up', 'FontSize', 22);
+%   xlabel('Standard-deviation', 'FontSize', 22);
+%   ylabel('Speedup', 'FontSize', 22);
   if (dim(i) == 2)
-      title('Spatial kernel, d = 2', 'FontSize', 22); 
-%       ylim([40, 50]);
+%       title('Spatial kernel, d = 2', 'FontSize', 22); 
+      ylim([40, 50]);
+%         ylim([20, 30]);
   end;
   if (dim(i) == 5)
-      title('Bilateral kernel, d = 5', 'FontSize', 22); 
-%       ylim([30, 40]);
+%       title('Bilateral kernel, d = 5', 'FontSize', 22); 
+      ylim([30, 40]);
+%         ylim([20, 30]);
   end;
   print('-depsc2', sprintf(epsname, dim(i), ims, l));
   eps2pdf(sprintf(epsname, dim(i), ims, l), sprintf(pdfname, dim(i), ims, l));  
@@ -46,7 +50,7 @@ end
 
 % speedup vs pixels
 s = 1;
-l = 22;
+l = 21;
 epsname = [fpath '/timings_%u_%u_%u_pixels.eps'];
 pdfname = [fpath '/timings_%u_%u_%u_pixels.pdf'];
 paperpdfname = [paperfpath '/timings_%u_%u_%u_pixels.pdf'];
@@ -59,14 +63,15 @@ for i = 1 : length(dim)
     data{j} = mean(data{j}, 1);
     speedup(j) = data{j}(3)/data{j}(4);
   end
-  plot(imskip, speedup, '-ro', 'LineWidth',2,...
+  npixels = pixels./imskip;
+  plot(npixels, speedup, '-ro', 'LineWidth',2,...
             'MarkerEdgeColor','r',...
             'MarkerFaceColor','r',...
             'MarkerSize',6);
-  xlabel('No of pixels', 'FontSize', 22);
-  ylabel('Speed-up', 'FontSize', 22);
-  if (dim(i) == 2), title('Spatial kernel, d = 2', 'FontSize', 22); end;
-  if (dim(i) == 5), title('Bilateral kernel, d = 5', 'FontSize', 22); end;
+%   xlabel('No of pixels', 'FontSize', 22);
+  ylabel('Speedup', 'FontSize', 22);
+%   if (dim(i) == 2), title('Spatial kernel, d = 2', 'FontSize', 22); end;
+%   if (dim(i) == 5), title('Bilateral kernel, d = 5', 'FontSize', 22); end;
   print('-depsc2', sprintf(epsname, dim(i), s, l));
   eps2pdf(sprintf(epsname, dim(i), s, l), sprintf(pdfname, dim(i), s, l)); 
   eps2pdf(sprintf(epsname, dim(i), s, l), sprintf(paperpdfname, dim(i), s, l)); 
@@ -91,13 +96,14 @@ for i = 1 : length(dim)
             'MarkerEdgeColor','r',...
             'MarkerFaceColor','r',...
             'MarkerSize',6);
-  xlabel('No of labels', 'FontSize', 15);
-  ylabel('Speed-up', 'FontSize', 15);
-  if (dim(i) == 2), title('Spatial kernel, d = 2', 'FontSize', 15); end;
+%   xlabel('No of labels', 'FontSize', 15);
+%   ylabel('Speedup', 'FontSize', 15);
+%   if (dim(i) == 2), title('Spatial kernel, d = 2', 'FontSize', 15); end;
   if (dim(i) == 5)
-      title('Bilateral kernel, d = 5', 'FontSize', 15); 
-%       ylim([35, 45]);
+%       title('Bilateral kernel, d = 5', 'FontSize', 15); 
+      ylim([35, 45]);
   end;
+%   ylim([20, 30]);
   
   
   print('-depsc2', sprintf(epsname, dim(i), s, ims));

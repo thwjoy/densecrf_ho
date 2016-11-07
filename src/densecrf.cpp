@@ -961,6 +961,7 @@ std::vector<perf_measure> DenseCRF::tracing_concave_qp_cccp_inference(MatrixXf &
             best_int_energy = int_energy;
             best_Q = Q;
         }
+        //std::cout << "#DC-neg: " << int_energy << ", " << best_int_energy << std::endl;
         perf_energy = best_int_energy;
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
