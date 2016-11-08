@@ -114,7 +114,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     
                 // lp inference params
                 LP_inf_params lp_params_rest = lp_params;
-                lp_params_rest.prox_max_iter = 20;
+                //lp_params_rest.prox_max_iter = 20;
                 lp_params_rest.prox_reg_const = 0.001;
                 Q = crf.lp_inference_prox_restricted(Q, lp_params_rest);
                 less_confident_pixels(pixel_ids, Q, lp_params.confidence_tol);                    
@@ -145,7 +145,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     
                     // lp inference params
                 	LP_inf_params lp_params_rest = lp_params;
-                    lp_params_rest.prox_max_iter = 20;
+                    //lp_params_rest.prox_max_iter = 20;
                     lp_params_rest.prox_reg_const = 0.001;
                     rQ = rcrf.lp_inference_prox_restricted(rQ, lp_params_rest);
                     less_confident_pixels(pixel_ids, rQ, lp_params.confidence_tol);                    
@@ -222,7 +222,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     
                 // lp inference params
                 LP_inf_params lp_params_rest = lp_params;
-                lp_params_rest.prox_max_iter = 20;
+                //lp_params_rest.prox_max_iter = 20;
                 lp_params_rest.prox_reg_const = 0.001;
                 new_perfs = crf.tracing_lp_inference_prox_restricted(Q, lp_params_rest, 0);
                 traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
@@ -256,7 +256,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     
                     // lp inference params
                 	LP_inf_params lp_params_rest = lp_params;
-                    lp_params_rest.prox_max_iter = 20;
+                    //lp_params_rest.prox_max_iter = 10;
                     lp_params_rest.prox_reg_const = 0.001;
                     new_perfs = rcrf.tracing_lp_inference_prox_restricted(rQ, lp_params_rest, 0);
                     traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
