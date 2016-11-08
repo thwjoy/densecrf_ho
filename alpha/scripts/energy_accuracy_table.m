@@ -5,9 +5,11 @@ addpath('/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Res
 
 dataset = 'MSRC';
 dpath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/densecrf/';
-folder = 'final/Test_10_5_1000_0.1_1000_1000_1_final_mf';
+folder = 'final2/Test_10_5_1000_0.1_1000_1000_1_final2_dc';
 fpath = [dpath, dataset '/' folder '/'];
 
+% algos = {'mf5', 'mf', 'fixedDC-CCV', 'sg_lp', 'prox_lp', 'prox_lp_acc_l', 'prox_lp_acc_p', 'prox_lp_acc'};
+% names = {'MF5', 'MF', 'DC$_\text{neg}$', 'SG-LP$_\text{l}$', 'PROX-LP', 'PROX-LP$_\text{l}$', 'PROX-LP$_\text{p}$', 'PROX-LP$_\text{acc}$'};
 algos = {'mf5', 'mf', 'fixedDC-CCV', 'sg_lp', 'prox_lp', 'prox_lp_acc_l', 'prox_lp_acc'};
 names = {'MF5', 'MF', 'DC$_\text{neg}$', 'SG-LP$_\text{l}$', 'PROX-LP', 'PROX-LP$_\text{l}$', 'PROX-LP$_\text{acc}$'};
 nalgos = length(algos);
