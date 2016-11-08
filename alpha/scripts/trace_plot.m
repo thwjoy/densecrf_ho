@@ -1,7 +1,7 @@
 %% plot enegy vs time graphs for different algorithms
 clear all;
 zoom = 1;
-lambda = 1;
+lambda = 0;
 addpath('/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/Codes/export_fig/altmany-export_fig-0a0fea6/');
 
 if (lambda == 1)
@@ -64,13 +64,13 @@ if (zoom == 1)
         ylim([1000000,1800000]);
         %     daspect([1 5000 2]);
     else
-        %     xlim([1,3]);
-        %     ylim([1100000,2500000]);
-        %     daspect([1 200000 2]);
+            xlim([1,3]);
+            ylim([1100000,2500000]);
+            daspect([1 400000 2]);
         
-        %     xlim([2,10]);
-        %     ylim([200000,1500000]);
-        %     daspect([1 50000 2]);
+%             xlim([2,10]);
+%             ylim([200000,1500000]);
+%             daspect([1 100000 2]);
     end
 else
     %title('Assignment energy as a function of time', 'FontSize', 15);
