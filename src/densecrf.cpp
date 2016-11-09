@@ -726,6 +726,7 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
     // Compute the value of the energy
     double old_energy;
     double energy = compute_energy(Q);
+    //double energy = compute_energy_CCCP(Q);   // didn't really make difference in the LP case --> keeping it the same!
     int outer_rounds = 0;
     double identity_coefficient = 0;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -831,6 +832,7 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
         //valid_probability_debug(Q);
         // Compute our current value of the energy;
         energy = compute_energy(Q);
+        //energy = compute_energy_CCCP(Q);
         outer_rounds++;
     } while ( (old_energy -energy) > 100 && outer_rounds < 100);
     return Q;
@@ -4076,6 +4078,30 @@ double DenseCRF::compute_energy_true(const MatrixXf & Q) const {
 		double const_energy = tmp2.sum();
 		energy += const_energy;
     }
+
+    return energy;
+}
+
+double DenseCRF::compute_energy_CCCP(const MatrixXf & Q) const {
+    double energy = 0;
+    MatrixP dot_tmp;
+    // Add the unary term
+    if (unary_) {
+        MatrixXf unary = unary_->get();
+        energy += dotProduct(unary, Q, dot_tmp);
+    }
+    // Add all pairwise terms
+    MatrixXf tmp;
+    for (unsigned int k = 0; k<pairwise_.size(); k++) {
+        pairwise_[k]->apply(tmp, Q);
+        energy += dotProduct(Q, tmp, dot_tmp);
+    }
+
+    float identity_coeff = 0.0;
+    for (unsigned int k = 0; k < pairwise_.size(); k++)
+        identity_coeff += pairwise_[k]->parameters()[0];
+
+    energy -= identity_coeff * Q.squaredNorm();
 
     return energy;
 }

@@ -204,6 +204,9 @@ public: /* Debugging functions */
     // Compute the energy associated with the QP relaxation (const - true)
     double compute_energy( const MatrixXf & Q) const;
 
+    // Compute the energy associated with the QP-CCCP relaxation (const - true)
+    double compute_energy_CCCP( const MatrixXf & Q) const;
+
     // Compute the true-energy associated with the QP relaxation
     double compute_energy_true( const MatrixXf & Q) const;
 
