@@ -1,11 +1,11 @@
 %% generate the energy, accuracy, time table for the given dataset
 clear all;
-addpath('/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/lp_densecrf/densecrf/tools/');
-addpath('/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/Codes/matrix2latex/');
+addpath('/media/ajanthan/sheep/Ajanthan/lp_densecrf/densecrf/tools/');
+addpath('/media/ajanthan/sheep/Ajanthan/AJ/Codes/matrix2latex/');
 
-dataset = 'MSRC';
-dpath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/densecrf/';
-folder = 'final2/Test_10_5_1000_0.1_1000_1000_1_final2_dc';
+dataset = 'Pascal2010';
+dpath = '/media/ajanthan/sheep/Ajanthan/data/densecrf/';
+folder = 'final2/Test_10_5_1000_0.1_1000_1000_1_final2_mf';
 fpath = [dpath, dataset '/' folder '/'];
 
 % algos = {'mf5', 'mf', 'fixedDC-CCV', 'sg_lp', 'prox_lp', 'prox_lp_acc_l', 'prox_lp_acc_p', 'prox_lp_acc'};
@@ -14,7 +14,7 @@ algos = {'mf5', 'mf', 'fixedDC-CCV', 'sg_lp', 'prox_lp', 'prox_lp_acc_l', 'prox_
 names = {'MF5', 'MF', 'DC$_\text{neg}$', 'SG-LP$_\text{l}$', 'PROX-LP', 'PROX-LP$_\text{l}$', 'PROX-LP$_\text{acc}$'};
 nalgos = length(algos);
 
-exepath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/lp_densecrf/densecrf/alpha/scripts/';
+exepath = '/media/ajanthan/sheep/Ajanthan/lp_densecrf/densecrf/alpha/scripts/';
 exe = ['python ' exepath 'energies.py'];
 out = [fpath 'energies.out'];
 
@@ -71,7 +71,11 @@ end
 
 for i = 1 : nalgos
     path = [fpath algos{i} '/'];
-    [score, avgacc(i)] = msrc_test(path, 'Test');
+    if (strcmp(dataset, 'MSRC'))
+        [score, avgacc(i)] = msrc_test(path, 'Test');
+    else 
+        [score, avgacc(i)] = voc_test(path, 'Test');
+    end
 end
 
 %% matrix to latex table
@@ -85,7 +89,7 @@ for i = 1 : r
     for j = 2 : nalgos + 1
         mat{i, j} = comma_separated(bemat(i, j-1), '%10.0f');
     end
-    mat{i, nalgos+2} = comma_separated(avgenergy(i)/1000, '%10.1f');
+    mat{i, nalgos+2} = comma_separated(avgenergy(i)/10000, '%10.1f');
     mat{i, nalgos+3} = comma_separated(avgtime(i), '%10.1f');
     mat{i, nalgos+4} = comma_separated(avgacc(i), '%10.2f');
 end

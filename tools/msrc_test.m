@@ -1,6 +1,6 @@
 function [score, overall_acc] = msrc_test(path, dataset_split)
 
-dpath = '/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/';
+dpath = '/media/ajanthan/sheep/Ajanthan/data/';
 
 datadir = [dpath 'MSRC/'];
 testset = dataset_split;
