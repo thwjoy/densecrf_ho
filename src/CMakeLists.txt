@@ -1,5 +1,6 @@
 include_directories( ../external/liblbfgs/include ../external/ )
 include_directories(../alpha)
+add_subdirectory(mean-shift)
 
 add_library( densecrf util.cpp permutohedral.cpp unary.cpp pairwise.cpp objective.cpp densecrf.cpp labelcompatibility.cpp )
 target_link_libraries(densecrf newton_cccp qp eigen_utils)

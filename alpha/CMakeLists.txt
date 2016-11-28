@@ -38,7 +38,7 @@ add_executable(example_inference  example_inference.cpp)
 target_link_libraries(example_inference inference file_storage)
 
 add_executable(non_convex non_convex.cpp)
-target_link_libraries(non_convex inference file_storage)
+target_link_libraries(non_convex inference mean-shift file_storage)
 
 add_executable(toy-problem toy-problem.cpp)
 target_link_libraries(toy-problem inference)

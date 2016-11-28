@@ -1,6 +1,9 @@
 #include <string>
 #include <sys/stat.h>
 #include "inference.hpp"
+#include "file_storage.hpp"
+#include "msImageProcessor.h"
+#include "libppm.h"
 
 inline bool fileExists(const std::string& name) {
   struct stat buffer;   
@@ -16,7 +19,7 @@ int main (int argc, char * argv[]) {
 	std::string path_to_output;
 	std::string file_name;
 
-	std::cout << "#################################################\r\nRunning non-convex segmentation\r\n#################################################" << std::endl;
+	std::cout << "#################################################\r\nRunning non-convex segmentation\r\n#################################################\r\n";
 
     if (argc < 2) {
 		std::cout << "Usage:  ./non_convex [file]" << std::endl;
@@ -25,9 +28,19 @@ int main (int argc, char * argv[]) {
 		file_name = argv[1];
 	}
 	
+
 	path_to_unaries = unaries_directory + argv[1] + std::string(".c_unary");
     path_to_image = images_directory + argv[1] + std::string(".bmp");
     path_to_output = std::string("./data/output/") + argv[1] + std::string("_out.bmp");
+
+    img_size size = {-1, -1};
+    unsigned char * image = load_image(path_to_image, size);
+    unsigned char * segment_image = new unsigned char[size.height * size.width * 3];
+	msImageProcessor m_process;
+	m_process.DefineImage(image,COLOR,size.height,size.width);
+	m_process.Segment(16,8,500,NO_SPEEDUP);
+	m_process.GetResults(segment_image);
+	writePPMImage("./ouput.ppm",segment_image, size.height, size.width, 3, "");
 
 
     //check the file exists
