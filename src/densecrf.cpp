@@ -313,7 +313,7 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
     }
     grad += 2 * diag_dom.cwiseProduct(Q);
 
-
+    double num, denom;
     energy = compute_LR_QP_value(Q, diag_dom);
     while( (old_energy - energy) > 100){
         old_energy = energy;
@@ -330,10 +330,12 @@ MatrixXf DenseCRF::qp_inference(const MatrixXf & init) const {
         }
         psisx += diag_dom.cwiseProduct(sx);
 
-        double num =  2 * dotProduct(Q, psisx, temp_dot) + dotProduct(unary, sx, temp_dot);
+        num =  2 * dotProduct(Q, psisx, temp_dot) + dotProduct(unary, sx, temp_dot);
         // Num should be negative, otherwise our choice of s was necessarily wrong.
-        double denom = dotProduct(sx, psisx, temp_dot);
-        // Denom should be positive, otherwise our choice of psi was not convex enough.
+        
+        denom = dotProduct(sx, psisx, temp_dot);
+
+         // Denom should be positive, otherwise our choice of psi was not convex enough.
 
         optimal_step_size = - num / (2 * denom);
         if (optimal_step_size > 1) {
@@ -604,8 +606,104 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference(MatrixXf & init, double
     return perfs;
 }
 
+MatrixXf DenseCRF::qp_inference_non_convex(const MatrixXf & init) const {
+    //Here we compute the Frank Wolfe algorithm on a non-convex energy function min phi' * y + y' * psi * y eq(8)
+    //gradient = phi + 2 * psi * y 
+    MatrixXf Q(M_, N_), unary(M_, N_),  tmp(M_,N_), grad(M_, N_),
+        cond_grad(M_,N_), sx(M_,N_), psisx(M_, N_);
+    MatrixP temp_dot(M_,N_);
 
+    double optimal_step_size = 0;
+    // Get parameters
+    unary.fill(0);
+    if(unary_){
+        unary = unary_->get();
+    }
 
+    Q = init;
+
+    // Compute the value of the energy
+    double old_energy = std::numeric_limits<double>::max();
+    double energy;
+
+    //this computes the  gradient function phi + 2 * psi * y
+    grad = unary;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        pairwise_[k]->apply( tmp, Q);
+        grad += 2 *tmp;
+    }
+    
+    int i = 0;
+    energy = compute_LR_QP_value(Q, MatrixXf::Zero(M_,N_)); //normally takes the diagonally dominant component which in this case does not exist
+    while( (old_energy - energy) > 0.1){
+        old_energy = energy;
+        i++;
+
+        //solve the conditional gradient
+        descent_direction(cond_grad, grad);
+
+        //Solve for the best step size. The best step size is:
+        //         1        phi' * (s - y) + 2 * y' * psi * (s - y)
+        //    a = --- x ---------------------------------------------
+        //         2              (s - y)' * psi * (s - y)
+        //clearly the expensive term are  "psi * (s - y)", hence we create two new variables sx  = (s - y) amd psisx = psi * (s - y)
+
+        sx = cond_grad - Q;
+        psisx.fill(0);
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply(tmp, sx);
+            psisx += tmp;
+        }
+        
+
+        double num =  2 * dotProduct(Q, psisx, temp_dot) + dotProduct(unary, sx, temp_dot);
+        // Num should be negative, otherwise our choice of s was necessarily wrong.
+        double denom = dotProduct(sx, psisx, temp_dot);
+        // Denom should be negative, as our energy function is now concave.
+        
+        optimal_step_size = - num / (2 * denom);
+           
+        if (denom == 0 || num == 0) {
+            // This means that the conditional gradient is the same
+            // than the current step and we have converged.
+            optimal_step_size = 0;
+            // Compute the gradient at the new estimates.
+            grad += 2 * optimal_step_size * psisx;
+            //energy = compute_LR_QP_value(Q, diag_dom);
+            //alt_energy = dotProduct(Q, unary, temp_dot) + 0.5*dotProduct(Q, grad - unary, temp_dot);
+            energy = 0.5 * dotProduct(Q, grad + unary, temp_dot);
+            break;
+        }
+
+        if (optimal_step_size > 1) {
+            // Respect the bounds.
+            optimal_step_size = 0;
+        }
+        if (optimal_step_size < 0) {
+            // Stay between the current step and the optimal.
+            // Theoretically shouldn't happen but we accumulate
+            // floating point errors when we compute the polynomial
+            // coefficients.
+            optimal_step_size = 1;
+        }
+
+        // Take a step
+        Q += optimal_step_size * sx;
+        if (not valid_probability(Q)) {
+            std::cout << "Bad proba" << '\n';
+        }
+        // Compute the gradient at the new estimates.
+        grad += 2 * optimal_step_size * psisx;
+        //energy = compute_LR_QP_value(Q, diag_dom);
+        //alt_energy = dotProduct(Q, unary, temp_dot) + 0.5*dotProduct(Q, grad - unary, temp_dot);
+        energy = 0.5 * dotProduct(Q, grad + unary, temp_dot);
+        
+    }
+
+    std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
+
+    return Q;
+}
 
 void kkt_solver(const VectorXf & lin_part, const MatrixXf & inv_KKT, VectorXf & out){
     int M = lin_part.size();

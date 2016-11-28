@@ -29,6 +29,10 @@ void minimize_LR_QP(std::string path_to_image, std::string path_to_unaries,
                     Potts_weight_set parameters, std::string path_to_output,
                     std::string dataset_name);
 
+void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_unaries,
+                    Potts_weight_set parameters, std::string path_to_output,
+                    std::string dataset_name);
+
 void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
                       Potts_weight_set parameters, std::string path_to_output,
                       std::string dataset_name);

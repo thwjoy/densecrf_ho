@@ -13,14 +13,13 @@ int main(int argc, char* argv[]) {
         path_to_image = "/data/PascalVOC2010/JPEGImages/2008_000645.jpg";
     }
 
-
     std::string path_to_alpha_output = "/data/densecrf/res.bmp";
     std::string path_to_mf_output = "/data/densecrf/res-mf.bmp";
     std::string path_to_cccp_output = "/data/densecrf/res-cccp-mf.bmp";
     std::string path_to_unoutput = "/data/densecrf/res-un.bmp";
-    std::string path_to_qplroutput = "/data/densecrf/res-lrqp.bmp";
-    std::string path_to_qpcccp_output = "/data/densecrf/res-cccp-qp.bmp";
-    std::string path_to_qpcccp_ccv_output = "/data/densecrf/res-cccp-ccv.bmp";
+    std::string path_to_qplroutput = "./data/densecrf/res-lrqp.bmp";
+    std::string path_to_qpcccp_output = "./data/densecrf/res-cccp-qp.bmp";
+    std::string path_to_qpcccp_ccv_output = "./data/densecrf/res-cccp-ccv.bmp";
     std::string path_to_fixed_iter_output = "/data/densecrf/res-fixediter-mf.bmp";
     std::string path_to_lp_cg_line_output = "/data/densecrf/res-lp-cg_line.bmp";
     std::string path_to_lp_sg_line_output = "/data/densecrf/res-lp-sg_line.bmp";
@@ -37,10 +36,10 @@ int main(int argc, char* argv[]) {
     // minimize_cccp_mean_field(path_to_image, path_to_unaries, params, path_to_cccp_output, dataset_name);
     // std::cout << "Fixed Iter Meanfield"  << '\n';
     // minimize_mean_field_fixed_iter(path_to_image, path_to_unaries, params, path_to_fixed_iter_output, dataset_name, 5);
-    // std::cout << "Lafferty QP"  << '\n';
-    // minimize_LR_QP(path_to_image, path_to_unaries, params, path_to_qplroutput, dataset_name);
-    std::cout << "CCCP QP" << '\n';
-    minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
+    std::cout << "Lafferty QP"  << '\n';
+    minimize_LR_QP(path_to_image, path_to_unaries, params, path_to_qplroutput, dataset_name);
+    //std::cout << "CCCP QP" << '\n';
+    //minimize_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_output, dataset_name);
     //std::cout << "Concave QP CCCP" << '\n';
     //minimize_concave_QP_cccp(path_to_image, path_to_unaries, params, path_to_qpcccp_ccv_output, dataset_name);
     // std::cout << "LP SG line search" << '\n';

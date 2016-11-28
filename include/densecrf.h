@@ -92,6 +92,9 @@ public:
 	MatrixXf qp_inference(const MatrixXf & init) const;
 	MatrixXf qp_inference(const MatrixXf & init, int nb_iterations) const;
 	std::vector<perf_measure> tracing_qp_inference(MatrixXf & init, double time_limit = 0) const;
+
+	MatrixXf qp_inference_non_convex(const MatrixXf & init) const;
+
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
     MatrixXf qp_cccp_inference(const MatrixXf & init) const;
 	std::vector<perf_measure> tracing_qp_cccp_inference(MatrixXf & init, double time_limit =0) const;
