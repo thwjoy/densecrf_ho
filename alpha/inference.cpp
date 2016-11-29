@@ -191,7 +191,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
-    //crf.compute_kl_divergence();
+    crf.addSuperPixel(img);
     MatrixXf init = crf.unary_init();
     //run the inference with the convex problem
     std::cout << "---Finding global optimum, of convex energy function" <<std::endl;
@@ -207,12 +207,11 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
 
-    //we now need to run the code with a non_convex energy function
+    //we now need to run the code with a non_convex energy function including the super pixels
     std::cout << "---Finding local optimum, of non-convex energy function" <<std::endl;
     path_to_output.replace(path_to_output.end()-4, path_to_output.end(),"_nc.bmp");
     clock_t start_nc, end_nc;
     start_nc = clock();
-    //expAndNormalize(Q,Q);
     MatrixXf Q_non_convex = crf.qp_inference_non_convex(Q);
     end_nc = clock();
     double timing_non_convex = (double(end_nc-start_nc)/CLOCKS_PER_SEC);

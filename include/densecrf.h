@@ -28,6 +28,7 @@
 #pragma once
 #include "unary.h"
 #include "labelcompatibility.h"
+#include "msImageProcessor.h"
 #include "objective.h"
 #include "pairwise.h"
 #include <vector>
@@ -47,6 +48,9 @@ protected:
 
 	// Store the unary term
 	UnaryEnergy * unary_;
+
+	//store the super pixel term
+	Matrix<int, Dynamic, Dynamic, RowMajor> super_pixel_classifier;
 
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
@@ -77,6 +81,8 @@ public:
 	void setUnaryEnergy( const MatrixXf & unary );
 	// Add a logistic unary term
 	void setUnaryEnergy( const MatrixXf & L, const MatrixXf & f );
+	//Add a super pixel term
+	int setSuperPixelEnergy( const unsigned char * img);
 	UnaryEnergy* getUnaryEnergy();
 
 
@@ -178,6 +184,10 @@ public:
 	// Add a Bilateral pairwise potential with spacial standard deviations sx, sy and color standard deviations sr,sg,sb
 	void addPairwiseBilateral( float sx, float sy, float sr, float sg, float sb, const unsigned char * im, LabelCompatibility * function=NULL, KernelType kernel_type=DIAG_KERNEL, NormalizationType normalization_type=NORMALIZE_SYMMETRIC );
 	
+	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
+	void addSuperPixel(unsigned char * img, int spatial_radius = 16, int range_radius = 8, int min_region_count = 500, SpeedUpLevel = NO_SPEEDUP);
+
+
 	// Set the unary potential for a specific variable
 	using DenseCRF::setUnaryEnergy;
 };

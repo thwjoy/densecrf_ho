@@ -32,31 +32,33 @@ int main (int argc, char * argv[]) {
 	path_to_unaries = unaries_directory + argv[1] + std::string(".c_unary");
     path_to_image = images_directory + argv[1] + std::string(".bmp");
     path_to_output = std::string("./data/output/") + argv[1] + std::string("_out.bmp");
-
+/*
     img_size size = {-1, -1};
     unsigned char * image = load_image(path_to_image, size);
     unsigned char * segment_image = new unsigned char[size.height * size.width * 3];
+    int ** lables_out;
+    float ** modes_out;
+    int ** MPC_out;
 	msImageProcessor m_process;
 	m_process.DefineImage(image,COLOR,size.height,size.width);
 	m_process.Segment(16,8,500,NO_SPEEDUP);
 	m_process.GetResults(segment_image);
+	int i = m_process.GetRegions(lables_out,modes_out,MPC_out);
+	std::cout << *lables_out[0] << "\n";
 	writePPMImage("./ouput.ppm",segment_image, size.height, size.width, 3, "");
-
-
+*/
     //check the file exists
 	if (!fileExists(path_to_unaries)) {
-		std::cout << "Unaries not found" << std::endl;
+		std::cout << "Unaries not found\r\n";
 		return 0;
 	}
 	if (!fileExists(path_to_image)) {
-		std::cout << "Image not found" << std::endl;
-		return 0;
+		std::cout << "Image not found\r\n";
 	}
 
 	Potts_weight_set params(3, 2, 50, 15, 3);
 	//run the minimisation
 	minimize_LR_QP_non_convex(path_to_image, path_to_unaries, params, path_to_output, dataset_name);
-	
 	
 	return 0;
 

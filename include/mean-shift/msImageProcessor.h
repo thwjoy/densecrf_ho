@@ -88,6 +88,10 @@ class msImageProcessor: public MeanShift {
 
 public:
 
+  /////////Image Regions////////
+  int       regionCount;      // stores the number of connected regions contained by the
+                      // image
+
   /*/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\*/
   /* Class Constructor and Destructor */
   /*\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/*/
@@ -615,7 +619,7 @@ public:
   //<--------------------------------------------------->|//
   //--\\||//--\\||//--\\||//--\\||//--\\||//--\\||//--\\||//
 
-  int GetRegions(int**, float**, int**);
+  int GetRegions(int** &, float** &, int** &);
 
 
   void SetSpeedThreshold(float);
@@ -724,10 +728,7 @@ private:
 	/////////Image Boundaries/////////
 	RegionList		*regionList;			// stores the boundary locations for each region
 
-	/////////Image Regions////////
-	int				regionCount;			// stores the number of connected regions contained by the
-											// image
-
+	
 	/////////8 Connected Neighbors/////////
 	int				neigh[8];
 

@@ -30,6 +30,8 @@
 #include "newton_cccp.hpp"
 #include "qp.hpp"
 #include "permutohedral.h"
+#include "msImageProcessor.h"
+#include "libppm.h"
 #include "util.h"
 #include "pairwise.h"
 #include <cmath>
@@ -86,6 +88,29 @@ void DenseCRF2D::addPairwiseBilateral ( float sx, float sy, float sr, float sg, 
         }
     addPairwiseEnergy( feature, function, kernel_type, normalization_type );
 }
+
+void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, SpeedUpLevel) {
+    //addSuperPixel is a member function that applies the mean-shift algorithm to the image and then initialises the protected member varaiable super_pixel_classifer.
+    unsigned char * segment_image = new unsigned char[W_ * H_ * 3];
+    int ** lables_out;
+    float ** modes_out;
+    int ** MPC_out;
+
+    msImageProcessor m_process;
+    m_process.DefineImage(img , COLOR , H_ , W_);
+    m_process.Segment(16,8,500,NO_SPEEDUP);
+    m_process.GetResults(segment_image);
+    int i = m_process.GetRegions(lables_out,modes_out,MPC_out);
+    super_pixel_classifier.resize(H_,W_);
+    for (int rows = 0; rows < super_pixel_classifier.rows(); rows++) {
+        for (int cols = 0; cols < super_pixel_classifier.cols(); cols++) {
+            super_pixel_classifier(rows,cols) = lables_out[0][(cols + rows*W_)];
+        }
+    }
+    //writePPMImage("./ouput.ppm",segment_image, H_, W_, 3, "");
+    return;
+}
+
 //////////////////////////////
 /////  Unary Potentials  /////
 //////////////////////////////
