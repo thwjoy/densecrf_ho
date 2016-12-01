@@ -50,7 +50,7 @@ protected:
 	UnaryEnergy * unary_;
 
 	//store the super pixel term
-	Matrix<int, Dynamic, Dynamic, RowMajor> super_pixel_classifier;
+	Matrix<int, Dynamic, Dynamic> super_pixel_classifier_;
 
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
@@ -99,7 +99,11 @@ public:
 	MatrixXf qp_inference(const MatrixXf & init, int nb_iterations) const;
 	std::vector<perf_measure> tracing_qp_inference(MatrixXf & init, double time_limit = 0) const;
 
+	//===============================================================
+	//The following two definitions are for Tom Joys 4YP which computes the QP with a non convex function and with super pixel terms
 	MatrixXf qp_inference_non_convex(const MatrixXf & init) const;
+	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init) const;
+	//===============================================================
 
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
     MatrixXf qp_cccp_inference(const MatrixXf & init) const;
@@ -185,7 +189,7 @@ public:
 	void addPairwiseBilateral( float sx, float sy, float sr, float sg, float sb, const unsigned char * im, LabelCompatibility * function=NULL, KernelType kernel_type=DIAG_KERNEL, NormalizationType normalization_type=NORMALIZE_SYMMETRIC );
 	
 	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
-	void addSuperPixel(unsigned char * img, int spatial_radius = 16, int range_radius = 8, int min_region_count = 500, SpeedUpLevel = NO_SPEEDUP);
+	void addSuperPixel(unsigned char * img, int spatial_radius = 8, int range_radius = 4, int min_region_count = 2500, SpeedUpLevel = NO_SPEEDUP);
 
 
 	// Set the unary potential for a specific variable

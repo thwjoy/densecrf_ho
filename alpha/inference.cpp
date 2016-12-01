@@ -191,6 +191,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
+    std::cout << "---Running mean-shift and adding super pixel term" <<std::endl;
     crf.addSuperPixel(img);
     MatrixXf init = crf.unary_init();
     //run the inference with the convex problem
@@ -212,7 +213,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     path_to_output.replace(path_to_output.end()-4, path_to_output.end(),"_nc.bmp");
     clock_t start_nc, end_nc;
     start_nc = clock();
-    MatrixXf Q_non_convex = crf.qp_inference_non_convex(Q);
+    MatrixXf Q_non_convex = crf.qp_inference_super_pixels_non_convex(Q);
     end_nc = clock();
     double timing_non_convex = (double(end_nc-start_nc)/CLOCKS_PER_SEC);
     double final_energy_non_convex = crf.compute_energy(Q_non_convex);
