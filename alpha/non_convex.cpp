@@ -23,7 +23,7 @@ int main (int argc, char * argv[]) {
 
     if (argc < 2) {
 		std::cout << "Usage:  ./non_convex [file]" << std::endl;
-		file_name = "5_14_s";
+		return 0;
 	} else { 
 		file_name = argv[1];
 	}

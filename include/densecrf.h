@@ -44,7 +44,7 @@ void normalize(MatrixXf & out, const MatrixXf & in);
 class DenseCRF{
 protected:
 	// Number of variables and labels
-	int N_, M_;
+	int N_, M_, R_;
 
 	// Store the unary term
 	UnaryEnergy * unary_;

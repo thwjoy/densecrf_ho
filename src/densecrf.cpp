@@ -101,8 +101,8 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     m_process.DefineImage(img , COLOR , H_ , W_);
     m_process.Segment(spatial_radius,range_radius,min_region_count,NO_SPEEDUP);
     m_process.GetResults(segment_image);
-    int regions = m_process.GetRegions(regions_out,modes_out,MPC_out);
-    super_pixel_classifier_.resize(regions,W_ * H_);
+    int R_ = m_process.GetRegions(regions_out,modes_out,MPC_out);
+    super_pixel_classifier_.resize(R_,W_ * H_);
     super_pixel_classifier_.setZero();
     for (int i = 0; i < super_pixel_classifier_.cols(); i++) {
         region = regions_out[0][i];
@@ -733,16 +733,29 @@ MatrixXf DenseCRF::qp_inference_non_convex(const MatrixXf & init) const {
 }
 
 MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) const {
-    //Here we compute the Frank Wolfe algorithm on a non-convex energy function min phi' * y + y' * psi * y eq(8)
-    //gradient = phi + 2 * psi * y 
-    MatrixXf Q(M_, N_), unary(M_, N_),  tmp(M_,N_), grad(M_, N_),
-        cond_grad(M_,N_), sx(M_,N_), psisx(M_, N_);
-    MatrixXi hyper_params(M_, N_);
+    /*Here we compute the Frank Wolfe, to find the optimum of the cost function contatining super pixels
+     * The cost function is: phi'.y + y'.psi.y + K[z + (1 - z){1'.theta.(1 - y)}]
+     * where theta reprosents a compatibility matrix for the super pixel regions
+     * The gradient of the cost function is defined as:
+     *      g_y = phi + 2psi.y - K[(1 - z).theta'.1]
+     *      g_z = 1 - [1'.theta.(1 - y)]
+     *
+     * The conditional gradient is then givel by:
+     *      c = argmin(g_y'.y,g_z'.z)
+     *
+     * We can the compute the optimal step size over y and z     
+     *
+     *
+     */
+    MatrixXf Q(M_, N_), unary(M_, N_),  tmp(M_,N_), grad_y(M_, N_), 
+        cond_grad_y(M_,N_), grad_z(M_, 1), cond_grad_z(M_, 1),sx(M_,N_), psisx(M_, N_);
     MatrixP temp_dot(M_,N_);
-    int k = 1;
+    MatrixXi z_labels(M_,1); 
+    int K = 1;
 
     double optimal_step_size = 0;
     // Get parameters
+    z_labels.fill(1); //setting the z_labelsto 1, means they have no influence on the initial gradient
     unary.fill(0);
     if(unary_){
         unary = unary_->get();
@@ -755,34 +768,36 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
     double energy = std::numeric_limits<double>::max();
 
     //this computes the  gradient function phi + 2 * psi * y
-    grad = unary;
+    grad_y = unary;
     for( unsigned int k=0; k<pairwise_.size(); k++ ) {
         pairwise_[k]->apply( tmp, Q);
-        grad += 2 *tmp;
+        grad_y += 2 *tmp;
     }
 
+    //initilise the gradient for z
+    MatrixXi temp = super_pixel_classifier_ * (MatrixXi::Ones(M_,N_) - Q.cast<int>());
+    MatrixXf temp1(M_,1);
+    temp1.fill(temp.sum());
+    grad_z = MatrixXi::Ones(M_,1).cast<float>() - temp1;
     
     int i = 0;
-     do {
+    energy = compute_LR_QP_value(Q, MatrixXf::Zero(M_,N_)); //normally takes the diagonally dominant component which in this case does not exist
+    while( (old_energy - energy) > 0.0001){
         old_energy = energy;
         i++;
 
-        //solve the conditional gradient, this needs to be down twice as to find the hyper parameter they need to be of the set I. y_a(i) E [0,1] 
-        descent_direction(cond_grad, grad);
-        //we now need to compute the hyperparameters we do this by taking the product of
-        compute_hyper_params(cond_grad,hyper_params,super_pixel_classifier_);
-        //add the super pixel term to the gradient
-        grad -= k * (MatrixXi::Ones(hyper_params.rows(),hyper_params.cols()) - hyper_params).cast <float> ();
-        //solve the new conditional gradient
-        descent_direction(cond_grad, grad);
-
+        //solve the conditional gradient for y 
+        descent_direction(cond_grad_y, grad_y);
+        //solve the conditional gradient for z
+        descent_direction(cond_grad_z, grad_z);
+  
         //Solve for the best step size. The best step size is:
         //         1        phi' * (s - y) + 2 * y' * psi * (s - y)
         //    a = --- x ---------------------------------------------
         //         2              (s - y)' * psi * (s - y)
         //clearly the expensive term are  "psi * (s - y)", hence we create two new variables sx  = (s - y) amd psisx = psi * (s - y)
 
-        sx = cond_grad - Q;
+        sx = cond_grad_y - Q;
         psisx.fill(0);
         for( unsigned int k=0; k<pairwise_.size(); k++ ) {
             pairwise_[k]->apply(tmp, sx);
@@ -793,18 +808,19 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
         // Num should be negative, otherwise our choice of s was necessarily wrong.
         double denom = dotProduct(sx, psisx, temp_dot);
         // Denom should be negative, as our energy function is now concave.
-        
-        optimal_step_size = - num / (2 * denom);
-           
+          
+        //optimal_step_size = - num / (2 * denom);
+        optimal_step_size = 2 / (2 + i); 
+
         if (denom == 0 || num == 0) {
             // This means that the conditional gradient is the same
             // than the current step and we have converged.
             optimal_step_size = 0;
             // Compute the gradient at the new estimates.
-            grad += 2 * optimal_step_size * psisx;
+            grad_y += 2 * optimal_step_size * psisx;
             //energy = compute_LR_QP_value(Q, diag_dom);
             //alt_energy = dotProduct(Q, unary, temp_dot) + 0.5*dotProduct(Q, grad - unary, temp_dot);
-            energy = 0.5 * dotProduct(Q, grad + unary, temp_dot);
+            energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
             break;
         }
 
@@ -827,19 +843,11 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
         }
 
         // Compute the gradient at the new estimates.
-        grad += 2 * optimal_step_size * psisx;
-        //compute the enrgy
-        double temp_energy = 0;
-        MatrixXf m_1(1,Q.cols());
-        m_1.fill(1);
-        for (int i = 0; i < Q.rows(); i++) {
-            temp_energy += (super_pixel_classifier_.cast<float>() * (m_1.row(0) - Q.row(i)).transpose()).sum();
-        }
-        double super_energy = (k * (hyper_params + (MatrixXi::Ones(hyper_params.rows(),hyper_params.cols()) - hyper_params)).cast<float>() ).sum();
-        energy = 0.5 * dotProduct(Q, grad + unary, temp_dot) + super_energy;
-        std::cout << "Energy : " << energy << "   Old Energy : " << old_energy << "  Difference in energy : " << old_energy - energy << "\r\n";
+        grad_y += 2 * optimal_step_size * psisx;
+        //compute the enrgys
+        energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
         
-    } while( optimal_step_size > 0.0001);
+    } 
 
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
 
