@@ -748,9 +748,9 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
      *
      */
     MatrixXf Q(M_, N_), unary(M_, N_),  tmp(M_,N_), grad_y(M_, N_), 
-        cond_grad_y(M_,N_), grad_z(M_, 1), cond_grad_z(M_, 1),sx(M_,N_), psisx(M_, N_);
+        cond_grad_y(M_,N_), grad_z(M_, N_), cond_grad_z(M_, N_),sx_z(M_,N_), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,N_);
     MatrixP temp_dot(M_,N_);
-    MatrixXi z_labels(M_,1); 
+ 
     int K = 1;
 
     double optimal_step_size = 0;
@@ -775,14 +775,13 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
     }
 
     //initilise the gradient for z
-    MatrixXi temp = super_pixel_classifier_ * (MatrixXi::Ones(M_,N_) - Q.cast<int>());
-    MatrixXf temp1(M_,1);
+    MatrixXf temp = super_pixel_classifier_.cast<float>() * (MatrixXi::Ones(M_,N_).cast<float>() - Q).transpose();
+    MatrixXf temp1(M_,N_);
     temp1.fill(temp.sum());
-    grad_z = MatrixXi::Ones(M_,1).cast<float>() - temp1;
-    
+    grad_z = MatrixXi::Ones(M_,N_).cast<float>();// - temp1;
+  
     int i = 0;
-    energy = compute_LR_QP_value(Q, MatrixXf::Zero(M_,N_)); //normally takes the diagonally dominant component which in this case does not exist
-    while( (old_energy - energy) > 0.0001){
+    do {
         old_energy = energy;
         i++;
 
@@ -791,64 +790,41 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
         //solve the conditional gradient for z
         descent_direction(cond_grad_z, grad_z);
   
-        //Solve for the best step size. The best step size is:
-        //         1        phi' * (s - y) + 2 * y' * psi * (s - y)
-        //    a = --- x ---------------------------------------------
-        //         2              (s - y)' * psi * (s - y)
-        //clearly the expensive term are  "psi * (s - y)", hence we create two new variables sx  = (s - y) amd psisx = psi * (s - y)
+        sx_y = cond_grad_y - Q;
+        sx_z = cond_grad_z - z_labels;
 
-        sx = cond_grad_y - Q;
-        psisx.fill(0);
-        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply(tmp, sx);
-            psisx += tmp;
-        }
-        
-        double num =  2 * dotProduct(Q, psisx, temp_dot) + dotProduct(unary, sx, temp_dot);
-        // Num should be negative, otherwise our choice of s was necessarily wrong.
-        double denom = dotProduct(sx, psisx, temp_dot);
-        // Denom should be negative, as our energy function is now concave.
-          
-        //optimal_step_size = - num / (2 * denom);
-        optimal_step_size = 2 / (2 + i); 
+        optimal_step_size = 2 / (2 + (double) i);
 
-        if (denom == 0 || num == 0) {
-            // This means that the conditional gradient is the same
-            // than the current step and we have converged.
-            optimal_step_size = 0;
-            // Compute the gradient at the new estimates.
-            grad_y += 2 * optimal_step_size * psisx;
-            //energy = compute_LR_QP_value(Q, diag_dom);
-            //alt_energy = dotProduct(Q, unary, temp_dot) + 0.5*dotProduct(Q, grad - unary, temp_dot);
-            energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
-            break;
-        }
-
-        if (optimal_step_size > 1) {
-            // Respect the bounds.
-            optimal_step_size = 0;
-        }
-        if (optimal_step_size < 0) {
-            // Stay between the current step and the optimal.
-            // Theoretically shouldn't happen but we accumulate
-            // floating point errors when we compute the polynomial
-            // coefficients.
-            optimal_step_size = 1;
-        }
+        std::cout << "Step size: " << optimal_step_size << "\r\n";
 
         // Take a step
-        Q += optimal_step_size * sx;
+        Q += optimal_step_size * sx_y;
+        z_labels += optimal_step_size * sx_z;
+
         if (not valid_probability(Q)) {
             std::cout << "Bad proba" << '\n';
         }
 
         // Compute the gradient at the new estimates.
-        grad_y += 2 * optimal_step_size * psisx;
-        //compute the enrgys
-        energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
-        
-    } 
+        //this computes the  gradient function phi + 2 * psi * y
+        grad_y = unary;
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, cond_grad_y);
+            grad_y += 2 *tmp;
+        }
 
+        grad_y -= K * (MatrixXi::Ones(M_,N_).cast<float>() - z_labels);
+        MatrixXf temp = super_pixel_classifier_.cast<float>() * (MatrixXi::Ones(M_,N_).cast<float>() - Q).transpose();
+        MatrixXf temp1(M_,N_);
+        temp1.fill(temp.sum());
+        grad_z = MatrixXi::Ones(M_,N_).cast<float>();// - temp1;
+
+
+        //compute the energy
+        energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot); 
+        energy += K * (z_labels + (MatrixXf::Ones(M_,N_) - z_labels) * temp.sum()).sum() / N_ ;
+        
+    } while( (old_energy - energy) > 0.0001);
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
 
     return Q;
