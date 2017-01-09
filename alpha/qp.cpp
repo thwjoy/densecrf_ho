@@ -15,7 +15,7 @@ void descent_direction(MatrixXf & out, const MatrixXf & grad){
 }
 
 
-void compute_hyper_params(const MatrixXf & Q, MatrixXi & params,const MatrixXi & super_pix_classifier) {
+void compute_hyper_params(const MatrixXf & Q, MatrixXf & params,const MatrixXf & super_pix_classifier) {
     int regions = super_pix_classifier.rows();
     int pixles = super_pix_classifier.cols();
     int lables = Q.rows();

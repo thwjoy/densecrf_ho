@@ -43,14 +43,14 @@ void normalize(MatrixXf & out, const MatrixXf & in);
 /**** DenseCRF ****/
 class DenseCRF{
 protected:
-	// Number of variables and labels
+	// Number of variables, labels and super pixel terms
 	int N_, M_, R_;
 
 	// Store the unary term
 	UnaryEnergy * unary_;
 
 	//store the super pixel term
-	Matrix<int, Dynamic, Dynamic> super_pixel_classifier_;
+	Matrix<float, Dynamic, Dynamic> super_pixel_classifier_;
 
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
