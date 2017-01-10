@@ -748,17 +748,16 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
      *
      */
     MatrixXf Q(M_, N_), unary(M_, N_),  tmp(M_,N_), grad_y(M_, N_), 
-        cond_grad_y(M_,N_), grad_z(M_, 1), cond_grad_z(M_, 1),sx_z(M_,1), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,1);
+        cond_grad_y(M_,N_), grad_z(M_, R_), cond_grad_z(M_, R_),sx_z(M_,R_), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,R_);
     MatrixP temp_dot(M_,N_);
  
     int K = 1;
     grad_z.fill(0);
     cond_grad_z.fill(0);
-    sx_z = cond_grad_z - z_labels;
+    z_labels.fill(0); //indicates that in all super pixels there are pixels that do not take the same label
 
     double optimal_step_size = 0;
-    
-    compute_hyper_params(Q,z_labels,super_pixel_classifier_);
+
    
     unary.fill(0);
     if(unary_){
@@ -777,25 +776,11 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
         pairwise_[k]->apply( tmp, Q);
         grad_y += 2 *tmp;
     }
+    grad_y -= K * MatrixXf::Ones(M_,super_pixel_classifier_.rows()) * super_pixel_classifier_;
 
-    for (int i = 0; i < M_; i++) {
-            grad_y.row(i) -=  sx_z(i,0) * MatrixXf::Ones(1,N_);
-    }
+   //initialise the gradient of z
+    grad_z = MatrixXf::Ones(M_,R_) + ((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_.transpose());
 
-    //initilise the gradient for z
-    MatrixXf temp = (MatrixXf::Ones(M_,N_) - cond_grad_y);
-        grad_z.fill(0);
-        double p = 0, n = 0;
-        for(int j = 0; j < M_; j++) {
-            for (int i = 0; i < super_pixel_classifier_.rows(); i++ ) {    
-                p += temp.row(j).dot(super_pixel_classifier_.row(i));              
-            }
-            grad_z(j,0) = p;
-            n = (n < p) ? p : n;          
-            p = 0;
-    }        
-    grad_z = (1 / n) * grad_z;         
-    grad_z = MatrixXf::Ones(M_,1)- grad_z;
 
     int i = 0;
     do {
@@ -805,9 +790,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
         //solve the conditional gradient for y 
         descent_direction(cond_grad_y, grad_y);
         //the conditional gradient of z is a vector of 0's
-        for (int i = 0; i < M_; i++) {
-            cond_grad_z(i,0) = (grad_z(i,0) > 0) ? 1 : 0;
-        }
+        descent_direction(cond_grad_z, grad_z);
   
         //sx  = (s - y) difference between conditional and actual
         //psisx = psi * (s - y)
@@ -827,10 +810,10 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
          *
          * argmin_a f(y + a(c_y - y),z + a(c_z - z))
          *
-         * argmin_a [phi' * (y + a(c_y - y)) + (y + a(c_y - y))' * psi * (y + a(c_y - y)) + K{(z + a(c_z - z))) + (1 - z + a(c_z - z))) * 1 * theta * (1 - (y + a(c_y - y)))}]
+         * argmin_a [phi' * (y + a(c_y - y)) + (y + a(c_y - y))' * psi * (y + a(c_y - y)) + K{(z + a(c_z - z))) + (1 - (z + a(c_z - z))) * theta * (1 - (y + a(c_y - y)))}]
          *
-         * argmin_a     a*a[(c_y - y)' * psi * (c_y - y) + K{(c_z - z) * 1 * theta * (c_y - y)}] 
-         * + a[phi' * (c_y - y) + 2y' * psi * (c_y - y) * K{(c_z - z) - (c_z - z) * 1_t * theta * 1_y - 1_z * 1_y * theta * (c_y - y)}]
+         * argmin_a     a*a[(c_y - y)' * psi * (c_y - y) + K{(c_z - z) * theta * (c_y - y)}] 
+         * + a[phi' * (c_y - y) + 2y' * psi * (c_y - y) * K{(c_z - z) - (c_z - z) * theta * 1_y - 1_z * 1_y * theta * (c_y - y)}]
          * + [phi' * y + y' * psi * y + K{z + 1_z * 1_t * theta * 1_y}]
          *
          *  This is effectively a quadratic equation with a being the varaible, the minimum of lx^2 + mx + n is givend by x = 0.5 * m / l
@@ -851,14 +834,14 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
                 theta_sx_y += sx_z(j,0) * super_pixel_classifier_.row(i).dot(temp1.row(j).transpose());
             }
         }
-
-        double num =  2 * dotProduct(Q, psisx, temp_dot) + dotProduct(unary, sx_y, temp_dot) - K * sx_y.sum();
+    
+        double num =  2 * dotProduct(Q, psisx, temp_dot);
         // Num should be negative, otherwise our choice of s was necessarily wrong.
-        double denom = dotProduct(sx_y, psisx, temp_dot) + K * theta_sx_y;
+        double denom = dotProduct(sx_y, psisx, temp_dot);
         // Denom should be negative, as our energy function is now concave.
         
-        optimal_step_size = - num / (2 * denom);
-        //optimal_step_size = 2 / (2 + (double) i);
+        //optimal_step_size = - num / (2 * denom);
+        optimal_step_size = 0.5;
            
         if (denom == 0 || num == 0) {
             // This means that the conditional gradient is the same
@@ -869,44 +852,29 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
         if (optimal_step_size > 1) { break;}
         if (optimal_step_size < 0) { optimal_step_size = 1;}
 
-        //std::cout << "Step size: " << optimal_step_size << "\r\n";
-    
+        
+        // we have to do this before we take a step as it means we only compute the expensive psi * y term once.   
+        grad_y -= K * (z_labels - MatrixXf::Ones(M_,R_)) * super_pixel_classifier_;
         // Take a step
         Q += optimal_step_size * sx_y;
         z_labels += optimal_step_size * sx_z;
 
+        if (not valid_probability(Q)) {std::cout << "Bad proba" << '\n';}
 
-        if (not valid_probability(Q)) {
-            std::cout << "Bad proba" << '\n';
-        }
+
 
         //compute the gradient updates
         grad_y += 0.5 * optimal_step_size * psisx;
-        for (int i = 0; i < M_; i++) {
-            grad_y.row(i) -=  K * ((1 - z_labels(i,0)) * MatrixXf::Ones(1,N_));
-        }
+        grad_y += K * (z_labels - MatrixXf::Ones(M_,R_)) * super_pixel_classifier_;
 
-
-        //This is not behaving well!
-        MatrixXf temp2 = (MatrixXf::Ones(M_,N_) - cond_grad_y);
-        grad_z.fill(0);
-        double p = 0, n = 0;
-        for(int j = 0; j < M_; j++) {
-            for (int i = 0; i < super_pixel_classifier_.rows(); i++ ) {    
-                p += temp2.row(j).dot(super_pixel_classifier_.row(i));              
-            }
-            grad_z(j,0) = p;
-            n = (n < p) ? p : n;          
-            p = 0;
-        }        
-        grad_z = (1 / n) * grad_z;  //       
-        grad_z = MatrixXf::Ones(M_,1) - grad_z;
+        grad_z = MatrixXf::Ones(M_,R_) + ((Q - MatrixXf::Ones(M_, N_)) * super_pixel_classifier_.transpose());
+    
         
        //compute the energy
         energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot); 
-        energy += K * (z_labels + (MatrixXf::Ones(M_,1) - z_labels) * temp.sum()).sum() / N_ ;
+        energy += K * z_labels.sum() + dotProduct((MatrixXf::Ones(M_,R_) - z_labels),((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_.transpose()),temp_dot);
         
-    } while((old_energy - energy) > 10 && i < 50);
+    } while((old_energy - energy) > 1 && i < 50);
     
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
     return Q;

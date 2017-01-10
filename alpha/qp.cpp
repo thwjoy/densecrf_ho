@@ -28,11 +28,9 @@ void compute_hyper_params(const MatrixXf & Q, MatrixXf & params,const MatrixXf &
             for (int pix = 0; pix < pixles; pix++) {           
                 sum += ((super_pix_classifier(i, pix)) * (1 - Q(lab,pix))); //we want to do this for all labels
             }
-            //std::cout << sum << "\r\n";
             prod = prod * sum;
         }
         params.row(lab).fill((prod == 0) ? 1 : 0);
-        //std::cout << "prod" << prod << "Param: " << params(lab,0) << "\r\n" ;
     }
 }
 
