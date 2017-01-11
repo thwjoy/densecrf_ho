@@ -14,6 +14,16 @@ void descent_direction(MatrixXf & out, const MatrixXf & grad){
     }
 }
 
+void descent_direction_z(MatrixXf & out, const MatrixXf & grad){
+    out.resize(grad.rows(), grad.cols());
+    out.fill(0);
+    for (int row = 0; row < grad.rows(); row++) {
+        for (int col = 0; col < grad.cols(); col++) {
+            out(row,col) = (grad(row,col) < 0) ? 1 : 0;
+        }
+    }
+}
+
 
 void compute_hyper_params(const MatrixXf & Q, MatrixXf & params,const MatrixXf & super_pix_classifier) {
     int regions = super_pix_classifier.rows();
