@@ -19,7 +19,7 @@ void descent_direction_z(MatrixXf & out, const MatrixXf & grad){
     out.fill(0);
     for (int row = 0; row < grad.rows(); row++) {
         for (int col = 0; col < grad.cols(); col++) {
-            out(row,col) = (grad(row,col) < 0) ? 1 : 0;
+            out(row,col) = (grad(row,col) >= 0) ? 0 : 1;
         }
     }
 }

@@ -103,6 +103,7 @@ public:
 	//The following two definitions are for Tom Joys 4YP which computes the QP with a non convex function and with super pixel terms
 	MatrixXf qp_inference_non_convex(const MatrixXf & init) const;
 	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init) const;
+	std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init) const;
 	//===============================================================
 
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
@@ -172,6 +173,7 @@ public: /* Parameters */
 	void setLabelCompatibilityParameters( const VectorXf & v );
 	VectorXf kernelParameters() const;
 	void setKernelParameters( const VectorXf & v );
+
 };
 
 class DenseCRF2D:public DenseCRF{
