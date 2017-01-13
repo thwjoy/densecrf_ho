@@ -680,7 +680,7 @@ MatrixXf DenseCRF::qp_inference_non_convex(const MatrixXf & init) const {
     
     int i = 0;
     energy = compute_LR_QP_value(Q, MatrixXf::Zero(M_,N_)); //normally takes the diagonally dominant component which in this case does not exist
-    while( (old_energy - energy) > 1){
+    do {
         old_energy = energy;
         i++;
 
@@ -743,7 +743,7 @@ MatrixXf DenseCRF::qp_inference_non_convex(const MatrixXf & init) const {
         //alt_energy = dotProduct(Q, unary, temp_dot) + 0.5*dotProduct(Q, grad - unary, temp_dot);
         energy = 0.5 * dotProduct(Q, grad + unary, temp_dot);
         
-    }
+    } while( (old_energy - energy) > 1);
 
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
 
@@ -765,6 +765,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
      *
      *
      */
+
     MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_),  tmp(M_,N_), grad_y(M_, N_), 
         cond_grad_y(M_,N_), grad_z(M_, R_), cond_grad_z(M_, R_),sx_z(M_,R_), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,R_);
     MatrixP temp_dot(M_,N_);
@@ -805,6 +806,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
     energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
     energy += K * (z_labels.sum() + dotProduct((MatrixXf::Ones(M_,R_) - z_labels),((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_.transpose()),temp_dot));
     while( (old_energy - energy) > 1 and i < 50){
+
         old_energy = energy;
         i++;
 
@@ -860,7 +862,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
         energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
         energy += K * (z_labels.sum() + dotProduct((MatrixXf::Ones(M_,R_) - z_labels),((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_.transpose()),temp_dot));
      
-    }
+    } while( (old_energy - energy) > 1 and i < 50);
 
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
 
@@ -881,8 +883,8 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference_super_pixels_non_convex
      *
      * We can the compute the optimal step size over y and z     
      *
-     *
      */
+     
     MatrixXf Q(M_, N_), unary(M_, N_),  tmp(M_,N_), grad_y(M_, N_), 
         cond_grad_y(M_,N_), grad_z(M_, R_), cond_grad_z(M_, R_),sx_z(M_,R_), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,R_);
     MatrixP temp_dot(M_,N_);
@@ -983,6 +985,7 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference_super_pixels_non_convex
          *
          * #################################################################################
          */
+         
 
         double a = K * dotProduct(sx_z,((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_.transpose()),temp_dot);
         double b = K * dotProduct((cond_grad_z - MatrixXf::Ones(M_,R_)) * super_pixel_classifier_,sx_y,temp_dot);
@@ -1041,8 +1044,9 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference_super_pixels_non_convex
     init = Q;
     std::cout << perfs;
     return perfs;
+    
 }
-
+/*
 MatrixXf DenseCRF::qp_inference_super_pixels(const MatrixXf & init) const {
     /*Here we compute the Frank Wolfe, to find the optimum of the cost function contatining super pixels
      * The cost function is: phi'.y + y'.psi.y + K[z + (1 - z){1'.theta.(1 - y)}]
@@ -1057,10 +1061,11 @@ MatrixXf DenseCRF::qp_inference_super_pixels(const MatrixXf & init) const {
      * We can the compute the optimal step size over y and z     
      *
      *
-     */
-    MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_),  tmp(M_,N_), grad_y(M_, N_), 
-        cond_grad_y(M_,N_), grad_z(M_, R_), cond_grad_z(M_, R_),sx_z(M_,R_), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,R_);
+   
+    MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_),  tmp(M_,N_),  psisx(M_, N_);
+    MatrixXd grad_y(M_, N_), cond_grad_y(M_,N_), grad_z(M_, R_), cond_grad_z(M_, R_),sx_z(M_,R_), sx_y(M_,N_),z_labels(M_,R_);
     MatrixP temp_dot(M_,N_);
+
 
     double K = CONSTANT;
     std::cout << "K:" << K << std::endl;
@@ -1163,13 +1168,15 @@ MatrixXf DenseCRF::qp_inference_super_pixels(const MatrixXf & init) const {
         energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
         energy += K * (z_labels.sum() + dotProduct((MatrixXf::Ones(M_,R_) - z_labels),((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_.transpose()),temp_dot));
      
+
     }
+
 
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
 
     return Q;
 }
-
+*/
 
 
 void kkt_solver(const VectorXf & lin_part, const MatrixXf & inv_KKT, VectorXf & out){
