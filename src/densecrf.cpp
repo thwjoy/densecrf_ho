@@ -769,7 +769,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
     MatrixP temp_dot(M_,N_);
 
 
-    double K = 10000;
+    double K = 296;
     std::cout << "K:" << K << std::endl;
     grad_z.fill(0);
     cond_grad_z.fill(0);
