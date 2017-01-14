@@ -46,6 +46,9 @@ protected:
 	// Number of variables, labels and super pixel terms
 	int N_, M_, R_;
 
+	std::vector<double> mean_of_superpixels_;
+	std::vector<double> sd_of_superpixels_; 
+
 	// Store the unary term
 	UnaryEnergy * unary_;
 
