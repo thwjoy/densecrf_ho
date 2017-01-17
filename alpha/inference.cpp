@@ -192,13 +192,13 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     std::cout << "---Running mean-shift and adding super pixel term" <<std::endl;
-    crf.addSuperPixel(img,4,2,500);
+    crf.addSuperPixel(img,4,2,5000);
     MatrixXf init = crf.unary_init();
     //run the inference with the convex problem
     std::cout << "---Finding global optimum, of convex energy function" <<std::endl;
     clock_t start, end;
     start = clock();
-    MatrixXf Q = crf.qp_inference(init);
+    const MatrixXf Q = crf.qp_inference(init);
     end = clock();
     double timing = (double(end-start)/CLOCKS_PER_SEC);
     double final_energy = crf.compute_energy(Q);
@@ -224,7 +224,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q_non_convex, size, path_to_output, dataset_name);
-
+/*
     //we now need to run the code with a non_convex energy function including the super pixels
     std::cout << "---Finding local optimum with super pixel" <<std::endl;
     path_to_output.replace(path_to_output.end()-7, path_to_output.end(),"_sp.bmp");
@@ -232,7 +232,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     start_sp = clock();
     //MatrixXf Q_non_convex_sp = Q;
     //(void) crf.tracing_qp_inference_super_pixels_non_convex(Q_non_convex_sp);
-    MatrixXf Q_sp = crf.qp_inference_super_pixels(init);
+    MatrixXf Q_sp = crf.qp_inference_super_pixels(Q);
     end_sp = clock();
     double timing_sp = (double(end_sp-start_sp)/CLOCKS_PER_SEC);
     double final_energy_sp = crf.compute_energy(Q_sp);
@@ -241,7 +241,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q_sp, size, path_to_output, dataset_name);
-
+*/
     //we now need to run the code with a non_convex energy function including the super pixels
     std::cout << "---Finding local optimum, of non-convex energy function with super pixel" <<std::endl;
     path_to_output.replace(path_to_output.end()-7, path_to_output.end(),"_nc_sp.bmp");
@@ -258,6 +258,23 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q_non_convex_sp, size, path_to_output, dataset_name);
+
+    //we now need to run the code with a non_convex energy function including the super pixels starting at the initial value
+    std::cout << "---Finding local optimum, of non-convex energy function with super pixel from initial values" <<std::endl;
+    path_to_output.replace(path_to_output.end()-10, path_to_output.end(),"_g_nc_sp.bmp");
+    clock_t start_g_nc_sp, end_g_nc_sp;
+    start_g_nc_sp = clock();
+    //MatrixXf Q_non_convex_sp = Q;
+    //(void) crf.tracing_qp_inference_super_pixels_non_convex(Q_non_convex_sp);
+    MatrixXf Q_g_non_convex_sp = crf.qp_inference_super_pixels_non_convex(init);
+    end_g_nc_sp = clock();
+    double timing_g_non_convex_sp = (double(end_g_nc_sp-start_g_nc_sp)/CLOCKS_PER_SEC);
+    double final_energy_g_non_convex_sp = crf.compute_energy(Q_g_non_convex_sp);
+    double discretized_energy_g_non_convex_sp = crf.assignment_energy(crf.currentMap(Q_g_non_convex_sp));
+    write_down_perf(timing_g_non_convex_sp, final_energy_g_non_convex_sp, discretized_energy_g_non_convex_sp, path_to_output);
+    // Perform the MAP estimation on the fully factorized distribution
+    // and write the results to an image file with a dumb color code
+    save_map(Q_g_non_convex_sp, size, path_to_output, dataset_name);
 
     delete[] img;
 }

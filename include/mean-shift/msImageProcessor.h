@@ -38,6 +38,7 @@ Implemented by Chris M. Christoudias, Bogdan Georgescu
 
 //include mean shift library
 #include	"ms.h"
+#include <vector>
 
 //include prototypes of additional strucuters
 //used for image segmentation...
@@ -619,7 +620,7 @@ public:
   //<--------------------------------------------------->|//
   //--\\||//--\\||//--\\||//--\\||//--\\||//--\\||//--\\||//
 
-  int GetRegions(int** &, float** &, int** &);
+  int GetRegions(std::vector<int> &);
 
 
   void SetSpeedThreshold(float);

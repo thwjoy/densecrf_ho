@@ -43,6 +43,7 @@ Implemented by Chris M. Christoudias, Bogdan Georgescu
 #include	<string.h>
 #include	<stdlib.h>
 #include	<iostream>
+#include	<vector>;
 
 /*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
 /*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
@@ -1118,30 +1119,18 @@ RegionList *msImageProcessor::GetBoundaries( void )
 /*      - -1 is returned for regionCount.              */
 /*******************************************************/
 
-int msImageProcessor::GetRegions(int ** &labels_out, float ** &modes_out, int ** &MPC_out)
+int msImageProcessor::GetRegions(std::vector<int> &labels_out)
 {
 	//check to see if output has been defined for the given input image...
 	if(class_state.OUTPUT_DEFINED == false)
 		return -1;
 
-
-	int * labels_ = new int[L];
-	float * modes_ = new float[regionCount*N];
-	int * MPC_ = new int[regionCount];
+	labels_out.resize(L);
 
 	int	i;
 	for(i = 0; i < L; i++) {
-		labels_[i] = labels[i];
+		labels_out[i] = labels[i];
 	}
-	//populate modes_out and MPC_out with the color and point
-	//count of each region
-	for(i = 0; i < regionCount*N; i++)
-		modes_[i]	= modes[i];
-	for(i = 0; i < regionCount; i++)
-		MPC_[i]	= modePointCounts[i];
-
-	labels_out = &labels_;
-
 
 	//done. Return the number of regions resulting from filtering or segmentation.
 	return regionCount;
