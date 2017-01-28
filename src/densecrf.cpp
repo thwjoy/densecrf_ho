@@ -27,6 +27,7 @@
 */
 #include "densecrf.h"
 #include "eigen_utils.hpp"
+#include "Eigen/src/Core/util/Constants.h"
 #include "newton_cccp.hpp"
 #include "qp.hpp"
 #include "permutohedral.h"
@@ -47,7 +48,7 @@
 /////////////////////////////
 /////  Alloc / Dealloc  /////
 /////////////////////////////
-DenseCRF::DenseCRF(int N, int M) : N_(N), M_(M), unary_(0) {
+DenseCRF::DenseCRF(int N, int M) : N_(N), M_(M), unary_(0), R_(0) {
 }
 DenseCRF::~DenseCRF() {
     if (unary_)
@@ -96,6 +97,10 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     unsigned char * segment_image = new unsigned char[W_ * H_ * 3];
     std::vector<int> regions_out;
     std::vector<double> count_regions;
+    std::vector<double> mean_of_superpixels;
+    std::vector<double> sd_of_superpixels; 
+    Matrix<float, Dynamic, Dynamic> super_pixel_classifier;
+
     int region;
 
     //get the mean shift info
@@ -103,46 +108,55 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     m_process.DefineImage(img , COLOR , H_ , W_);
     m_process.Segment(spatial_radius,range_radius,min_region_count,NO_SPEEDUP);
     m_process.GetResults(segment_image);
-    R_ = m_process.GetRegions(regions_out);
+    int reg = m_process.GetRegions(regions_out);
 
-    count_regions.resize(R_);
+    count_regions.resize(reg);
     for (double & it : count_regions) it = 0;
-    mean_of_superpixels_.resize(R_);
-    sd_of_superpixels_.resize(R_);
-    for (auto & it : mean_of_superpixels_) it = 0;
-    for (auto & it : sd_of_superpixels_) it = 0;
-    super_pixel_classifier_.resize(R_,W_ * H_);
-    super_pixel_classifier_.fill(0);
-    for (int i = 0; i < super_pixel_classifier_.cols(); i++) {
+    mean_of_superpixels.resize(reg);
+    sd_of_superpixels.resize(reg);
+    for (auto & it : mean_of_superpixels) it = 0;
+    for (auto & it : sd_of_superpixels) it = 0;
+    super_pixel_classifier.resize(reg,W_ * H_);
+    super_pixel_classifier.fill(0);
+    for (int i = 0; i < super_pixel_classifier.cols(); i++) {
         region = regions_out[i];
-        super_pixel_classifier_(region,i) = 1;
-        mean_of_superpixels_[region] += 0.2989 * (double) img[i];
-        mean_of_superpixels_[region] += 0.5870 * (double) img[i + 1];
-        mean_of_superpixels_[region] += 0.1140 * (double) img[i + 2];
+        super_pixel_classifier(region,i) = 1;
+        mean_of_superpixels[region] += 0.2989 * (double) img[i];
+        mean_of_superpixels[region] += 0.5870 * (double) img[i + 1];
+        mean_of_superpixels[region] += 0.1140 * (double) img[i + 2];
         count_regions[region] += 1;
     }
 
     int count = 0;
-    std::for_each(mean_of_superpixels_.begin(), mean_of_superpixels_.end(), [&count,&count_regions](double & it){
+    std::for_each(mean_of_superpixels.begin(), mean_of_superpixels.end(), [&count,&count_regions](double & it){
         it = it / count_regions[count];
         count++;
     });
 
-    for (int i = 0; i < super_pixel_classifier_.cols(); i++) {
+    for (int i = 0; i < super_pixel_classifier.cols(); i++) {
         region = regions_out[i];
         double grey_val = 0.2989 * (double) img[i] + 0.5870 * (double) img[i + 1] + 0.1140 * (double) img[i + 2];
-        //std::cout << *regions << std::endl;
-        sd_of_superpixels_[region] += (mean_of_superpixels_[region] - grey_val) * (mean_of_superpixels_[region] - grey_val);
+        sd_of_superpixels[region] += (mean_of_superpixels[region] - grey_val) * (mean_of_superpixels[region] - grey_val);
     }
 
-    std::for_each(mean_of_superpixels_.begin(), mean_of_superpixels_.end(), [](double & it){
-        it = sqrt(it);
+    count = 0;
+    std::for_each(sd_of_superpixels.begin(), sd_of_superpixels.end(), [&count,&count_regions](double & it){
+        it = sqrt(it / count_regions[count]);
+        count++;
     });
+
+    //update the private member functions
+    mean_of_superpixels_.insert(mean_of_superpixels_.end(), mean_of_superpixels.begin(), mean_of_superpixels.end());
+    sd_of_superpixels_.insert(sd_of_superpixels_.end(),sd_of_superpixels.begin(),sd_of_superpixels.end());
+    R_ += reg;
+    super_pixel_classifier_.conservativeResize(R_,W_ * H_);
+    super_pixel_classifier_.block(R_ - reg, 0, reg,W_ * H_) << super_pixel_classifier;
 
     writePPMImage("./output.ppm",segment_image, H_, W_, 3, "");
     delete[] segment_image;
     return;
 }
+
 
 //////////////////////////////
 /////  Unary Potentials  /////
@@ -792,7 +806,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
      *      c = argmin(g_y'.y,g_z'.z)
      *
      * We can the compute the optimal step size over y and z     
-     *
+     * TODO use K which includes a vector of the variance
      */
      
 

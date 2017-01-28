@@ -193,6 +193,8 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     std::cout << "---Running mean-shift and adding super pixel term" <<std::endl;
     crf.addSuperPixel(img,4,2,5000);
+    crf.addSuperPixel(img,4,2,500);
+    crf.addSuperPixel(img,4,2,50);
     MatrixXf init = crf.unary_init();
     //run the inference with the convex problem
     std::cout << "---Finding global optimum, of convex energy function" <<std::endl;
@@ -222,6 +224,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     double discretized_energy_non_convex = crf.assignment_energy(crf.currentMap(Q_non_convex));
     write_down_perf(timing_non_convex, final_energy_non_convex, discretized_energy_non_convex, path_to_output);
     // Perform the MAP estimation on the fully factorized distribution
+
     // and write the results to an image file with a dumb color code
     save_map(Q_non_convex, size, path_to_output, dataset_name);
 /*

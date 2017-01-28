@@ -1,0 +1,15 @@
+Job launching after 0.07 seconds in submission.
+Running python job.
+Changed into dir /home/tomj/Documents/4YP/densecrf/CV/Allparameters-QP
+Importing exp-lrqp.py
+Traceback (most recent call last):
+  File "/home/tomj/Documents/4YP/Spearmint/spearmint/launcher.py", line 243, in launch
+    result = python_launcher(job)
+  File "/home/tomj/Documents/4YP/Spearmint/spearmint/launcher.py", line 325, in python_launcher
+    module  = __import__(main_file)
+  File "/home/tomj/Documents/4YP/densecrf/CV/Allparameters-QP/exp-lrqp.py", line 2, in <module>
+    import matlab.engine
+ImportError: No module named matlab.engine
+Problem executing the function
+Job failed in 0.00 seconds.
+(<type 'exceptions.ImportError'>, ImportError('No module named matlab.engine',), <traceback object at 0x7f10979eb7e8>)

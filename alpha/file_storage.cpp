@@ -80,9 +80,9 @@ std::string Dataset::get_ground_truth_path(const std::string & image_name){
     return gt_path;
 }
 
-std::vector<std::string> Dataset::get_all_split_files(const std::string & split)
-{
-    std::string path_to_split = path_to_root + "split/" + split+ ".txt";
+std::vector<std::string> Dataset::get_all_split_files(const std::string & split) {
+
+    std::string path_to_split = "data/PascalVOC2010/split/" + split+ ".txt";
 
     std::vector<std::string> split_images;
     std::string next_img_name;
@@ -99,19 +99,19 @@ std::vector<std::string> Dataset::get_all_split_files(const std::string & split)
 
 Dataset get_dataset_by_name(const std::string & dataset_name){
     if (dataset_name == "MSRC") {
-        return Dataset("/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
-                       "/data/MSRC/texton_unaries/",
-                       "/data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
-                       "/data/MSRC/",
+        return Dataset("data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
+                       "data/MSRC/texton_unaries/",
+                       "data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
+                       "data/MSRC/",
                        ".bmp",
                        "_GT.bmp",
                        "MSRC");
     }
     else if (dataset_name == "Pascal2010") {
-        return Dataset("/data/PascalVOC2010/JPEGImages/",
-                       "/data/PascalVOC2010/logit_unaries/",
-                       "/data/PascalVOC2010/SegmentationClass/",
-                       "/data/PascalVOC2010/",
+        return Dataset("data/PascalVOC2010/JPEGImages/",
+                       "data/PascalVOC2010/logit_unaries/",
+                       "data/PascalVOC2010/SegmentationClass/",
+                       "data/PascalVOC2010/",
                        ".jpg",
                        ".png",
                        "Pascal2010");

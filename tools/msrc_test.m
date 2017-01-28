@@ -1,50 +1,53 @@
-function score = voc_test(path, dataset_split)
-addpath('/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/VOCdevkit/VOCcode');
+function [score, overall_acc] = msrc_test(path, dataset_split)
 
-VOCinit;
+dpath = '/home/tomj/Documents/4YP/densecrf/data';
 
-
-
-VOCopts.datadir = '/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010';
+datadir = [dpath '/MSRC'];
 testset = dataset_split;
 
-
-gtimgpath= '/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/SegmentationClass/%s.png';
-imgsetpath= '/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/split/%s.txt';
+gtimgpath= [datadir '/MSRC_ObjCategImageDatabase_v2/GroundTruth/%s_GT.bmp'];
 respath_tmpl=[path '/%s.png'];
 
-path_to_test_set = ['/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/split/' dataset_split '.txt'];
+path_to_test_set = [datadir '/split/' dataset_split '.txt'];
 [gtids,t]=textread(path_to_test_set,'%s %d');
 
-num = 21; % Number of classes
+num = 22; % Number of classes
 
 confcounts = zeros(num);
 count=0;
 
+cmap = MSRClabelcolormap(num);
+
 for i=1:length(gtids)
     imname = gtids{i};
-
+    toks = strsplit(imname, '.');
+    imname = toks{1};
+     try
     % ground truth label file
+
     gtfile = sprintf(gtimgpath,imname);
+%     break;
+
     [gtim,map] = imread(gtfile);
+    gtim = rgb2ind(gtim, cmap);
     gtim = double(gtim);
 
     % results file
     resfile = sprintf(respath_tmpl, imname);
     [resim,map] = imread(resfile);
-    %% Added Code
-    cmap = VOClabelcolormap(num);
+    %% Added Code    
     resim = rgb2ind(resim, cmap);
     resim = double(resim);
 
     % Check validity of results image
     maxlabel = max(resim(:));
-    if (maxlabel>VOCopts.nclasses),
+    if (maxlabel>22),
         error(['Results image ''%s'' has out of range value %d (the ' ...
                'value should be <= %d)'],imname,maxlabel,num-1);
     end
 
-    szgtim = size(gtim); szresim = size(resim);
+    szgtim = size(gtim);
+    szresim = size(resim);
     if any(szgtim~=szresim)
         error('Results image ''%s'' is the wrong size, was %d x %d, should be %d x %d.',imname,szresim(1),szresim(2),szgtim(1),szgtim(2));
     end
@@ -57,6 +60,9 @@ for i=1:length(gtids)
     hs = histc(sumim(locs),1:num*num);
     count = count + numel(find(locs));
     confcounts(:) = confcounts(:) + hs(:);
+
+     catch
+     end
 end
 
 % confusion matrix - first index is true label, second is inferred label
@@ -80,11 +86,41 @@ for j=1:num
    accuracies(j)=100*gtjresj/(gtj+resj-gtjresj);
 
    clname = 'background';
-   if (j>1), clname = VOCopts.classes{j-1};end;
+   if (j>1), clname = int2str(j-1);end;
    fprintf('  %14s: %6.3f%%\n',clname,accuracies(j));
 end
 accuracies = accuracies(1:end);
 avacc = mean(accuracies);
 
 score = avacc;
+end
+
+function cmap = MSRClabelcolormap(N)
+    assert(N == 22);
+    
+    cmap = zeros(21,3);
+    cmap(1,:) = [128,0,0];
+    cmap(2,:) = [0,128,0];
+    cmap(3,:) = [128,128,0];
+    cmap(4,:) = [0,0,128];
+    cmap(5,:) = [0,128,128];
+    cmap(6,:) = [128,128,128];
+    cmap(7,:) = [192,0,0];
+    cmap(8,:) = [64,128,0];
+    cmap(9,:) = [192,128,0];
+    cmap(10,:) = [64,0,128];
+    cmap(11,:) = [192,0,128];
+    cmap(12,:) = [64,128,128];
+    cmap(13,:) = [192,128,128];
+    cmap(14,:) = [0,64,0];
+    cmap(15,:) = [128,64,0];
+    cmap(16,:) = [0,192,0];
+    cmap(17,:) = [128,64,128];
+    cmap(18,:) = [0,192,128];
+    cmap(19,:) = [128,192,128];
+    cmap(20,:) = [64,64,0];
+    cmap(21,:) = [192,64,0];
+    cmap(22,:) = [0,0,0];
+    
+    cmap = cmap / 255;
 end
