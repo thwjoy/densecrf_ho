@@ -27,6 +27,8 @@
 */
 #include "densecrf.h"
 #include "eigen_utils.hpp"
+#include "Eigen/LU"
+#include "Eigen/Core"
 #include "Eigen/src/Core/util/Constants.h"
 #include "newton_cccp.hpp"
 #include "qp.hpp"
@@ -96,9 +98,9 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     //addSuperPixel is a member function that applies the mean-shift algorithm to the image and then initialises the protected member varaiable super_pixel_classifer.
     unsigned char * segment_image = new unsigned char[W_ * H_ * 3];
     std::vector<int> regions_out;
-    std::vector<double> count_regions;
-    std::vector<double> mean_of_superpixels;
-    std::vector<double> sd_of_superpixels; 
+    VectorXd count_regions; 
+    VectorXd mean_of_superpixels;
+    VectorXd sd_of_superpixels; 
     Matrix<float, Dynamic, Dynamic> super_pixel_classifier;
 
     int region;
@@ -111,44 +113,40 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     int reg = m_process.GetRegions(regions_out);
 
     count_regions.resize(reg);
-    for (double & it : count_regions) it = 0;
     mean_of_superpixels.resize(reg);
     sd_of_superpixels.resize(reg);
-    for (auto & it : mean_of_superpixels) it = 0;
-    for (auto & it : sd_of_superpixels) it = 0;
+    count_regions.fill(0);
+    mean_of_superpixels.fill(0);
+    sd_of_superpixels.fill(0);
     super_pixel_classifier.resize(reg,W_ * H_);
     super_pixel_classifier.fill(0);
     for (int i = 0; i < super_pixel_classifier.cols(); i++) {
         region = regions_out[i];
         super_pixel_classifier(region,i) = 1;
-        mean_of_superpixels[region] += 0.2989 * (double) img[i];
-        mean_of_superpixels[region] += 0.5870 * (double) img[i + 1];
-        mean_of_superpixels[region] += 0.1140 * (double) img[i + 2];
-        count_regions[region] += 1;
+        mean_of_superpixels(region) += 0.2989 * (double) img[i];
+        mean_of_superpixels(region) += 0.5870 * (double) img[i + 1];
+        mean_of_superpixels(region) += 0.1140 * (double) img[i + 2];
+        count_regions(region) += 1;
     }
 
-    int count = 0;
-    std::for_each(mean_of_superpixels.begin(), mean_of_superpixels.end(), [&count,&count_regions](double & it){
-        it = it / count_regions[count];
-        count++;
-    });
+
+    mean_of_superpixels = mean_of_superpixels.cwiseQuotient(count_regions);
+    
 
     for (int i = 0; i < super_pixel_classifier.cols(); i++) {
         region = regions_out[i];
         double grey_val = 0.2989 * (double) img[i] + 0.5870 * (double) img[i + 1] + 0.1140 * (double) img[i + 2];
-        sd_of_superpixels[region] += (mean_of_superpixels[region] - grey_val) * (mean_of_superpixels[region] - grey_val);
+        sd_of_superpixels(region) += (mean_of_superpixels(region) - grey_val) * (mean_of_superpixels(region) - grey_val);
     }
 
-    count = 0;
-    std::for_each(sd_of_superpixels.begin(), sd_of_superpixels.end(), [&count,&count_regions](double & it){
-        it = sqrt(it / count_regions[count]);
-        count++;
-    });
+    sd_of_superpixels = (sd_of_superpixels.cwiseQuotient(count_regions).cwiseSqrt());
 
     //update the private member functions
-    mean_of_superpixels_.insert(mean_of_superpixels_.end(), mean_of_superpixels.begin(), mean_of_superpixels.end());
-    sd_of_superpixels_.insert(sd_of_superpixels_.end(),sd_of_superpixels.begin(),sd_of_superpixels.end());
     R_ += reg;
+    mean_of_superpixels_.conservativeResize(R_);
+    mean_of_superpixels_.tail(reg) = mean_of_superpixels;
+    exp_of_superpixels_.conservativeResize(R_);
+    exp_of_superpixels_.tail(reg) = exp(-1 * VectorXd::Ones(reg).cwiseQuotient(sd_of_superpixels).array());
     super_pixel_classifier_.conservativeResize(R_,W_ * H_);
     super_pixel_classifier_.block(R_ - reg, 0, reg,W_ * H_) << super_pixel_classifier;
 
@@ -809,11 +807,12 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
      * TODO use K which includes a vector of the variance
      */
      
+     std::cout << exp_of_superpixels_;
 
     MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_),  tmp(M_,N_), grad_y(M_, N_), 
         cond_grad_y(M_,N_), grad_z(M_, R_), cond_grad_z(M_, R_),sx_z(M_,R_), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,R_);
     MatrixP temp_dot(M_,N_);
-
+    //Implement the exponentials in diagonal way
 
     double K = CONSTANT;
     std::cout << "K:" << K << std::endl;
@@ -831,7 +830,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
     Q = init;
   
     //initialise the gradient of z
-    grad_z = K * MatrixXf::Ones(M_,R_) + K * ((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_.transpose());
+    grad_z = K * (MatrixXf::Ones(M_,R_) + ((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_.transpose()));
     descent_direction_z(cond_grad_z, grad_z);
     //this computes the  gradient function phi + 2 * psi * y
     grad_y = unary;

@@ -209,7 +209,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
-
+/*
     //run with non_convex function
     std::cout << "---Finding local optimum, of non-convex energy function" <<std::endl;
     path_to_output.replace(path_to_output.end()-4, path_to_output.end(),"_nc.bmp");
@@ -245,6 +245,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // and write the results to an image file with a dumb color code
     save_map(Q_sp, size, path_to_output, dataset_name);
 */
+    /*
     //we now need to run the code with a non_convex energy function including the super pixels
     std::cout << "---Finding local optimum, of non-convex energy function with super pixel" <<std::endl;
     path_to_output.replace(path_to_output.end()-7, path_to_output.end(),"_nc_sp.bmp");
@@ -261,10 +262,10 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q_non_convex_sp, size, path_to_output, dataset_name);
-
+*/
     //we now need to run the code with a non_convex energy function including the super pixels starting at the initial value
     std::cout << "---Finding local optimum, of non-convex energy function with super pixel from initial values" <<std::endl;
-    path_to_output.replace(path_to_output.end()-10, path_to_output.end(),"_g_nc_sp.bmp");
+    path_to_output.replace(path_to_output.end()-4, path_to_output.end(),"_g_nc_sp.bmp");
     clock_t start_g_nc_sp, end_g_nc_sp;
     start_g_nc_sp = clock();
     //MatrixXf Q_non_convex_sp = Q;
