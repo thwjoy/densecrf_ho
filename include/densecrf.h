@@ -46,8 +46,8 @@ protected:
 	// Number of variables, labels and super pixel terms
 	int N_, M_, R_;
 
-	VectorXd mean_of_superpixels_;
-	VectorXd exp_of_superpixels_;
+	VectorXf mean_of_superpixels_;
+	VectorXf exp_of_superpixels_;
 
 
 	// Store the unary term
@@ -108,7 +108,8 @@ public:
 	MatrixXf qp_inference_non_convex(const MatrixXf & init) const;
 	MatrixXf qp_inference_super_pixels(const MatrixXf & init) const;
 	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init) const;
-	std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init) const;
+	std::vector<perf_measure> tracing_qp_inference_non_convex(MatrixXf & init, double time_limit = 0) const;
+	std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit = 0) const;
 	//===============================================================
 
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.

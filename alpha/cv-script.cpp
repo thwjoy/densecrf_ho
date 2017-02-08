@@ -56,6 +56,12 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 std::cout << "---Running tests on QP with non convex energy\r\n";
                 Q = crf.qp_inference(Q);
                 Q = crf.qp_inference_non_convex(Q);
+            } else if (method == "qp_sp"){
+                std::cout << "---Running tests on QP with super pixel terms\r\n";
+                crf.addSuperPixel(img,4,2,5000);
+                crf.addSuperPixel(img,4,2,500);
+                crf.addSuperPixel(img,4,2,50);
+                Q = crf.qp_inference_super_pixels_non_convex(Q);
             } else if (method == "unary"){
                 (void)0;
             } else{
