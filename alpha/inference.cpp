@@ -193,8 +193,8 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     std::cout << "---Running mean-shift and adding super pixel term" <<std::endl;
     crf.addSuperPixel(img,4,2,2000);
-    crf.addSuperPixel(img,4,2,200);
-    crf.addSuperPixel(img,4,2,20);
+    crf.addSuperPixel(img,4,2,500);
+    crf.addSuperPixel(img,4,2,100);
     MatrixXf init = crf.unary_init();
     std::vector<perf_measure> traced_perfs_qp;
     std::vector<perf_measure> traced_perfs_qp_nc;
@@ -213,7 +213,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
-
+/*
     //run with non_convex function
     std::cout << "---Finding local optimum, of non-convex energy function" <<std::endl;
     path_to_output.replace(path_to_output.end()-4, path_to_output.end(),"_nc.bmp");
@@ -231,7 +231,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // and write the results to an image file with a dumb color code
     save_map(Q_non_convex, size, path_to_output, dataset_name);
 
-/*
+
     //we now need to run the code with a non_convex energy function including the super pixels
     std::cout << "---Finding local optimum with super pixel" <<std::endl;
     path_to_output.replace(path_to_output.end()-7, path_to_output.end(),"_sp.bmp");
@@ -277,6 +277,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     MatrixXf Q_g_non_convex_sp = crf.qp_inference_super_pixels_non_convex(init);
     end_g_nc_sp = clock();
     double timing_g_non_convex_sp = (double(end_g_nc_sp-start_g_nc_sp)/CLOCKS_PER_SEC);
+    std::cout << "Time: " << timing_g_non_convex_sp << std::endl;    
     double final_energy_g_non_convex_sp = crf.compute_energy(Q_g_non_convex_sp);
     double discretized_energy_g_non_convex_sp = crf.assignment_energy(crf.currentMap(Q_g_non_convex_sp));
     write_down_perf(timing_g_non_convex_sp, final_energy_g_non_convex_sp, discretized_energy_g_non_convex_sp, path_to_output);

@@ -44,9 +44,12 @@ int main (int argc, char * argv[]) {
 		std::cout << "Image not found\r\n";
 	}
 
-	Potts_weight_set params(3, 2, 50, 15, 3);
+	Potts_weight_set params(3, 2, 50, 15, 3); //QP MSRC These seem to work the best...
+	//Potts_weight_set params(1, 19.983100, 28.759019, 1.0, 39.932261);
+	//Potts_weight_set params(3.071772, 0.5, 49.785678, 1, 0.960811);
+	//Potts_weight_set params(11.110367,0.5,1,50,92.53338);
 	//run the minimisation
-	minimize_LR_QP_non_convex_tracing(path_to_image, path_to_unaries, params, path_to_output, dataset_name);
+	minimize_LR_QP_non_convex(path_to_image, path_to_unaries, params, path_to_output, dataset_name);
 	
 	return 0;
 

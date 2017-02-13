@@ -5,7 +5,7 @@
 #include "densecrf.h"
 
 void image_inference(Dataset dataset, std::string method, std::string path_to_results,
-                     std::string image_name, float spc_std, float spc_potts, float bil_spcstd, float bil_colstd, float bil_potts)
+                     std::string image_name, float spc_std, float spc_potts, float bil_spcstd, float bil_colstd, float bil_potts, float sp_const)
 {
 
     std::string image_path = dataset.get_image_path(image_name);
@@ -56,12 +56,12 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 std::cout << "---Running tests on QP with non convex energy\r\n";
                 Q = crf.qp_inference(Q);
                 Q = crf.qp_inference_non_convex(Q);
-            } else if (method == "qp_sp"){
+            } else if (method == "qp_sp" || method == "qp_sp_0" || method == "qp_sp_10" || method == "qp_sp_100" || method == "qp_sp_1000" || method == "qp_sp_10000" || method == "qp_sp_100000" || method == "qp_sp_1000000"){
                 std::cout << "---Running tests on QP with super pixel terms\r\n";
                 crf.addSuperPixel(img,4,2,5000);
                 crf.addSuperPixel(img,4,2,500);
-                crf.addSuperPixel(img,4,2,50);
-                Q = crf.qp_inference_super_pixels_non_convex(Q);
+                crf.addSuperPixel(img,4,2,50);               
+                Q = crf.qp_inference_super_pixels_non_convex(Q,sp_const);
             } else if (method == "unary"){
                 (void)0;
             } else{
@@ -110,12 +110,23 @@ int main(int argc, char *argv[])
     std::string param5 = argv[9];
     float bil_potts = std::stof(param5);
 
+    float sp_const;
+    if(method == "qp_sp_0") sp_const = 0;
+    else if ("qp_sp_10") sp_const = 10;
+    else if ("qp_sp_100") sp_const = 100;
+    else if ("qp_sp_1000") sp_const = 1000;
+    else if ("qp_sp_10000") sp_const = 10000;
+    else if ("qp_sp_100000") sp_const = 100000;
+    else if ("qp_sp_1000000") sp_const = 1000000;
+    
+
+
     make_dir(path_to_results);
 
     Dataset ds = get_dataset_by_name(dataset_name);
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
     for(int i=0; i< test_images.size(); ++i){
-        image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts, bil_spcstd, bil_colstd, bil_potts);
+        image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts, bil_spcstd, bil_colstd, bil_potts, sp_const);
     }
 
 
