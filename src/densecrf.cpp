@@ -1003,7 +1003,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
 
         //optimal_step_size = 2 / ((double) i + 2);
 
-        // Take a step
+        // Take a stepgit st
         Q += optimal_step_size * sx_y;
         z_labels += optimal_step_size * sx_z;
         if (not valid_probability(Q)) {
