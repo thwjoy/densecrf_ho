@@ -2188,35 +2188,19 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 	const float qp_tol = params.qp_tol;		// qp-gamma tolernace
 	const int qp_maxiter = params.qp_max_iter;
 
-	//MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
+
 	VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_), v_tmp2(M_);
 	MatrixXf Y(M_, N_), neg_H(M_, N_), pos_H(M_, N_);
 	VectorXf qp_values(N_);
 
-//	pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/float(M_));				      
-//	pos_C *= lambda;	// pos_C
-//	neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
-//	neg_C /= float(M_);													      
-//	neg_C *= lambda; 	// neg_C
-//	C = pos_C - neg_C;	// C
-//	abs_C = pos_C + neg_C;	// abs_C
-
     //clock_t start, end;
     typedef std::chrono::high_resolution_clock::time_point htime;
     htime start, end;
-    
-//    // multi-plane FW --> NO ADAPTIVE SELECTION OF WORKING-SET-SIZE AND APPROX-FW-ITER as of now
-//    const int work_set_size = params.work_set_size;
-//    const int approx_fw_iter = params.approx_fw_iter;
-//    const bool mp_fw = (work_set_size != 0 || approx_fw_iter != 0);
-//    std::vector<MatrixXf> working_set;    // stores conditional gradients (copied)
-//    double dual_prox_start = 0, dual_app_start = 0;
-//    //clock_t time_prox_start;
-//    htime time_prox_start;
+
 
     int it=0;
     int count = 0;
-    do {
+    do { //step iteration
         ++it;
 
 		// initialization
@@ -2235,65 +2219,54 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
         
 		int pit = 0;
 		alpha_tQ.fill(0);	// all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
+
 		
-		// prox step
+		// proximal iteration this is the t iterating parameter in the paper
 		do {	
 			++pit;
-//            if (mp_fw) {
-//                //time_prox_start = clock();
-//                time_prox_start = std::chrono::high_resolution_clock::now();
-//            }
 			// initialization
 			s_tQ.fill(0);
 
-            //if (pit == 1) { // only compute beta and gamma in the first iteration
+/*#############################Optimise aver gamma##############################*/
+
 			// QP-gamma -- \cite{NNQP solver Xiao and Chen 2014}
 			// case-1: solve for gamma using qp solver! 
 			// 1/2 * gamma^T * C * gamma - gamma^T * H
-			// populate Y matrix
+			// populate Y matrix (compute H in the paper)
 			tmp = alpha_tQ - unary;
 			for (int i = 0; i < N_; ++i) {
-//                v_y = C * tmp.col(i);
                 // do it in linear time
                 v_tmp2 = tmp.col(i);
-                qp_gamma_multiplyC(v_y, v_tmp2, M_, lambda);
-				Y.col(i) = v_y;
+                qp_gamma_multiplyC(v_y, v_tmp2, M_, lambda); //computes eq 35 in the paper for each pixel
+				Y.col(i) = v_y; 
 			}	
-			Y += cur_Q;		// H = -Y
+			Y += cur_Q;		// Y is the h in the paper given as h = Q(Aa - phi) - y^k (paper notation)
+            //we have calculate Y as a +ve when it's actually -ve
 			for (int i = 0; i < N_; ++i) {
 				for (int j = 0; j < M_; ++j) {	
 					pos_H(j, i) = std::max(-Y(j, i), (float)0);		// pos_H 
 					neg_H(j, i) = std::max(Y(j, i), (float)0);		// neg_H
 				}
 			}
-			// qp iterations, 
-			int qpit = 0;
-			qp_values.fill(0);
-		    //gamma.fill(1);	// initializing gamma here affects efficiency!
-			float qp_value = std::numeric_limits<float>::max();
+            // qp iterations, 
+            int qpit = 0;
+            qp_values.fill(0);
+            float qp_value = std::numeric_limits<float>::max();
 #if VERBOSE
             //start = clock();
             start = std::chrono::high_resolution_clock::now();
 #endif
 			do {
-				//solve for each pixel separately
+				//solve for each pixel separately, this employes the algorithm from citeation 26
 				for (int i = 0; i < N_; ++i) {
-					v_gamma = gamma.col(i);
+					v_gamma = gamma.col(i); //col just accesses the lables of pixel i
 					v_pos_h = pos_H.col(i);
 					v_neg_h = neg_H.col(i);
-                    //
-//                    v_step = 2 * neg_C * v_gamma + v_pos_h;
-//					v_step = v_step.array() + qp_delta;
-//					v_tmp = abs_C * v_gamma + v_neg_h;
-//				    v_tmp = v_tmp.array() + qp_delta;
-//					v_step = v_step.cwiseQuotient(v_tmp);
-//					v_gamma = v_gamma.cwiseProduct(v_step);
+                    
                     // do it linear time
                     qp_gamma_step(v_gamma, v_pos_h, v_neg_h, qp_delta, M_, lambda, v_step, v_tmp, v_tmp2);
 					gamma.col(i) = v_gamma;
 
-					// qp value
-//                    v_tmp = C * v_gamma;
                     // do it in linear time
                     qp_gamma_multiplyC(v_tmp, v_gamma, M_, lambda);
 					v_y = Y.col(i);
@@ -2305,14 +2278,14 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 				if (std::abs(qp_value - qp_value1) < qp_tol) break;
 				qp_value = qp_value1;
 			} while (qpit < qp_maxiter);
+
 #if VERBOSE
-            //end = clock();
-            //double dt = (double)(end-start)/CLOCKS_PER_SEC
             end = std::chrono::high_resolution_clock::now();
             double dt = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
             printf("# Time-QP %d: %5.5f, %10.3f\t", qpit, dt, qp_value);
 #endif
-			// end-qp-gamma
+
+/*#############################Optimise aver beta###############################*/
 
 			// case-2: update beta -- gradient of dual wrt beta equals to zero
 			beta_mat = (alpha_tQ + gamma - unary);	// -B^T/l * (A * alpha + gamma - phi)
@@ -2323,21 +2296,14 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			for (int j = 0; j < M_; ++j) {
 				beta_mat.row(j) = beta;
 			}
-            //}
+
+/*#############################Optimise aver alpha##############################*/
 
 			// case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
 			Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;	// Q may be infeasible --> but no problem
-#if BRUTE_FORCE
-        	sortRows(Q, ind);
-#else
-			// new PH implementation doesn't work with Q values outside [0,1] - or in fact truncates to be within [0,1]
-    		// rescale Q to be within [0,1] -- order of Q values preserved!
-    		rescale(rescaled_Q, Q);
-//            // check colinearity of subgradients
-//            double ph_e = 0, bf_e = 0;
-//            compare_energies(rescaled_Q, ph_e, bf_e, false, false, true);
-//            //
-#endif
+    		rescale(rescaled_Q, Q);//truncate Q to be [0,1]
+
+            // Compute the conditional gradient
 			// subgradient lower minus upper
 			// Pairwise
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
@@ -2345,21 +2311,11 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
                 //start = clock();
                 start = std::chrono::high_resolution_clock::now();
 #endif
-#if BRUTE_FORCE
-				// brute-force computation
-            	no_norm_pairwise_[k]->apply_upper_minus_lower_bf(tmp2, ind);
-            	//no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp2, ind);
-            	for(int i=0; i<tmp2.cols(); ++i) {
-                	for(int j=0; j<tmp2.rows(); ++j) {
-                    	tmp(j, ind(j, i)) = tmp2(j, i);
-                	}
-            	}
-#else
 				// new PH implementation
 				// rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
                 pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);	
-#endif
                 s_tQ += tmp;	// A * s is lower minus upper, keep neg introduced by compatibility->apply
+
 #if VERBOSE
                 //end = clock();
                 //double dt = (double)(end-start)/CLOCKS_PER_SEC;
@@ -2383,117 +2339,24 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 			//assert(dual_gap == (dual_energy - primal_energy));
 			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, primal_energy+dual_energy, 
                     -dual_energy, primal_energy);
-//            if (mp_fw) dual_prox_start = -dual_energy;
-            //if (dual_gap < 0) {   // may become negative due to PH approximations!
-            //    std::cout << "\nERROR: Dual-gap cannot be negative!\n";
-            //    exit(1);
-            //}
+
 #endif
 			if (dual_gap <= dual_gap_tol) break;	// stopping condition
 
-			// optimal fw step size
+			// compute the optimal step size
 			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
 			delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
 			assert(delta > 0);
+
 #if VERBOSE
 			printf("%1.10f]\n", delta);
 #endif
 			// update alpha_tQ
-			tmp = s_tQ - alpha_tQ;
-			tmp *= delta;
-			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
-
-//            if (mp_fw) {
-//                if (working_set.size() == work_set_size) working_set.erase(working_set.begin());
-//                working_set.push_back(s_tQ);
-//            }
-//
-//            // multi-plane approximate iterations
-//            for (int appit = 0; appit < approx_fw_iter; ++appit) {
-//                // case-1: use the old-gamma
-//                // case-2:
-//                beta_mat = (alpha_tQ + gamma - unary);	// -B^T/l * (A * alpha + gamma - phi)
-//			    beta = -beta_mat.colwise().sum();	
-//			    beta /= M_;
-//			    // repeat beta in each row of beta_mat - - B * beta
-//			    for (int j = 0; j < M_; ++j) {
-//				    beta_mat.row(j) = beta;
-//			    }
-//                //
-//                // case-3
-//                Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q;
-//
-//                MatrixXf& s_tQ_hat = working_set[0];
-//                double maxe = dotProduct(s_tQ_hat, Q, dot_tmp);
-//#if VERBOSE
-//                //clock_t st = clock();
-//                htime st = std::chrono::high_resolution_clock::now();
-//#endif
-//                for (int i = 1; i < working_set.size(); ++i) {
-//                    double e = dotProduct(working_set[i], Q, dot_tmp);
-//                    if (maxe < e) {
-//                        maxe = e;
-//                        s_tQ_hat = working_set[i];
-//                    }
-//                    //std::cout << "##i: " << i << ", e: " << e << ", maxe: " << maxe << std::endl;
-//                }
-//#if VERBOSE
-//                //clock_t et = clock();
-//                //double app_fw_time = (double)(et-st)/CLOCKS_PER_SEC;
-//                htime et = std::chrono::high_resolution_clock::now();
-//                double app_fw_time = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
-//                printf("#App-FW-Time: %5.5f, size: %d\t", app_fw_time, (int)working_set.size());
-//#endif
-//
-//                // find dual gap
-//    			tmp = alpha_tQ - s_tQ_hat;	
-//    			dual_gap = dotProduct(tmp, Q, dot_tmp);
-//    
-//#if VERBOSE
-//    			// dual-energy value
-//    			tmp2 = Q - cur_Q;
-//    			dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
-//    			dual_energy -= beta.sum();
-//    			double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
-//    		   	primal_energy += dotProduct(unary, Q, dot_tmp);
-//    			primal_energy -= dotProduct(s_tQ_hat, Q, dot_tmp);	// cancel the neg in s_tQ_hat
-//    			//assert(dual_gap == (dual_energy - primal_energy));
-//    			printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", appit, dual_gap, primal_energy+dual_energy, 
-//                        -dual_energy, primal_energy);
-//                if (appit > 0) {
-//                    //double prox_tot_time = (double)(et-time_prox_start)/CLOCKS_PER_SEC;
-//                    double prox_tot_time = std::chrono::duration_cast<std::chrono::duration<double>>
-//                        (et-time_prox_start).count();
-//                    double avg_imp = (-dual_energy-dual_prox_start)/prox_tot_time;
-//                    double app_imp = (-dual_energy-dual_app_start)/app_fw_time;
-//                    printf("(%10.3f, %10.3f), ", avg_imp, app_imp);
-//                    if (avg_imp >= app_imp) {
-//                        printf(" break: app_imp\n");
-//                        break;
-//                    }
-//                }
-//                dual_app_start = -dual_energy;
-//#endif
-//    			if (dual_gap <= 10) {
-//                    printf(" break: dual_gap\n");
-//                    break;	// stopping condition
-//                }
-//    
-//    			// optimal fw step size
-//    			delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
-//    			delta = std::min(std::max(delta, (float)0.0), (float)1.0);
-//    			assert(delta > 0);
-//#if VERBOSE
-//    			printf("%1.10f]\n", delta);
-//#endif
-//
-//                // update alpha_tQ
-//		    	tmp = s_tQ_hat - alpha_tQ;
-//	    		tmp *= delta;
-//    			alpha_tQ += tmp;	// alpha_tQ = alpha_tQ + delta * (s_tQ_hat - alpha_tQ);
-//            }
+            alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
 
 		} while(pit<fw_maxiter);
+
+/*##############################################################################*/
 
 		// project Q back to feasible region
 		feasible_Q(tmp, ind, sum, K, Q);
@@ -2506,10 +2369,8 @@ MatrixXf DenseCRF::lp_inference_prox(MatrixXf & init, LP_inf_params & params) co
 #if VERBOSE
         double prev_energy = energy;
 		energy = compute_energy_LP(Q);
-//#if VERBOSE
         int_Q = max_rounding(Q);
         kl = klDivergence(Q, int_Q);
-//#endif
 #endif
         if (best_int) {
             if (abs(int_energy - prev_int_energy) < prox_tol) ++count;

@@ -306,11 +306,7 @@ void compare_old_new_ph(int argc, char *argv[]) {
 
 int main(int argc, char *argv[])
 {
-    //original_toy_problem(argc, argv);
-
-    //compare_bf_ph_energies(argc, argv);
-
-    compare_old_new_ph(argc, argv);
+    original_toy_problem(argc, argv);
 
     return 0;
 }
