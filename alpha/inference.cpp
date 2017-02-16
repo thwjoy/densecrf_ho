@@ -279,6 +279,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     double timing_g_non_convex_sp = (double(end_g_nc_sp-start_g_nc_sp)/CLOCKS_PER_SEC);
     std::cout << "Time: " << timing_g_non_convex_sp << std::endl;    
     double final_energy_g_non_convex_sp = crf.compute_energy(Q_g_non_convex_sp);
+    std::cout << "Energy: " << final_energy_g_non_convex_sp << std::endl;
     double discretized_energy_g_non_convex_sp = crf.assignment_energy(crf.currentMap(Q_g_non_convex_sp));
     write_down_perf(timing_g_non_convex_sp, final_energy_g_non_convex_sp, discretized_energy_g_non_convex_sp, path_to_output);
     // Perform the MAP estimation on the fully factorized distribution

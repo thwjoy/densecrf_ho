@@ -48,6 +48,9 @@ protected:
 
 	VectorXf mean_of_superpixels_;
 	VectorXf exp_of_superpixels_;
+	std::vector<std::vector<double>> super_pixel_container_;
+
+
 
 
 	// Store the unary term
@@ -64,6 +67,10 @@ protected:
 
 	// Don't copy this object, bad stuff will happen
 	DenseCRF( DenseCRF & o ){}
+
+	float multiplySuperPixels(const MatrixXf & p1, const MatrixXf & p2) const;
+	MatrixXf multiplySuperPixels(const MatrixXf & p) const;
+
 public:
 	// Create a dense CRF model of size N with M labels
 	DenseCRF( int N, int M );
@@ -186,6 +193,9 @@ class DenseCRF2D:public DenseCRF{
 protected:
 	// Width, height of the 2d grid
 	int W_, H_;
+
+
+
 public:
 	// Create a 2d dense CRF model of size W x H with M labels
 	DenseCRF2D( int W, int H, int M );
@@ -199,7 +209,7 @@ public:
 	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
 	void addSuperPixel(unsigned char * img, int spatial_radius = 8, int range_radius = 4, int min_region_count = 2500, SpeedUpLevel = NO_SPEEDUP);
 
-
+	
 	// Set the unary potential for a specific variable
 	using DenseCRF::setUnaryEnergy;
 };

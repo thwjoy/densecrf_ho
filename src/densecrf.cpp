@@ -42,14 +42,61 @@
 #include <iostream>
 #include <set>
 
-
-
 #define DCNEG_FASTAPPROX false
 #define NORMALISER 10000 //should be around 10,000
 #define DIFF_ENG 100
 /////////////////////////////
 /////  Alloc / Dealloc  /////
 /////////////////////////////
+
+
+float DenseCRF::multiplySuperPixels(const MatrixXf & p1, const MatrixXf & p2) const {
+    float res = 0;
+    assert(p1.cols() == R_);
+    assert(p1.rows() == M_);
+    assert(p2.cols() == N_);
+    assert(p2.rows() == M_);
+    for(int sp_reg = 0; sp_reg < R_; sp_reg++) { //for each super pixel
+        for(int pixel = 0; pixel < super_pixel_container_[sp_reg].size(); pixel++) { //sum up the values where the pixel is in the sp
+            for(int lab = 0; lab < M_; lab++) {
+                res += p1(lab, sp_reg) * p2(lab, pixel);
+            }
+        }
+    }
+    return res;
+}
+
+MatrixXf DenseCRF::multiplySuperPixels(const MatrixXf & p) const {
+    int dim;
+    if (p.cols() == R_) dim = N_;
+    else dim = R_;    //if we pass in a z vector the size needs to be that of the y vector
+    assert(p.rows() == M_);
+    MatrixXf res(M_, dim);
+    res.fill(0);
+    if (dim == R_) { //we want to sum up over the pixel values
+        for(int sp_reg = 0; sp_reg < R_; sp_reg++) {
+            for(int lab =0; lab < M_; lab++) {
+                for(int pixel = 0; pixel < super_pixel_container_[sp_reg].size(); pixel++) {
+                    res(lab,sp_reg) += p(lab,pixel);
+                }
+            }
+        }
+
+    } else { //we want to sum up over the
+        for(int sp_reg = 0; sp_reg < R_; sp_reg++) {
+            for(int lab =0; lab < M_; lab++) {
+                for(int pixel = 0; pixel < super_pixel_container_[sp_reg].size(); pixel++) {
+                    res(lab,pixel) += p(lab,sp_reg);
+                }
+            }
+        }
+    }
+
+    return res;
+    
+} 
+
+
 DenseCRF::DenseCRF(int N, int M) : N_(N), M_(M), unary_(0), R_(0) {
 }
 DenseCRF::~DenseCRF() {
@@ -98,6 +145,7 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     //addSuperPixel is a member function that applies the mean-shift algorithm to the image and then initialises the protected member varaiable super_pixel_classifer.
     unsigned char * segment_image = new unsigned char[W_ * H_ * 3];
     std::vector<int> regions_out;
+    std::vector<std::vector<double>> super_pixel_container;
     VectorXf count_regions; 
     VectorXf mean_of_superpixels;
     VectorXf sd_of_superpixels; 
@@ -112,6 +160,7 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     m_process.GetResults(segment_image);
     int reg = m_process.GetRegions(regions_out);
 
+    super_pixel_container.resize(reg);
     count_regions.resize(reg);
     mean_of_superpixels.resize(reg);
     sd_of_superpixels.resize(reg);
@@ -123,16 +172,16 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     for (int i = 0; i < super_pixel_classifier.cols(); i++) {
         region = regions_out[i];
         super_pixel_classifier(region,i) = 1;
+        super_pixel_container[region].push_back(i);
         mean_of_superpixels(region) += 0.2989 * (double) img[i];
         mean_of_superpixels(region) += 0.5870 * (double) img[i + 1];
         mean_of_superpixels(region) += 0.1140 * (double) img[i + 2];
         count_regions(region) += 1;
     }
 
-
     mean_of_superpixels = mean_of_superpixels.cwiseQuotient(count_regions);
-    
 
+    
     for (int i = 0; i < super_pixel_classifier.cols(); i++) {
         region = regions_out[i];
         double grey_val = 0.2989 * (double) img[i] + 0.5870 * (double) img[i + 1] + 0.1140 * (double) img[i + 2];
@@ -143,6 +192,7 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
 
     //update the private member functions
     R_ += reg;
+    super_pixel_container_.insert(super_pixel_container_.end(),super_pixel_container.begin(), super_pixel_container.end());
     mean_of_superpixels_.conservativeResize(R_);
     mean_of_superpixels_.tail(reg) = mean_of_superpixels;
     exp_of_superpixels_.conservativeResize(R_);
@@ -150,7 +200,7 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     super_pixel_classifier_.conservativeResize(R_,W_ * H_);
     super_pixel_classifier_.block(R_ - reg, 0, reg,W_ * H_) << super_pixel_classifier;
 
-    writePPMImage("./output.ppm",segment_image, H_, W_, 3, "");
+    //writePPMImage("./output.ppm",segment_image, H_, W_, 3, "");
     delete[] segment_image;
     return;
 }
@@ -931,7 +981,6 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
         cond_grad_y(M_,N_), grad_z(M_, R_), cond_grad_z(M_, R_),sx_z(M_,R_), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,R_);
     MatrixP temp_dot(M_,N_);
     MatrixXf constant = exp_of_superpixels_.replicate( 1, grad_z.rows() ).transpose();
-    MatrixXf super_pixel_classifier_tran = super_pixel_classifier_.transpose();
     //Implement the exponentials in diagonal way
 
     //double K = CONSTANT;
@@ -949,7 +998,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
     Q = init;
   
     //initialise the gradient of z
-    grad_z = K * (MatrixXf::Ones(M_,R_) + ((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_tran));
+    grad_z = K * (MatrixXf::Ones(M_,R_) + multiplySuperPixels((Q - MatrixXf::Ones(M_,N_))));
     grad_z = grad_z.cwiseProduct(constant);
     descent_direction_z(cond_grad_z, grad_z);
     //this computes the  gradient function phi + 2 * psi * y
@@ -958,12 +1007,12 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
         pairwise_[i]->apply( tmp, Q);
         grad_y += 2 *tmp;
     }
-    grad_y += K * ((z_labels - MatrixXf::Ones(M_,R_)).cwiseProduct(constant) * super_pixel_classifier_);
+    grad_y += K * multiplySuperPixels((z_labels - MatrixXf::Ones(M_,R_)).cwiseProduct(constant));
     
     // Compute the value of the energy
     double old_energy = std::numeric_limits<double>::max();
     double energy = compute_LR_QP_value(Q, 0 * MatrixXf::Ones(M_,N_));
-    energy += K * (z_labels.cwiseProduct(constant).sum() + dotProduct((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_tran),temp_dot));
+    energy += K * (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
 
     int i = 0;
     while((old_energy - energy) > DIFF_ENG){
@@ -984,13 +1033,13 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
             psisx += tmp;
         }
 
-        double a = K * dotProduct(sx_z.cwiseProduct(constant),((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_tran),temp_dot);
+        double a = K * multiplySuperPixels(sx_z.cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_)));
 
-        double b = K * dotProduct((cond_grad_z - MatrixXf::Ones(M_,R_)).cwiseProduct(constant) * super_pixel_classifier_,sx_y,temp_dot);
+        double b = K * multiplySuperPixels((cond_grad_z - MatrixXf::Ones(M_,R_)).cwiseProduct(constant),sx_y);
 
         double num = dotProduct(unary, sx_y, temp_dot) + 2 * dotProduct(Q, psisx, temp_dot) + a + b + K * sx_z.sum();
         // Num should be negative, otherwise our choice of s was necessarily wrong.
-        double denom = dotProduct(sx_y, psisx, temp_dot) + K * dotProduct(sx_z.cwiseProduct(constant) * super_pixel_classifier_,sx_y,temp_dot);
+        double denom = dotProduct(sx_y, psisx, temp_dot) + K * multiplySuperPixels(sx_z.cwiseProduct(constant),sx_y);
         // Denom should be negative, as our energy function is now concave.
         optimal_step_size = - num / (2 * denom);
 
@@ -1011,21 +1060,20 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
         }
 
         //compute the new gradient
-        grad_y += 2 * optimal_step_size * (psisx + sx_z.cwiseProduct(constant) * super_pixel_classifier_);// - (sx_z.cwiseProduct(constant).sum() - dotProduct(sx_z.cwiseProduct(constant) * super_pixel_classifier_,Q - MatrixXf::Ones(M_,N_),temp_dot)) * sx_y.inverse().transpose(); 
-        grad_z = K * MatrixXf::Ones(M_,R_) + K * ((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_tran).cwiseProduct(constant);
+        grad_y += 2 * optimal_step_size * (psisx + multiplySuperPixels(sx_z.cwiseProduct(constant)));// - (sx_z.cwiseProduct(constant).sum() - dotProduct(sx_z.cwiseProduct(constant) * super_pixel_classifier_,Q - MatrixXf::Ones(M_,N_),temp_dot)) * sx_y.inverse().transpose(); 
+        grad_z = K * MatrixXf::Ones(M_,R_) + K * (multiplySuperPixels(Q - MatrixXf::Ones(M_,N_))).cwiseProduct(constant);
 
         energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
-        energy += K * (z_labels.cwiseProduct(constant).sum() + dotProduct((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),((Q - MatrixXf::Ones(M_,N_)) * super_pixel_classifier_tran),temp_dot));
-     
-    }
+        energy += K * (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
 
+    }
+    
+    //std::cout << v.roow << std::endl;
+    //std::cout << multiplySuperPixels(sx_z.cwiseProduct(constant)).rows() << std::endl;
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
 
     return Q;
 }
-
-
-
 
 MatrixXf DenseCRF::qp_inference_super_pixels(const MatrixXf & init, double K) const {
     /*Here we compute the Frank Wolfe, to find the optimum of the cost function contatining super pixels

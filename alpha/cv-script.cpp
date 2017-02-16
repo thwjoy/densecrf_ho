@@ -57,7 +57,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
                 Q = crf.qp_inference_non_convex(Q);
             } else if (method == "qp_sp" || method == "qp_sp_0" || method == "qp_sp_10" || method == "qp_sp_100" || method == "qp_sp_1000" || method == "qp_sp_10000" || method == "qp_sp_100000" || method == "qp_sp_1000000"){
-                std::cout << "---Running tests on QP with super pixel terms\r\n";
+                std::cout << "---Running tests on QP with super pixel terms. Constant = "<< sp_const << "\r\n";
                 crf.addSuperPixel(img,4,2,5000);
                 crf.addSuperPixel(img,4,2,500);
                 crf.addSuperPixel(img,4,2,50);               
