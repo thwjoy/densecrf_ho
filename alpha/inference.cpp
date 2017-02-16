@@ -691,8 +691,8 @@ void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_t
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     crf.addSuperPixel(img,4,2,5000);
-    crf.addSuperPixel(img,4,2,1000);
-    crf.addSuperPixel(img,4,2,100);
+    crf.addSuperPixel(img,4,2,5000);
+    crf.addSuperPixel(img,4,2,5000);
     clock_t start, end;
     MatrixXf init = crf.unary_init();
 

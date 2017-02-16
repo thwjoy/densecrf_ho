@@ -89,6 +89,7 @@ protected:
 
 	//store the super pixel term
 	Matrix<float, Dynamic, Dynamic> super_pixel_classifier_;
+	std::vector<std::vector<double>> super_pixel_container_; //is a vector of super pixels which holds a vector of pixel locations for that super pixel
 
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;

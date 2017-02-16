@@ -123,9 +123,7 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     //addSuperPixel is a member function that applies the mean-shift algorithm to the image and then initialises the protected member varaiable super_pixel_classifer.
     unsigned char * segment_image = new unsigned char[W_ * H_ * 3];
     std::vector<int> regions_out;
-    VectorXf count_regions; 
-    VectorXf mean_of_superpixels;
-    VectorXf sd_of_superpixels; 
+    std::vector<std::vector<double>> super_pixel_container;
     Matrix<float, Dynamic, Dynamic> super_pixel_classifier;
 
     int region;
@@ -136,21 +134,17 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     m_process.Segment(spatial_radius,range_radius,min_region_count,NO_SPEEDUP);
     m_process.GetResults(segment_image);
     int reg = m_process.GetRegions(regions_out);
-
-    count_regions.resize(reg);
-    mean_of_superpixels.resize(reg);
-    sd_of_superpixels.resize(reg);
-    count_regions.fill(0);
-    mean_of_superpixels.fill(0);
-    sd_of_superpixels.fill(0);
+    super_pixel_container.resize(reg);
     super_pixel_classifier.resize(reg,W_ * H_);
     super_pixel_classifier.fill(0);
     for (int i = 0; i < super_pixel_classifier.cols(); i++) {
         region = regions_out[i];
         super_pixel_classifier(region,i) = 1;
+        super_pixel_container[region].push_back(i); //for the super pixel region, add the pixel index to the vector
     }
 
     R_ += reg;
+    super_pixel_container_.insert(super_pixel_container_.end(),super_pixel_container.begin(), super_pixel_container.end());
 
     writePPMImage("./output.ppm",segment_image, H_, W_, 3, "");
     delete[] segment_image;
@@ -3669,6 +3663,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     VectorXd sum(N_);
     MatrixXf unary = unary_->get();
 
+
     MatrixXf Q = init;
     renormalize(Q);
     assert(valid_probability_debug(Q));
@@ -3678,9 +3673,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     double energy = 0, best_energy = std::numeric_limits<double>::max(), 
            best_int_energy = std::numeric_limits<double>::max();
     double int_energy = assignment_energy_true(currentMap(Q));
-#if VERBOSE    
-    double kl = klDivergence(Q, max_rounding(Q));
-#endif
+
     energy = compute_energy_LP(Q);
     if (energy > int_energy) {  // choose the best initialization 
         Q = max_rounding(Q);
@@ -3688,9 +3681,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     }
     best_energy = energy;
     best_int_energy = int_energy;
-#if VERBOSE    
-    printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f\n", energy, int_energy, kl);
-#endif
+
 
     const int maxiter = params.prox_max_iter;
     const bool best_int = params.best_int;
@@ -3706,6 +3697,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
     // dual variables
     MatrixXf alpha_tQ(M_, N_);  // A * alpha, (t - tilde not iteration)
+    MatrixXf u_tQ(M_,N_);       // U * mew 
     MatrixXf s_tQ(M_, N_);      // A * s, conditional gradient of FW == subgradient
     VectorXf beta(N_);          // unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
     MatrixXf beta_mat(M_, N_);  // beta_mat.row(i) == beta forall i --> N_ * M_ elements 
@@ -3713,9 +3705,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     
     MatrixXf cur_Q(M_, N_);     // current Q in prox step
     MatrixXf rescaled_Q(M_, N_);// infeasible Q rescaled to be within [0,1]
-#if VERBOSE
-    MatrixXf int_Q(M_, N_);     // store integral Q
-#endif
+
 
     // accelerated prox_lp
     MatrixXf prev_Q(M_, N_);    // Q resulted in prev prox step
@@ -3836,7 +3826,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                 beta_mat.row(j) = beta;
             }
 
-/*#############################Optimise aver alpha##############################*/
+/*#############################Optimise aver alpha and mew##############################*/
 
             // case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
             Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q; // Q may be infeasible --> but no problem
@@ -3846,40 +3836,15 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             // subgradient lower minus upper
             // Pairwise
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-#if VERBOSE
-                //start = clock();
-                start = std::chrono::high_resolution_clock::now();
-#endif
                 // new PH implementation
                 // rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
                 pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q); 
                 s_tQ += tmp;    // A * s is lower minus upper, keep neg introduced by compatibility->apply
-
-#if VERBOSE
-                //end = clock();
-                //double dt = (double)(end-start)/CLOCKS_PER_SEC;
-                end = std::chrono::high_resolution_clock::now();
-                double dt = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
-                printf("# Time-%d: %5.5f\t", k, dt);
-#endif
             }
             // find dual gap
             tmp = alpha_tQ - s_tQ;  
             dual_gap = dotProduct(tmp, Q, dot_tmp);
 
-#if VERBOSE
-            // dual-energy value
-            tmp2 = Q - cur_Q;
-            dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
-            dual_energy -= beta.sum();
-            double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
-            primal_energy += dotProduct(unary, Q, dot_tmp);
-            primal_energy -= dotProduct(s_tQ, Q, dot_tmp);  // cancel the neg in s_tQ
-            //assert(dual_gap == (dual_energy - primal_energy));
-            printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, primal_energy+dual_energy, 
-                    -dual_energy, primal_energy);
-
-#endif
             if (dual_gap <= dual_gap_tol) break;    // stopping condition
 
             // compute the optimal step size
@@ -3887,9 +3852,6 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
             assert(delta > 0);
 
-#if VERBOSE
-            printf("%1.10f]\n", delta);
-#endif
             // update alpha_tQ
             alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
 
@@ -3905,12 +3867,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
         double prev_int_energy = int_energy;
         int_energy = assignment_energy_true(currentMap(Q));
-#if VERBOSE
-        double prev_energy = energy;
-        energy = compute_energy_LP(Q);
-        int_Q = max_rounding(Q);
-        kl = klDivergence(Q, int_Q);
-#endif
+
         if (best_int) {
             if (abs(int_energy - prev_int_energy) < prox_tol) ++count;
             else count = 0;
@@ -3923,14 +3880,9 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                 best_Q = Q;
                 best_int_energy = int_energy;
             }
-#if VERBOSE
-            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_int_energy);
-#endif
+
         } else {
-#if VERBOSE == false
-            double prev_energy = energy;
-            energy = compute_energy_LP(Q);
-#endif
+
             if (abs(energy - prev_energy) < prox_tol) ++count;
             else count = 0;
             if (count >= 5) {
@@ -3942,9 +3894,6 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                 best_Q = Q;
                 best_energy = energy;
             }
-#if VERBOSE
-            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
-#endif
         }
         if (params.less_confident_percent > 0) {
             float confidence_tol = params.confidence_tol;
@@ -3960,18 +3909,6 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
     } while(it<maxiter);
 
-#if VERBOSE
-    int_energy = assignment_energy_true(currentMap(Q));
-    std::cout <<"final projected energy: " << int_energy << "\n";
-
-    // verify KKT conditions
-    // gamma
-    tmp = gamma.cwiseProduct(Q);
-    std::cout << "gamma\t:: mean=" << gamma.mean() << ",\tmax=" << gamma.maxCoeff() << ",\tmin=" << gamma.minCoeff() << std::endl;
-    std::cout << "gamma.cwiseProduct(Q)\t:: mean=" << tmp.mean() << ",\tmax=" << tmp.maxCoeff() << ",\tmin=" << tmp.minCoeff() << std::endl;
-    std::cout << "beta_mat\t:: mean=" << beta_mat.mean() << ",\tmax=" << beta_mat.maxCoeff() << ",\tmin=" << beta_mat.minCoeff() << std::endl;
-    std::cout << "alpha_tQ\t:: mean=" << alpha_tQ.mean() << ",\tmax=" << alpha_tQ.maxCoeff() << ",\tmin=" << alpha_tQ.minCoeff() << std::endl;
-#endif
 
     return best_Q;
 }
