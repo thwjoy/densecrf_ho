@@ -977,14 +977,11 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
      *
      */
 
-    std::cout << "Constant:" << K << std::endl;
     MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_),  tmp(M_,N_), grad_y(M_, N_), 
         cond_grad_y(M_,N_), grad_z(M_, R_), cond_grad_z(M_, R_),sx_z(M_,R_), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,R_);
     MatrixP temp_dot(M_,N_);
     MatrixXf constant =  K * exp_of_superpixels_.replicate( 1, grad_z.rows() ).transpose();
     //Implement the exponentials in diagonal way
-
-    std::cout << constant.sum();
 
     //double K = CONSTANT;
     grad_z.fill(0);

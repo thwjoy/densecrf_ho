@@ -112,14 +112,14 @@ int main(int argc, char *argv[])
 
     float sp_const;
     if(method == "qp_sp_0") sp_const = 0;
-    else if ("qp_sp_10") sp_const = 10;
-    else if ("qp_sp_100") sp_const = 100;
-    else if ("qp_sp_1000") sp_const = 1000;
-    else if ("qp_sp_10000") sp_const = 10000;
-    else if ("qp_sp_01") sp_const = 0.1;
-    else if ("qp_sp_001") sp_const = 0.01;
-    else if ("qp_sp_0001") sp_const = 0.001;
-    else if ("qp_sp_00001") sp_const = 0.0001;
+    else if (method == "qp_sp_10") sp_const = 10;
+    else if (method == "qp_sp_100") sp_const = 100;
+    else if (method == "qp_sp_1000") sp_const = 1000;
+    else if (method == "qp_sp_10000") sp_const = 10000;
+    else if (method == "qp_sp_01") sp_const = 0.1;
+    else if (method == "qp_sp_001") sp_const = 0.01;
+    else if (method == "qp_sp_0001") sp_const = 0.001;
+    else if (method == "qp_sp_00001") sp_const = 0.0001;
 
     
 
