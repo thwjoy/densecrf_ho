@@ -977,11 +977,14 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
      *
      */
 
+    std::cout << "Constant:" << K << std::endl;
     MatrixXf Q(M_, N_), unary(M_, N_), diag_dom(M_,N_),  tmp(M_,N_), grad_y(M_, N_), 
         cond_grad_y(M_,N_), grad_z(M_, R_), cond_grad_z(M_, R_),sx_z(M_,R_), sx_y(M_,N_), psisx(M_, N_), z_labels(M_,R_);
     MatrixP temp_dot(M_,N_);
-    MatrixXf constant = exp_of_superpixels_.replicate( 1, grad_z.rows() ).transpose();
+    MatrixXf constant =  K * exp_of_superpixels_.replicate( 1, grad_z.rows() ).transpose();
     //Implement the exponentials in diagonal way
+
+    std::cout << constant.sum();
 
     //double K = CONSTANT;
     grad_z.fill(0);
@@ -998,7 +1001,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
     Q = init;
   
     //initialise the gradient of z
-    grad_z = K * (MatrixXf::Ones(M_,R_) + multiplySuperPixels((Q - MatrixXf::Ones(M_,N_))));
+    grad_z = (MatrixXf::Ones(M_,R_) + multiplySuperPixels((Q - MatrixXf::Ones(M_,N_))));
     grad_z = grad_z.cwiseProduct(constant);
     descent_direction_z(cond_grad_z, grad_z);
     //this computes the  gradient function phi + 2 * psi * y
@@ -1012,7 +1015,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
     // Compute the value of the energy
     double old_energy = std::numeric_limits<double>::max();
     double energy = compute_LR_QP_value(Q, 0 * MatrixXf::Ones(M_,N_));
-    energy += K * (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
+    energy += (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
 
     int i = 0;
     while((old_energy - energy) > DIFF_ENG){
@@ -1033,13 +1036,13 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
             psisx += tmp;
         }
 
-        double a = K * multiplySuperPixels(sx_z.cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_)));
+        double a = multiplySuperPixels(sx_z.cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_)));
 
-        double b = K * multiplySuperPixels((cond_grad_z - MatrixXf::Ones(M_,R_)).cwiseProduct(constant),sx_y);
+        double b = multiplySuperPixels((cond_grad_z - MatrixXf::Ones(M_,R_)).cwiseProduct(constant),sx_y);
 
         double num = dotProduct(unary, sx_y, temp_dot) + 2 * dotProduct(Q, psisx, temp_dot) + a + b + K * sx_z.sum();
         // Num should be negative, otherwise our choice of s was necessarily wrong.
-        double denom = dotProduct(sx_y, psisx, temp_dot) + K * multiplySuperPixels(sx_z.cwiseProduct(constant),sx_y);
+        double denom = dotProduct(sx_y, psisx, temp_dot) + multiplySuperPixels(sx_z.cwiseProduct(constant),sx_y);
         // Denom should be negative, as our energy function is now concave.
         optimal_step_size = - num / (2 * denom);
 
@@ -1060,17 +1063,17 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
         }
 
         //compute the new gradient
-        grad_y += 2 * optimal_step_size * (psisx + multiplySuperPixels(sx_z.cwiseProduct(constant)));// - (sx_z.cwiseProduct(constant).sum() - dotProduct(sx_z.cwiseProduct(constant) * super_pixel_classifier_,Q - MatrixXf::Ones(M_,N_),temp_dot)) * sx_y.inverse().transpose(); 
-        grad_z = K * MatrixXf::Ones(M_,R_) + K * (multiplySuperPixels(Q - MatrixXf::Ones(M_,N_))).cwiseProduct(constant);
+        grad_y += 2 * optimal_step_size * (psisx + multiplySuperPixels((z_labels - MatrixXf::Ones(M_,R_)).cwiseProduct(constant)));// - (sx_z.cwiseProduct(constant).sum() - dotProduct(sx_z.cwiseProduct(constant) * super_pixel_classifier_,Q - MatrixXf::Ones(M_,N_),temp_dot)) * sx_y.inverse().transpose(); 
+        grad_z = MatrixXf::Ones(M_,R_).cwiseProduct(constant) + (multiplySuperPixels(Q - MatrixXf::Ones(M_,N_))).cwiseProduct(constant);
 
         energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
-        energy += K * (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
-
+        energy += (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
     }
-    
+
     //std::cout << v.roow << std::endl;
     //std::cout << multiplySuperPixels(sx_z.cwiseProduct(constant)).rows() << std::endl;
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
+    std::cout << energy << std::endl;
 
     return Q;
 }

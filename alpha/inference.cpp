@@ -199,7 +199,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     std::vector<perf_measure> traced_perfs_qp;
     std::vector<perf_measure> traced_perfs_qp_nc;
     std::vector<perf_measure> traced_perfs_qp_sp;
-    
+ /*   
     //run the inference with the convex problem
     std::cout << "---Finding global optimum, of convex energy function" <<std::endl;
     clock_t start, end;
@@ -213,7 +213,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q, size, path_to_output, dataset_name);
-/*
+*/
     //run with non_convex function
     std::cout << "---Finding local optimum, of non-convex energy function" <<std::endl;
     path_to_output.replace(path_to_output.end()-4, path_to_output.end(),"_nc.bmp");
@@ -221,7 +221,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     start_nc = clock();
     //MatrixXf Q_non_convex = Q;
     //(void) crf.tracing_qp_inference_super_pixels_non_convex(Q_non_convex);
-    MatrixXf Q_non_convex = crf.qp_inference_non_convex(Q);
+    MatrixXf Q_non_convex = crf.qp_inference_non_convex(init);
     end_nc = clock();
     double timing_non_convex = (double(end_nc-start_nc)/CLOCKS_PER_SEC);
     double final_energy_non_convex = crf.compute_energy(Q_non_convex);
@@ -230,7 +230,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(Q_non_convex, size, path_to_output, dataset_name);
-
+/*
 
     //we now need to run the code with a non_convex energy function including the super pixels
     std::cout << "---Finding local optimum with super pixel" <<std::endl;
@@ -279,7 +279,6 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
     double timing_g_non_convex_sp = (double(end_g_nc_sp-start_g_nc_sp)/CLOCKS_PER_SEC);
     std::cout << "Time: " << timing_g_non_convex_sp << std::endl;    
     double final_energy_g_non_convex_sp = crf.compute_energy(Q_g_non_convex_sp);
-    std::cout << "Energy: " << final_energy_g_non_convex_sp << std::endl;
     double discretized_energy_g_non_convex_sp = crf.assignment_energy(crf.currentMap(Q_g_non_convex_sp));
     write_down_perf(timing_g_non_convex_sp, final_energy_g_non_convex_sp, discretized_energy_g_non_convex_sp, path_to_output);
     // Perform the MAP estimation on the fully factorized distribution

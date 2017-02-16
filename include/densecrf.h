@@ -113,8 +113,8 @@ public:
 	//===============================================================
 	//The following definitions are for Tom Joys 4YP which computes the QP with a non convex function and with super pixel terms
 	MatrixXf qp_inference_non_convex(const MatrixXf & init) const;
-	MatrixXf qp_inference_super_pixels(const MatrixXf & init, double K = 100000) const;
-	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init, double K = 100000) const;
+	MatrixXf qp_inference_super_pixels(const MatrixXf & init, double K = 10000) const;
+	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init, double K = 0.005) const;
 	std::vector<perf_measure> tracing_qp_inference_non_convex(MatrixXf & init, double time_limit = 0) const;
 	std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit = 0) const;
 	//===============================================================

@@ -56,7 +56,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 std::cout << "---Running tests on QP with non convex energy\r\n";
                 Q = crf.qp_inference(Q);
                 Q = crf.qp_inference_non_convex(Q);
-            } else if (method == "qp_sp" || method == "qp_sp_0" || method == "qp_sp_10" || method == "qp_sp_100" || method == "qp_sp_1000" || method == "qp_sp_10000" || method == "qp_sp_100000" || method == "qp_sp_1000000"){
+            } else if (method == "qp_sp_0" || method == "qp_sp_0" || method == "qp_sp_00001" || method == "qp_sp_0001" || method == "qp_sp_001" || method == "qp_sp_01" || method == "qp_sp_1" || method == "qp_sp_10" || method == "qp_sp_100" || method == "qp_sp_1000" || method == "qp_sp_10000" ){
                 std::cout << "---Running tests on QP with super pixel terms. Constant = "<< sp_const << "\r\n";
                 crf.addSuperPixel(img,4,2,5000);
                 crf.addSuperPixel(img,4,2,500);
@@ -116,8 +116,11 @@ int main(int argc, char *argv[])
     else if ("qp_sp_100") sp_const = 100;
     else if ("qp_sp_1000") sp_const = 1000;
     else if ("qp_sp_10000") sp_const = 10000;
-    else if ("qp_sp_100000") sp_const = 100000;
-    else if ("qp_sp_1000000") sp_const = 1000000;
+    else if ("qp_sp_01") sp_const = 0.1;
+    else if ("qp_sp_001") sp_const = 0.01;
+    else if ("qp_sp_0001") sp_const = 0.001;
+    else if ("qp_sp_00001") sp_const = 0.0001;
+
     
 
 
