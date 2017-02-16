@@ -1,19 +1,20 @@
-function [score, overall_acc] = voc_test(path, dataset_split)
-addpath('/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/VOCdevkit/VOCcode');
+
+function score = voc_test(path, dataset_split)
+addpath('/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/VOCdevkit/VOCcode');
+
 
 VOCinit;
 
-
-
-VOCopts.datadir = '/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010';
+VOCopts.datadir = '/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010';
 testset = dataset_split;
 
 
-gtimgpath= '/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/SegmentationClass/%s.png';
-imgsetpath= '/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/split/%s.txt';
+gtimgpath= '/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/SegmentationClass/%s.png';
+imgsetpath= '/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/split/%s.txt';
 respath_tmpl=[path '/%s.png'];
 
-path_to_test_set = ['/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/split/' dataset_split '.txt'];
+path_to_test_set = ['/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/split/' dataset_split '.txt'];
+
 [gtids,t]=textread(path_to_test_set,'%s %d');
 
 num = 21; % Number of classes

@@ -28,6 +28,7 @@
 #pragma once
 #include "unary.h"
 #include "labelcompatibility.h"
+#include "msImageProcessor.h"
 #include "objective.h"
 #include "pairwise.h"
 #include <vector>
@@ -76,11 +77,18 @@ public:
 /**** DenseCRF ****/
 class DenseCRF{
 protected:
-	// Number of variables and labels
-	int N_, M_;
+	// Number of variables, labels and super pixel terms
+	int N_, M_, R_;
+
+	VectorXf mean_of_superpixels_;
+	VectorXf exp_of_superpixels_;
+
 
 	// Store the unary term
 	UnaryEnergy * unary_;
+
+	//store the super pixel term
+	Matrix<float, Dynamic, Dynamic> super_pixel_classifier_;
 
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
@@ -117,6 +125,8 @@ public:
 	void setUnaryEnergy( const MatrixXf & unary );
 	// Add a logistic unary term
 	void setUnaryEnergy( const MatrixXf & L, const MatrixXf & f );
+	//Add a super pixel term
+	int setSuperPixelEnergy( const unsigned char * img);
 	UnaryEnergy* getUnaryEnergy();
 
 
@@ -132,6 +142,16 @@ public:
 	MatrixXf qp_inference(const MatrixXf & init) const;
 	MatrixXf qp_inference(const MatrixXf & init, int nb_iterations) const;
 	std::vector<perf_measure> tracing_qp_inference(MatrixXf & init, double time_limit = 0) const;
+
+	//===============================================================
+	//The following definitions are for Tom Joys 4YP which computes the QP with a non convex function and with super pixel terms
+	MatrixXf qp_inference_non_convex(const MatrixXf & init) const;
+	MatrixXf qp_inference_super_pixels(const MatrixXf & init, double K = 100000) const;
+	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init, double K = 100000) const;
+	std::vector<perf_measure> tracing_qp_inference_non_convex(MatrixXf & init, double time_limit = 0) const;
+	std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit = 0) const;
+	//===============================================================
+
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
     MatrixXf qp_cccp_inference(const MatrixXf & init) const;
 	std::vector<perf_measure> tracing_qp_cccp_inference(MatrixXf & init, double time_limit =0) const;
@@ -224,6 +244,7 @@ public: /* Parameters */
 	void setLabelCompatibilityParameters( const VectorXf & v );
 	VectorXf kernelParameters() const;
 	void setKernelParameters( const VectorXf & v );
+
 };
 
 class DenseCRF2D:public DenseCRF{
@@ -240,6 +261,10 @@ public:
 	// Add a Bilateral pairwise potential with spacial standard deviations sx, sy and color standard deviations sr,sg,sb
 	void addPairwiseBilateral( float sx, float sy, float sr, float sg, float sb, const unsigned char * im, LabelCompatibility * function=NULL, KernelType kernel_type=DIAG_KERNEL, NormalizationType normalization_type=NORMALIZE_SYMMETRIC );
 	
+	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
+	void addSuperPixel(unsigned char * img, int spatial_radius = 8, int range_radius = 4, int min_region_count = 2500, SpeedUpLevel = NO_SPEEDUP);
+
+
 	// Set the unary potential for a specific variable
 	using DenseCRF::setUnaryEnergy;
 };

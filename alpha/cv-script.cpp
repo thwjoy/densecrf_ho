@@ -9,6 +9,7 @@
 void image_inference(Dataset dataset, std::string method, std::string path_to_results,
                      std::string image_name, float spc_std, float spc_potts, 
                      float bil_spcstd, float bil_colstd, float bil_potts, LP_inf_params & lp_params)
+
 {
 
     std::string image_path = dataset.get_image_path(image_name);
@@ -16,16 +17,14 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     std::string dataset_name = dataset.name;
 
     img_size size = {-1, -1};
-    // Load the unaries potentials for our image.
+    //Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(unaries_path, size);
     unsigned char * img = load_image(image_path, size);
 
     DenseCRF2D crf(size.width, size.height, unaries.rows());
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
-    crf.addPairwiseBilateral(bil_spcstd, bil_spcstd,
-                             bil_colstd, bil_colstd, bil_colstd,
-                             img, new PottsCompatibility(bil_potts));
+    crf.addPairwiseBilateral(bil_spcstd, bil_spcstd,bil_colstd, bil_colstd, bil_colstd,img, new PottsCompatibility(bil_potts));
 
     MatrixXf Q;
     {
@@ -47,8 +46,6 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             double time_budget = 30;    // seconds
 
             start = std::chrono::high_resolution_clock::now();
-            //start = time(NULL);
-            //start = omp_get_wtime();
             Q = crf.unary_init();
             if (method == "mf5") {
                 Q = crf.inference(Q, 5);
@@ -58,7 +55,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
             } else if (method == "qpcccp") {
                 Q = crf.qp_inference(Q);
-                Q = crf.qp_cccp_inference(Q);
+                Q = crf.qp_cccp_inference(Q); 
             } else if (method == "fixedDC-CCV"){
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
@@ -301,6 +298,16 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                     Q = get_extended_matrix(rQ, indices, unaries.rows());
                 }
 
+            } else if (method == "qp_nc"){ //qp with a non convex energy function, relaxations removed
+                std::cout << "---Running tests on QP with non convex energy\r\n";
+                Q = crf.qp_inference(Q);
+                Q = crf.qp_inference_non_convex(Q);
+            } else if (method == "qp_sp"){
+                std::cout << "---Running tests on QP with super pixel terms\r\n";
+                crf.addSuperPixel(img,4,2,5000);
+                crf.addSuperPixel(img,4,2,500);
+                crf.addSuperPixel(img,4,2,50);               
+                Q = crf.qp_inference_super_pixels_non_convex(Q);
             } else if (method == "unary"){
                 (void)0;
             } else{
@@ -352,11 +359,12 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+
     std::string dataset_split = argv[1];
     std::string dataset_name  = argv[2];
     std::string method = argv[3];
     std::string path_to_results = argv[4];
-
+    path_to_results = "/home/tomj/Documents/4YP/densecrf/" + path_to_results;
 
     std::string param1 = argv[5];
     float spc_std = std::stof(param1);
@@ -371,15 +379,8 @@ int main(int argc, char *argv[])
 
     // lp inference params
 	LP_inf_params lp_params;
-	if(argc > 10) lp_params.prox_max_iter = atoi(argv[10]);
-	if(argc > 11) lp_params.fw_max_iter = atoi(argv[11]);
-	if(argc > 12) lp_params.qp_max_iter = atoi(argv[12]);
-	if(argc > 13) lp_params.prox_reg_const = atof(argv[13]);
-	if(argc > 14) lp_params.dual_gap_tol = atof(argv[14]);
-	if(argc > 15) lp_params.qp_tol = atof(argv[15]);
-	if(argc > 16) lp_params.best_int = atoi(argv[16]);
     lp_params.prox_energy_tol = lp_params.dual_gap_tol;
-	if(argc > 17) lp_params.prox_energy_tol = atof(argv[17]);
+	
 
     std::cout << "## COMMAND: " << argv[0] << " " << dataset_split << " " << dataset_name << " " << method << " "
         << path_to_results << " " << spc_std << " " << spc_potts << " " << bil_spcstd << " " << bil_colstd << " "
@@ -388,9 +389,11 @@ int main(int argc, char *argv[])
         << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
         << lp_params.best_int << " " << lp_params.prox_energy_tol << std::endl;
 
+
     make_dir(path_to_results);
 
     Dataset ds = get_dataset_by_name(dataset_name);
+
     //std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
     std::vector<std::string> test_images;
     //test_images.push_back("2007_000559");

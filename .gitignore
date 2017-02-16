@@ -1,7 +1,6 @@
+data
 build
 debug
 *.pyc
 data
-output.ppm
-ouput.ppm
-
+*.ppm

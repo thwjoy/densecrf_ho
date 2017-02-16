@@ -1,14 +1,12 @@
 function [score, overall_acc] = msrc_test(path, dataset_split)
 
-dpath = '/media/ajanthan/sheep/Ajanthan/data/';
+dpath = '/home/tomj/Documents/4YP/densecrf/data';
 
-datadir = [dpath 'MSRC/'];
+datadir = [dpath '/MSRC'];
 testset = dataset_split;
 
+gtimgpath= [datadir '/MSRC_ObjCategImageDatabase_v2/GroundTruth/%s_GT.bmp'];
 
-%gtimgpath0= [datadir 'MSRC_ObjCategImageDatabase_v2/GroundTruth/%s_GT.bmp'];
-%gtimgpath= [datadir 'MSRC_ObjCategImageDatabase_v2/GroundTruth/%s_GT.png'];
-gtimgpath= [datadir 'fine_annot/%s_GT.bmp'];
 respath_tmpl=[path '/%s.png'];
 
 path_to_test_set = [datadir '/split/' dataset_split '.txt'];
@@ -27,12 +25,14 @@ for i=1:length(gtids)
     imname = toks{1};
      try
     % ground truth label file
+
+
     gtfile = sprintf(gtimgpath,imname);
 %     break;
+
     [gtim,map] = imread(gtfile);
     gtim = rgb2ind(gtim, cmap);
     gtim = double(gtim);
-
 
     % results file
     resfile = sprintf(respath_tmpl, imname);
@@ -125,4 +125,6 @@ function cmap = MSRClabelcolormap(N)
     cmap(22,:) = [0,0,0];
     
     cmap = cmap / 255;
+
 end
+

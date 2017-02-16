@@ -1,0 +1,41 @@
+Job launching after 0.08 seconds in submission.
+Running python job.
+Changed into dir /home/tomj/Documents/4YP/densecrf/CV/Allparameters-QP
+Importing exp-lrqp.py
+Traceback (most recent call last):
+  File "/home/tomj/Documents/4YP/Spearmint/spearmint/launcher.py", line 243, in launch
+    result = python_launcher(job)
+  File "/home/tomj/Documents/4YP/Spearmint/spearmint/launcher.py", line 325, in python_launcher
+    module  = __import__(main_file)
+  File "/home/tomj/Documents/4YP/densecrf/CV/Allparameters-QP/exp-lrqp.py", line 2, in <module>
+    import matlab.engine
+ImportError: No module named matlab.engine
+Problem executing the function
+Job failed in 0.00 seconds.
+Error in atexit._run_exitfuncs:
+Traceback (most recent call last):
+  File "/usr/lib/python2.7/atexit.py", line 24, in _run_exitfuncs
+    func(*targs, **kargs)
+  File "/usr/local/lib/python2.7/dist-packages/pymongo/periodic_executor.py", line 167, in _shutdown_executors
+    executor.join(1)
+  File "/usr/local/lib/python2.7/dist-packages/pymongo/periodic_executor.py", line 96, in join
+    self._thread.join(timeout)
+  File "/usr/lib/python2.7/threading.py", line 951, in join
+    self.__block.wait(delay)
+  File "/usr/lib/python2.7/threading.py", line 359, in wait
+    _sleep(delay)
+KeyboardInterrupt
+Error in sys.exitfunc:
+(<type 'exceptions.ImportError'>, ImportError('No module named matlab.engine',), <traceback object at 0x7f24f309d7e8>)
+Traceback (most recent call last):
+  File "/usr/lib/python2.7/atexit.py", line 24, in _run_exitfuncs
+    func(*targs, **kargs)
+  File "/usr/local/lib/python2.7/dist-packages/pymongo/periodic_executor.py", line 167, in _shutdown_executors
+    executor.join(1)
+  File "/usr/local/lib/python2.7/dist-packages/pymongo/periodic_executor.py", line 96, in join
+    self._thread.join(timeout)
+  File "/usr/lib/python2.7/threading.py", line 951, in join
+    self.__block.wait(delay)
+  File "/usr/lib/python2.7/threading.py", line 359, in wait
+    _sleep(delay)
+KeyboardInterrupt
