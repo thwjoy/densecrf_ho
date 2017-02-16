@@ -29,6 +29,10 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
                  Potts_weight_set parameters, std::string path_to_output,
                  std::string dataset_name, int argc, char* argv[]);
 
+void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_to_unaries,
+                 Potts_weight_set parameters, std::string path_to_output,
+                 std::string dataset_name, int argc, char* argv[]);
+
 void minimize_old_new_ph(std::string path_to_image, std::string path_to_unaries,
                  Potts_weight_set parameters, std::string path_to_output,
                  std::string dataset_name, int argc, char* argv[]);

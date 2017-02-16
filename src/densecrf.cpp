@@ -148,32 +148,9 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     for (int i = 0; i < super_pixel_classifier.cols(); i++) {
         region = regions_out[i];
         super_pixel_classifier(region,i) = 1;
-        mean_of_superpixels(region) += 0.2989 * (double) img[i];
-        mean_of_superpixels(region) += 0.5870 * (double) img[i + 1];
-        mean_of_superpixels(region) += 0.1140 * (double) img[i + 2];
-        count_regions(region) += 1;
     }
 
-
-    mean_of_superpixels = mean_of_superpixels.cwiseQuotient(count_regions);
-    
-
-    for (int i = 0; i < super_pixel_classifier.cols(); i++) {
-        region = regions_out[i];
-        double grey_val = 0.2989 * (double) img[i] + 0.5870 * (double) img[i + 1] + 0.1140 * (double) img[i + 2];
-        sd_of_superpixels(region) += (mean_of_superpixels(region) - grey_val) * (mean_of_superpixels(region) - grey_val);
-    }
-
-    sd_of_superpixels = (sd_of_superpixels.cwiseQuotient(NORMALISER * count_regions).cwiseSqrt());
-
-    //update the private member functions
     R_ += reg;
-    mean_of_superpixels_.conservativeResize(R_);
-    mean_of_superpixels_.tail(reg) = mean_of_superpixels;
-    exp_of_superpixels_.conservativeResize(R_);
-    exp_of_superpixels_.tail(reg) = exp(-1 * sd_of_superpixels.array());
-    super_pixel_classifier_.conservativeResize(R_,W_ * H_);
-    super_pixel_classifier_.block(R_ - reg, 0, reg,W_ * H_) << super_pixel_classifier;
 
     writePPMImage("./output.ppm",segment_image, H_, W_, 3, "");
     delete[] segment_image;
@@ -3681,6 +3658,322 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 
     init = best_Q;
     return perfs;
+}
+
+// LP inference with proximal algorithm
+MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const {
+    MatrixXf best_Q(M_, N_), tmp(M_, N_), tmp2(M_, N_);
+    MatrixP dot_tmp(M_, N_);
+    MatrixXi ind(M_, N_);
+    VectorXi K(N_);
+    VectorXd sum(N_);
+    MatrixXf unary = unary_->get();
+
+    MatrixXf Q = init;
+    renormalize(Q);
+    assert(valid_probability_debug(Q));
+    best_Q = Q;
+
+    // Compute the value of the energy
+    double energy = 0, best_energy = std::numeric_limits<double>::max(), 
+           best_int_energy = std::numeric_limits<double>::max();
+    double int_energy = assignment_energy_true(currentMap(Q));
+#if VERBOSE    
+    double kl = klDivergence(Q, max_rounding(Q));
+#endif
+    energy = compute_energy_LP(Q);
+    if (energy > int_energy) {  // choose the best initialization 
+        Q = max_rounding(Q);
+        energy = compute_energy_LP(Q);
+    }
+    best_energy = energy;
+    best_int_energy = int_energy;
+#if VERBOSE    
+    printf("Initial energy in the LP: %10.3f / %10.3f / %10.3f\n", energy, int_energy, kl);
+#endif
+
+    const int maxiter = params.prox_max_iter;
+    const bool best_int = params.best_int;
+    const bool accel_prox = params.accel_prox;
+    const float prox_tol = params.prox_energy_tol;      // proximal energy tolerance
+
+    // dual Frank-Wolfe variables
+    const float dual_gap_tol = params.dual_gap_tol;     // dual gap tolerance
+    const float lambda = params.prox_reg_const; // proximal-regularization constant
+    const int fw_maxiter = params.fw_max_iter;
+    float delta = 1;                        // FW step size
+    double dual_gap = 0, dual_energy = 0;
+
+    // dual variables
+    MatrixXf alpha_tQ(M_, N_);  // A * alpha, (t - tilde not iteration)
+    MatrixXf s_tQ(M_, N_);      // A * s, conditional gradient of FW == subgradient
+    VectorXf beta(N_);          // unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
+    MatrixXf beta_mat(M_, N_);  // beta_mat.row(i) == beta forall i --> N_ * M_ elements 
+    MatrixXf gamma(M_, N_);     // nonnegative
+    
+    MatrixXf cur_Q(M_, N_);     // current Q in prox step
+    MatrixXf rescaled_Q(M_, N_);// infeasible Q rescaled to be within [0,1]
+#if VERBOSE
+    MatrixXf int_Q(M_, N_);     // store integral Q
+#endif
+
+    // accelerated prox_lp
+    MatrixXf prev_Q(M_, N_);    // Q resulted in prev prox step
+    prev_Q.fill(0);
+    float w_it = 1;             // momentum weight: eg. it/(it+3)
+
+    // gamma-qp variables
+    const float qp_delta = params.qp_const; // constant used in qp-gamma
+    const float qp_tol = params.qp_tol;     // qp-gamma tolernace
+    const int qp_maxiter = params.qp_max_iter;
+
+
+    VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_), v_tmp2(M_);
+    MatrixXf Y(M_, N_), neg_H(M_, N_), pos_H(M_, N_);
+    VectorXf qp_values(N_);
+
+    //clock_t start, end;
+    typedef std::chrono::high_resolution_clock::time_point htime;
+    htime start, end;
+
+
+    int it=0;
+    int count = 0;
+    do { //step iteration
+        ++it;
+
+        // initialization
+        beta_mat.fill(0);
+        beta.fill(0);
+        gamma.fill(1);  // all zero is a fixed point of QP iteration!
+        cur_Q = Q;
+        
+        if (accel_prox) {   // accelerated prox
+            w_it = float(it)/(it+3.0);  // simplest choice
+            tmp = Q - prev_Q;
+            tmp *= w_it;
+            cur_Q += tmp;   // cur_Q = Q + w_it(Q - prev_Q)
+            prev_Q = Q;
+        }
+        
+        int pit = 0;
+        alpha_tQ.fill(0);   // all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
+
+        
+        // proximal iteration this is the t iterating parameter in the paper
+        do {    
+            ++pit;
+            // initialization
+            s_tQ.fill(0);
+
+/*#############################Optimise aver gamma##############################*/
+
+            // QP-gamma -- \cite{NNQP solver Xiao and Chen 2014}
+            // case-1: solve for gamma using qp solver! 
+            // 1/2 * gamma^T * C * gamma - gamma^T * H
+            // populate Y matrix (compute H in the paper)
+            tmp = alpha_tQ - unary;
+            for (int i = 0; i < N_; ++i) {
+                // do it in linear time
+                v_tmp2 = tmp.col(i);
+                qp_gamma_multiplyC(v_y, v_tmp2, M_, lambda); //computes eq 35 in the paper for each pixel
+                Y.col(i) = v_y; 
+            }   
+            Y += cur_Q;     // Y is the h in the paper given as h = Q(Aa - phi) - y^k (paper notation)
+            //we have calculate Y as a +ve when it's actually -ve
+            for (int i = 0; i < N_; ++i) {
+                for (int j = 0; j < M_; ++j) {  
+                    pos_H(j, i) = std::max(-Y(j, i), (float)0);     // pos_H 
+                    neg_H(j, i) = std::max(Y(j, i), (float)0);      // neg_H
+                }
+            }
+            // qp iterations, 
+            int qpit = 0;
+            qp_values.fill(0);
+            float qp_value = std::numeric_limits<float>::max();
+#if VERBOSE
+            //start = clock();
+            start = std::chrono::high_resolution_clock::now();
+#endif
+            do {
+                //solve for each pixel separately, this employes the algorithm from citeation 26
+                for (int i = 0; i < N_; ++i) {
+                    v_gamma = gamma.col(i); //col just accesses the lables of pixel i
+                    v_pos_h = pos_H.col(i);
+                    v_neg_h = neg_H.col(i);
+                    
+                    // do it linear time
+                    qp_gamma_step(v_gamma, v_pos_h, v_neg_h, qp_delta, M_, lambda, v_step, v_tmp, v_tmp2);
+                    gamma.col(i) = v_gamma;
+
+                    // do it in linear time
+                    qp_gamma_multiplyC(v_tmp, v_gamma, M_, lambda);
+                    v_y = Y.col(i);
+                    qp_values(i) = 0.5 * v_gamma.dot(v_tmp) + v_gamma.dot(v_y);
+                }
+                float qp_value1 = qp_values.sum();
+                //printf("\n#QP: %4d, %10.3f", qpit, qp_value1);
+                ++qpit;
+                if (std::abs(qp_value - qp_value1) < qp_tol) break;
+                qp_value = qp_value1;
+            } while (qpit < qp_maxiter);
+
+#if VERBOSE
+            end = std::chrono::high_resolution_clock::now();
+            double dt = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
+            printf("# Time-QP %d: %5.5f, %10.3f\t", qpit, dt, qp_value);
+#endif
+
+/*#############################Optimise aver beta###############################*/
+
+            // case-2: update beta -- gradient of dual wrt beta equals to zero
+            beta_mat = (alpha_tQ + gamma - unary);  // -B^T/l * (A * alpha + gamma - phi)
+            // DON'T DO IT AT ONCE!! (RETURNS A SCALAR???)--> do it in two steps
+            beta = -beta_mat.colwise().sum();   
+            beta /= M_;
+            // repeat beta in each row of beta_mat - - B * beta
+            for (int j = 0; j < M_; ++j) {
+                beta_mat.row(j) = beta;
+            }
+
+/*#############################Optimise aver alpha##############################*/
+
+            // case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
+            Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q; // Q may be infeasible --> but no problem
+            rescale(rescaled_Q, Q);//truncate Q to be [0,1]
+
+            // Compute the conditional gradient
+            // subgradient lower minus upper
+            // Pairwise
+            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+#if VERBOSE
+                //start = clock();
+                start = std::chrono::high_resolution_clock::now();
+#endif
+                // new PH implementation
+                // rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
+                pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q); 
+                s_tQ += tmp;    // A * s is lower minus upper, keep neg introduced by compatibility->apply
+
+#if VERBOSE
+                //end = clock();
+                //double dt = (double)(end-start)/CLOCKS_PER_SEC;
+                end = std::chrono::high_resolution_clock::now();
+                double dt = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
+                printf("# Time-%d: %5.5f\t", k, dt);
+#endif
+            }
+            // find dual gap
+            tmp = alpha_tQ - s_tQ;  
+            dual_gap = dotProduct(tmp, Q, dot_tmp);
+
+#if VERBOSE
+            // dual-energy value
+            tmp2 = Q - cur_Q;
+            dual_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda) + dotProduct(tmp2, cur_Q, dot_tmp) / lambda;
+            dual_energy -= beta.sum();
+            double primal_energy = dotProduct(tmp2, tmp2, dot_tmp) / (2* lambda);
+            primal_energy += dotProduct(unary, Q, dot_tmp);
+            primal_energy -= dotProduct(s_tQ, Q, dot_tmp);  // cancel the neg in s_tQ
+            //assert(dual_gap == (dual_energy - primal_energy));
+            printf("%4d: [%10.3f = %10.3f, %10.3f, %10.3f, ", pit-1, dual_gap, primal_energy+dual_energy, 
+                    -dual_energy, primal_energy);
+
+#endif
+            if (dual_gap <= dual_gap_tol) break;    // stopping condition
+
+            // compute the optimal step size
+            delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+            delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
+            assert(delta > 0);
+
+#if VERBOSE
+            printf("%1.10f]\n", delta);
+#endif
+            // update alpha_tQ
+            alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
+
+        } while(pit<fw_maxiter);
+
+/*##############################################################################*/
+
+        // project Q back to feasible region
+        feasible_Q(tmp, ind, sum, K, Q);
+        Q = tmp;
+        renormalize(Q);
+        assert(valid_probability_debug(Q));
+
+        double prev_int_energy = int_energy;
+        int_energy = assignment_energy_true(currentMap(Q));
+#if VERBOSE
+        double prev_energy = energy;
+        energy = compute_energy_LP(Q);
+        int_Q = max_rounding(Q);
+        kl = klDivergence(Q, int_Q);
+#endif
+        if (best_int) {
+            if (abs(int_energy - prev_int_energy) < prox_tol) ++count;
+            else count = 0;
+            if (count >= 5) {
+                std::cout << "\n##CONV: int_energy - prev_int_energy < " << prox_tol << " for last " << count 
+                    << " iterations! terminating...\n";
+                break;
+            }
+            if(int_energy < best_int_energy) {
+                best_Q = Q;
+                best_int_energy = int_energy;
+            }
+#if VERBOSE
+            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_int_energy);
+#endif
+        } else {
+#if VERBOSE == false
+            double prev_energy = energy;
+            energy = compute_energy_LP(Q);
+#endif
+            if (abs(energy - prev_energy) < prox_tol) ++count;
+            else count = 0;
+            if (count >= 5) {
+                std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
+                    << " iterations! terminating...\n";
+                break;
+            }
+            if( energy < best_energy) {
+                best_Q = Q;
+                best_energy = energy;
+            }
+#if VERBOSE
+            printf("%4d: %10.3f / %10.3f / %10.3f / %10.3f\n", it-1, energy, int_energy, kl, best_energy);
+#endif
+        }
+        if (params.less_confident_percent > 0) {
+            float confidence_tol = params.confidence_tol;
+            std::vector<int> pI;
+            less_confident_pixels(pI, best_Q, confidence_tol);
+            double percent = double(pI.size())/double(Q.cols())*100;
+            if (percent > params.less_confident_percent) {
+                std::cout << "\n##CONV: Less confident pixels are greater than " << params.less_confident_percent 
+                    << "%, terminating...\n";
+                break;
+            }
+        }
+
+    } while(it<maxiter);
+
+#if VERBOSE
+    int_energy = assignment_energy_true(currentMap(Q));
+    std::cout <<"final projected energy: " << int_energy << "\n";
+
+    // verify KKT conditions
+    // gamma
+    tmp = gamma.cwiseProduct(Q);
+    std::cout << "gamma\t:: mean=" << gamma.mean() << ",\tmax=" << gamma.maxCoeff() << ",\tmin=" << gamma.minCoeff() << std::endl;
+    std::cout << "gamma.cwiseProduct(Q)\t:: mean=" << tmp.mean() << ",\tmax=" << tmp.maxCoeff() << ",\tmin=" << tmp.minCoeff() << std::endl;
+    std::cout << "beta_mat\t:: mean=" << beta_mat.mean() << ",\tmax=" << beta_mat.maxCoeff() << ",\tmin=" << beta_mat.minCoeff() << std::endl;
+    std::cout << "alpha_tQ\t:: mean=" << alpha_tQ.mean() << ",\tmax=" << alpha_tQ.maxCoeff() << ",\tmin=" << alpha_tQ.minCoeff() << std::endl;
+#endif
+
+    return best_Q;
 }
 
 std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit, bool full_mat) const {

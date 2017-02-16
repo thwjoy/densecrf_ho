@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
     std::string path_to_output = "/home/tomj/Documents/4YP/densecrf/data/output/"  + std::string(argv[1]) + "_lp.bmp";
     std::string dataset_name = "MSRC";
 
-    minimize_prox_LP(path_to_image, path_to_unaries, params, path_to_output, dataset_name, argc, argv);
+    minimize_prox_LP_super_pixels(path_to_image, path_to_unaries, params, path_to_output, dataset_name, argc, argv);
 
     return 0;
  

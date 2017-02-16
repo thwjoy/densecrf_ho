@@ -543,6 +543,7 @@ void minimize_LP(std::string path_to_image, std::string path_to_unaries,
     delete[] img;
 }
 
+
 void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
                       Potts_weight_set parameters, std::string path_to_output,
                       std::string dataset_name, int argc, char* argv[]) {
@@ -647,6 +648,80 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
         << crf.compute_energy_true(int_Q) << std::endl;
 
+
+    save_map(Q, size, path_to_output, dataset_name);
+
+    delete[] img;
+}
+
+void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_to_unaries,
+                      Potts_weight_set parameters, std::string path_to_output,
+                      std::string dataset_name, int argc, char* argv[]) {
+
+    // lp inference params
+    LP_inf_params lp_params;
+    if(argc > 1) lp_params.prox_max_iter = atoi(argv[1]);
+    if(argc > 2) lp_params.fw_max_iter = atoi(argv[2]);
+    if(argc > 3) lp_params.qp_max_iter = atoi(argv[3]);
+    if(argc > 4) lp_params.prox_reg_const = atof(argv[4]);
+    if(argc > 5) lp_params.dual_gap_tol = atof(argv[5]);
+    if(argc > 6) lp_params.qp_tol = atof(argv[6]);
+    if(argc > 7) lp_params.best_int = atoi(argv[7]);
+    lp_params.prox_energy_tol = lp_params.dual_gap_tol;
+    if(argc > 8) lp_params.prox_energy_tol = atof(argv[8]);
+
+    std::cout << "## COMMAND: " << argv[0] << " " 
+        << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
+        << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
+        << lp_params.best_int << " " << lp_params.prox_energy_tol << std::endl;
+
+    img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
+    // Load the unaries potentials for our image.
+    MatrixXf unaries = load_unary(path_to_unaries, size);
+    unsigned char * img = load_image(path_to_image, size);
+
+    // Load a crf
+    DenseCRF2D crf(size.width, size.height, unaries.rows());
+    std::cout << "CRF: W = " << size.width << ", H = " << size.height << ", L = " << unaries.rows() << std::endl;
+
+    crf.setUnaryEnergy(unaries);
+    crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
+                            new PottsCompatibility(parameters.spatial_potts_weight));
+    crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
+                             parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
+                             img, new PottsCompatibility(parameters.bilat_potts_weight));
+    crf.addSuperPixel(img,4,2,5000);
+    crf.addSuperPixel(img,4,2,1000);
+    crf.addSuperPixel(img,4,2,100);
+    clock_t start, end;
+    MatrixXf init = crf.unary_init();
+
+    double timing = -1;
+    
+    //Q = crf.lp_inference_prox_restricted(Q, lp_params);
+    typedef std::chrono::high_resolution_clock::time_point htime;
+    htime st = std::chrono::high_resolution_clock::now();
+    MatrixXf Q = crf.lp_inference_prox_super_pixels(init, lp_params);
+    htime et = std::chrono::high_resolution_clock::now();
+    double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
+    std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
+
+    end = clock();
+    timing = (double(end-start)/CLOCKS_PER_SEC);
+    std::cout << "TOT-PROX-LP: " << timing << " seconds" << std::endl;
+    double final_energy = crf.compute_energy(Q);
+    double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+    write_down_perf(timing, final_energy, discretized_energy, path_to_output);
+    double final_energy_true = crf.compute_energy_true(Q);
+    double discretized_energy_true = crf.assignment_energy_true(crf.currentMap(Q));
+    std::cout << "QP: " << final_energy << ", int: " << discretized_energy << std::endl;
+    std::cout << "#TRUE QP: " << final_energy_true << ", LP: " << crf.compute_energy_LP(Q) 
+        << ", int: " << discretized_energy_true << std::endl;
+
+    MatrixXf int_Q = crf.max_rounding(Q);
+
+    std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
+        << crf.compute_energy_true(int_Q) << std::endl;
 
     save_map(Q, size, path_to_output, dataset_name);
 
