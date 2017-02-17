@@ -25,6 +25,7 @@
         (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
         SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 #include "densecrf.h"
 #include "eigen_utils.hpp"
 #include "Eigen/LU"
@@ -3882,6 +3883,9 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             }
 
         } else {
+
+            double prev_energy = energy;
+            energy = compute_energy_LP(Q);
 
             if (abs(energy - prev_energy) < prox_tol) ++count;
             else count = 0;
