@@ -112,6 +112,7 @@ int main(int argc, char *argv[])
 
     float sp_const;
     if(method == "qp_sp_0") sp_const = 0;
+    else if (method == "qp_sp_1") sp_const = 1;
     else if (method == "qp_sp_10") sp_const = 10;
     else if (method == "qp_sp_100") sp_const = 100;
     else if (method == "qp_sp_1000") sp_const = 1000;
