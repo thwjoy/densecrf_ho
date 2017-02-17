@@ -3663,6 +3663,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     VectorXd sum(N_);
     MatrixXf unary = unary_->get();
 
+    double sp_constant = 10;
 
     MatrixXf Q = init;
     renormalize(Q);
@@ -3730,6 +3731,8 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
     int it=0;
     int count = 0;
+
+
     do { //step iteration
         ++it;
 
@@ -3749,6 +3752,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
         
         int pit = 0;
         alpha_tQ.fill(0);   // all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
+        initUu(u_tQ,sp_constant);
 
         
         // proximal iteration this is the t iterating parameter in the paper
@@ -3756,20 +3760,22 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             ++pit;
             // initialization
             sa_tQ.fill(0);
-
+            su_tQ.fill(0);
 /*#############################Optimise aver gamma##############################*/
+
 
             // QP-gamma -- \cite{NNQP solver Xiao and Chen 2014}
             // case-1: solve for gamma using qp solver! 
             // 1/2 * gamma^T * C * gamma - gamma^T * H
             // populate Y matrix (compute H in the paper)
-            tmp = alpha_tQ - unary;
+            tmp = alpha_tQ + u_tQ - unary;
             for (int i = 0; i < N_; ++i) {
                 // do it in linear time
                 v_tmp2 = tmp.col(i);
                 qp_gamma_multiplyC(v_y, v_tmp2, M_, lambda); //computes eq 35 in the paper for each pixel
                 Y.col(i) = v_y; 
             }   
+
             Y += cur_Q;     // Y is the h in the paper given as h = Q(Aa - phi) - y^k (paper notation)
             //we have calculate Y as a +ve when it's actually -ve
             for (int i = 0; i < N_; ++i) {
@@ -3783,21 +3789,24 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             qp_values.fill(0);
             float qp_value = std::numeric_limits<float>::max();
 
+            
+            double dt = 0;
             do {
                 //solve for each pixel separately, this employes the algorithm from citeation 26
                 for (int i = 0; i < N_; ++i) {
                     v_gamma = gamma.col(i); //col just accesses the lables of pixel i
                     v_pos_h = pos_H.col(i);
                     v_neg_h = neg_H.col(i);
-                    
+
                     // do it linear time
                     qp_gamma_step(v_gamma, v_pos_h, v_neg_h, qp_delta, M_, lambda, v_step, v_tmp, v_tmp2);
                     gamma.col(i) = v_gamma;
-
+                                   
                     // do it in linear time
                     qp_gamma_multiplyC(v_tmp, v_gamma, M_, lambda);
                     v_y = Y.col(i);
                     qp_values(i) = 0.5 * v_gamma.dot(v_tmp) + v_gamma.dot(v_y);
+
                 }
                 float qp_value1 = qp_values.sum();
                 //printf("\n#QP: %4d, %10.3f", qpit, qp_value1);
@@ -3806,11 +3815,14 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                 qp_value = qp_value1;
             } while (qpit < qp_maxiter);
 
+            
+
 
 /*#############################Optimise aver beta###############################*/
 
+
             // case-2: update beta -- gradient of dual wrt beta equals to zero
-            beta_mat = (alpha_tQ + gamma - unary);  // -B^T/l * (A * alpha + gamma - phi)
+            beta_mat = (alpha_tQ + u_tQ + gamma - unary);  // -B^T/l * (A * alpha + gamma - phi)
             // DON'T DO IT AT ONCE!! (RETURNS A SCALAR???)--> do it in two steps
             beta = -beta_mat.colwise().sum();   
             beta /= M_;
@@ -3819,10 +3831,12 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                 beta_mat.row(j) = beta;
             }
 
+
 /*#############################Optimise aver alpha and mew##############################*/
 
+
             // case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
-            Q = lambda * (alpha_tQ + beta_mat + gamma - unary) + cur_Q; // Q may be infeasible --> but no problem
+            Q = lambda * (alpha_tQ + beta_mat + u_tQ + gamma - unary) + cur_Q; // Q may be infeasible --> but no problem
             rescale(rescaled_Q, Q);//truncate Q to be [0,1]
 
             // Compute the conditional gradient
@@ -3840,12 +3854,12 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             tmp = alpha_tQ - sa_tQ;  
             dual_gap = dotProduct(tmp, Q, dot_tmp);
 
-            if (dual_gap <= dual_gap_tol) break;    // stopping condition
+            //if (dual_gap <= dual_gap_tol) break;    // stopping condition
 
             // compute the optimal step size
             delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
             delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
-            assert(delta > 0);
+            assert(delta >= 0);
 
             // update alpha_tQ
             alpha_tQ = alpha_tQ + delta * (sa_tQ - alpha_tQ);
@@ -3853,14 +3867,19 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             //WE NOW OPTIMISE OVER MEW
 
             //Compute the conditional gradient
-            computeUCondGrad(su_tQ,Q);
-
+            computeUCondGrad(su_tQ,Q,sp_constant);
+            
             //Calculate dual gap
+            tmp = (u_tQ - su_tQ);
+            dual_gap = dotProduct(tmp, Q, dot_tmp);
 
             //compute optimal step size
-
+            delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+            delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
             //take a step
+            u_tQ = (u_tQ + delta * (su_tQ - u_tQ));
 
+            
 
         } while(pit<fw_maxiter);
 
@@ -3923,21 +3942,41 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     return best_Q;
 }
 
-void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const {
+void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double constant) const {
     assert(Us.cols() == N_);
     assert(Us.rows() == M_);
-    int reg;
+    Us.fill(0);
+    int min=std::numeric_limits<int>::max(),max=std::numeric_limits<int>::min(),min_ind=0,max_ind=0;
     int sum = 0;
-    for(int pix = 0; pix < N_; pix++) {
-        //find which region this pixel belongs in and then find all of it's other pixels
-        reg = pixel_to_regions_[pix];
-        for (int lab = 0; lab < M_; lab++) {
-            for(int sub_pix = 0; sub_pix < super_pixel_container_[reg].size(); sub_pix++) { //loop through all of the pixels in this super pixel
-                //finish here! 
-            }     
-        }      
+    for (int lab = 0; lab < M_; lab++) {
+        for(int reg = 0; reg < R_; reg++) {
+            min = std::numeric_limits<int>::max();
+            max = std::numeric_limits<int>::min();
+            for (auto it : super_pixel_container_[reg]) { //loop through all of the pixels in this super pixel
+                //we want to find the smallest and largest values, we then set the conditional gradient accordingly
+                if (min > Q(lab,it)) {
+                    min_ind = it;
+                    min = Q(lab,it);
+                }
+                if (max < Q(lab,it)) {
+                    max_ind = it;
+                    max = Q(lab,it);
+                }
+            }
+            Us(lab,min_ind) = constant;
+            Us(lab,max_ind) = -constant;              
+        }  
     }
-    std::cout << sum;
+}
+
+void DenseCRF::initUu(MatrixXf & u, double constant) const {
+    assert(u.cols() == N_);
+    assert(u.rows() == M_);
+    for (int lab = 0; lab < M_; lab++) {
+        for(int reg = 0; reg < R_; reg++) {
+            u(lab,super_pixel_container_[reg][0]) =  constant;         
+        }  
+    }
 }
 
 std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit, bool full_mat) const {

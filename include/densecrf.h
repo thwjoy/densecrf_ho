@@ -104,7 +104,8 @@ protected:
 	// Don't copy this object, bad stuff will happen
 	DenseCRF( DenseCRF & o ){}
 
-	void computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const;
+	void computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double constant) const;
+	void initUu(MatrixXf & u, double constant) const;
 public:
 	// Create a dense CRF model of size N with M labels
 	DenseCRF( int N, int M );
