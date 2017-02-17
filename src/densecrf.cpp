@@ -1070,7 +1070,6 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
     //std::cout << v.roow << std::endl;
     //std::cout << multiplySuperPixels(sx_z.cwiseProduct(constant)).rows() << std::endl;
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
-    std::cout << energy << std::endl;
 
     return Q;
 }
