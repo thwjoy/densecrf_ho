@@ -90,6 +90,7 @@ protected:
 	//store the super pixel term
 	Matrix<float, Dynamic, Dynamic> super_pixel_classifier_;
 	std::vector<std::vector<double>> super_pixel_container_; //is a vector of super pixels which holds a vector of pixel locations for that super pixel
+	std::vector<int> pixel_to_regions_;
 
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
@@ -102,6 +103,8 @@ protected:
 
 	// Don't copy this object, bad stuff will happen
 	DenseCRF( DenseCRF & o ){}
+
+	void computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const;
 public:
 	// Create a dense CRF model of size N with M labels
 	DenseCRF( int N, int M );
@@ -265,7 +268,6 @@ public:
 	
 	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
 	void addSuperPixel(unsigned char * img, int spatial_radius = 8, int range_radius = 4, int min_region_count = 2500, SpeedUpLevel = NO_SPEEDUP);
-
 
 	// Set the unary potential for a specific variable
 	using DenseCRF::setUnaryEnergy;

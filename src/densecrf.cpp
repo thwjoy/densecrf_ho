@@ -125,8 +125,6 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     unsigned char * segment_image = new unsigned char[W_ * H_ * 3];
     std::vector<int> regions_out;
     std::vector<std::vector<double>> super_pixel_container;
-    Matrix<float, Dynamic, Dynamic> super_pixel_classifier;
-
     int region;
 
     //get the mean shift info
@@ -136,16 +134,17 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     m_process.GetResults(segment_image);
     int reg = m_process.GetRegions(regions_out);
     super_pixel_container.resize(reg);
-    super_pixel_classifier.resize(reg,W_ * H_);
-    super_pixel_classifier.fill(0);
-    for (int i = 0; i < super_pixel_classifier.cols(); i++) {
+    for (int i = 0; i < H_ * W_; i++) {
         region = regions_out[i];
-        super_pixel_classifier(region,i) = 1;
+        regions_out[i] += R_; //increment the current region so we don't get a mix up!
         super_pixel_container[region].push_back(i); //for the super pixel region, add the pixel index to the vector
     }
 
     R_ += reg;
+
     super_pixel_container_.insert(super_pixel_container_.end(),super_pixel_container.begin(), super_pixel_container.end());
+    pixel_to_regions_.insert(pixel_to_regions_.end(),regions_out.begin(),regions_out.end());
+
 
     writePPMImage("./output.ppm",segment_image, H_, W_, 3, "");
     delete[] segment_image;
@@ -3699,7 +3698,8 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     // dual variables
     MatrixXf alpha_tQ(M_, N_);  // A * alpha, (t - tilde not iteration)
     MatrixXf u_tQ(M_,N_);       // U * mew 
-    MatrixXf s_tQ(M_, N_);      // A * s, conditional gradient of FW == subgradient
+    MatrixXf sa_tQ(M_, N_);     // A * s, conditional gradient of FW == subgradient
+    MatrixXf su_tQ(M_,N_);      // Conditional gradient for mew
     VectorXf beta(N_);          // unconstrained --> correct beta values (beta.row(i) == v_beta forall i)
     MatrixXf beta_mat(M_, N_);  // beta_mat.row(i) == beta forall i --> N_ * M_ elements 
     MatrixXf gamma(M_, N_);     // nonnegative
@@ -3755,7 +3755,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
         do {    
             ++pit;
             // initialization
-            s_tQ.fill(0);
+            sa_tQ.fill(0);
 
 /*#############################Optimise aver gamma##############################*/
 
@@ -3782,10 +3782,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             int qpit = 0;
             qp_values.fill(0);
             float qp_value = std::numeric_limits<float>::max();
-#if VERBOSE
-            //start = clock();
-            start = std::chrono::high_resolution_clock::now();
-#endif
+
             do {
                 //solve for each pixel separately, this employes the algorithm from citeation 26
                 for (int i = 0; i < N_; ++i) {
@@ -3809,11 +3806,6 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                 qp_value = qp_value1;
             } while (qpit < qp_maxiter);
 
-#if VERBOSE
-            end = std::chrono::high_resolution_clock::now();
-            double dt = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
-            printf("# Time-QP %d: %5.5f, %10.3f\t", qpit, dt, qp_value);
-#endif
 
 /*#############################Optimise aver beta###############################*/
 
@@ -3840,10 +3832,12 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                 // new PH implementation
                 // rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
                 pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q); 
-                s_tQ += tmp;    // A * s is lower minus upper, keep neg introduced by compatibility->apply
+                sa_tQ += tmp;    // A * s is lower minus upper, keep neg introduced by compatibility->apply
             }
+
+
             // find dual gap
-            tmp = alpha_tQ - s_tQ;  
+            tmp = alpha_tQ - sa_tQ;  
             dual_gap = dotProduct(tmp, Q, dot_tmp);
 
             if (dual_gap <= dual_gap_tol) break;    // stopping condition
@@ -3854,7 +3848,19 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             assert(delta > 0);
 
             // update alpha_tQ
-            alpha_tQ = alpha_tQ + delta * (s_tQ - alpha_tQ);
+            alpha_tQ = alpha_tQ + delta * (sa_tQ - alpha_tQ);
+
+            //WE NOW OPTIMISE OVER MEW
+
+            //Compute the conditional gradient
+            computeUCondGrad(su_tQ,Q);
+
+            //Calculate dual gap
+
+            //compute optimal step size
+
+            //take a step
+
 
         } while(pit<fw_maxiter);
 
@@ -3915,6 +3921,23 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
 
     return best_Q;
+}
+
+void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const {
+    assert(Us.cols() == N_);
+    assert(Us.rows() == M_);
+    int reg;
+    int sum = 0;
+    for(int pix = 0; pix < N_; pix++) {
+        //find which region this pixel belongs in and then find all of it's other pixels
+        reg = pixel_to_regions_[pix];
+        for (int lab = 0; lab < M_; lab++) {
+            for(int sub_pix = 0; sub_pix < super_pixel_container_[reg].size(); sub_pix++) { //loop through all of the pixels in this super pixel
+                //finish here! 
+            }     
+        }      
+    }
+    std::cout << sum;
 }
 
 std::vector<perf_measure> DenseCRF::tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit, bool full_mat) const {
