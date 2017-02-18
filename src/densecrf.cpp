@@ -3655,7 +3655,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 }
 
 // LP inference with proximal algorithm
-MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const {
+MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params, double sp_constant) const {
     MatrixXf best_Q(M_, N_), tmp(M_, N_), tmp2(M_, N_);
     MatrixP dot_tmp(M_, N_);
     MatrixXi ind(M_, N_);
@@ -3663,7 +3663,6 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     VectorXd sum(N_);
     MatrixXf unary = unary_->get();
 
-    double sp_constant = 10;
 
     MatrixXf Q = init;
     renormalize(Q);

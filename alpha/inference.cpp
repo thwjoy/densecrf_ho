@@ -656,24 +656,11 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
 
 void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_to_unaries,
                       Potts_weight_set parameters, std::string path_to_output,
-                      std::string dataset_name, int argc, char* argv[]) {
+                      std::string dataset_name, double sp_const) {
 
     // lp inference params
     LP_inf_params lp_params;
-    if(argc > 1) lp_params.prox_max_iter = atoi(argv[1]);
-    if(argc > 2) lp_params.fw_max_iter = atoi(argv[2]);
-    if(argc > 3) lp_params.qp_max_iter = atoi(argv[3]);
-    if(argc > 4) lp_params.prox_reg_const = atof(argv[4]);
-    if(argc > 5) lp_params.dual_gap_tol = atof(argv[5]);
-    if(argc > 6) lp_params.qp_tol = atof(argv[6]);
-    if(argc > 7) lp_params.best_int = atoi(argv[7]);
     lp_params.prox_energy_tol = lp_params.dual_gap_tol;
-    if(argc > 8) lp_params.prox_energy_tol = atof(argv[8]);
-
-    std::cout << "## COMMAND: " << argv[0] << " " 
-        << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
-        << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
-        << lp_params.best_int << " " << lp_params.prox_energy_tol << std::endl;
 
     img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
     // Load the unaries potentials for our image.
@@ -701,7 +688,7 @@ void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_t
     //Q = crf.lp_inference_prox_restricted(Q, lp_params);
     typedef std::chrono::high_resolution_clock::time_point htime;
     htime st = std::chrono::high_resolution_clock::now();
-    MatrixXf Q = crf.lp_inference_prox_super_pixels(init, lp_params);
+    MatrixXf Q = crf.lp_inference_prox_super_pixels(init, lp_params, sp_const);
     htime et = std::chrono::high_resolution_clock::now();
     double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
     std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
