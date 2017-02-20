@@ -3663,7 +3663,6 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     VectorXd sum(N_);
     MatrixXf unary = unary_->get();
 
-
     MatrixXf Q = init;
     renormalize(Q);
     assert(valid_probability_debug(Q));
@@ -3751,7 +3750,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
         
         int pit = 0;
         alpha_tQ.fill(0);   // all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
-        initUu(u_tQ,sp_constant);
+        u_tQ.fill(0);
 
         
         // proximal iteration this is the t iterating parameter in the paper
@@ -3779,8 +3778,8 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             //we have calculate Y as a +ve when it's actually -ve
             for (int i = 0; i < N_; ++i) {
                 for (int j = 0; j < M_; ++j) {  
-                    pos_H(j, i) = std::max(-Y(j, i), (float)0);     // pos_H 
-                    neg_H(j, i) = std::max(Y(j, i), (float)0);      // neg_H
+                    pos_H(j, i) = std::max(Y(j, i), (float)0);     // pos_H 
+                    neg_H(j, i) = std::min(Y(j, i), (float)0);      // neg_H
                 }
             }
             // qp iterations, 
@@ -3875,6 +3874,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             //compute optimal step size
             delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
             delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
+            std::cout << "Step: " << delta << std::endl;
             //take a step
             u_tQ = (u_tQ + delta * (su_tQ - u_tQ));
 

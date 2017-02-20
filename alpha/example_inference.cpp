@@ -11,16 +11,7 @@ int main(int argc, char* argv[]) {
     std::string path_to_unaries = "/home/tomj/Documents/4YP/densecrf/data/MSRC/texton_unaries/" + std::string(argv[1]) + ".c_unary";
     std::string dataset_name = "MSRC";
 	std::string path_to_output = "/home/tomj/Documents/4YP/densecrf/data/output/"  + std::string(argv[1]) + "_lp.bmp";
-
-    minimize_prox_LP(path_to_image, path_to_unaries, params, path_to_output, dataset_name, argc, argv);
-    double sp_constant = 0.00001;
-    for (int i = 0; i < 10; i++) {
-    	sp_constant *= 10;
-    	path_to_output = "/home/tomj/Documents/4YP/densecrf/data/output/"  + std::string(argv[1]) + "_" + std::to_string(sp_constant) + "_lp.bmp";
-    	minimize_prox_LP_super_pixels(path_to_image, path_to_unaries, params, path_to_output, dataset_name, sp_constant);
-    }
-    
-
+    minimize_prox_LP_super_pixels(path_to_image, path_to_unaries, params, path_to_output, dataset_name);
     return 0;
  
 }
