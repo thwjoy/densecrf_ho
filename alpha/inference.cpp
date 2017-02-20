@@ -597,20 +597,18 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     //crf.compute_kl_divergence();
     clock_t start, end;
-    start = clock();
+    //start = clock();
     MatrixXf Q = crf.unary_init();
-    Q = crf.qp_inference(Q);
-    Q = crf.concave_qp_cccp_inference(Q);
-    end = clock();
-    std::cout << "Upto DC-neg: " << (double(end-start)/CLOCKS_PER_SEC) << " seconds" << std::endl;
+    //Q = crf.qp_inference(Q);
+    //Q = crf.concave_qp_cccp_inference(Q);
+    //end = clock();
+    //std::cout << "Upto DC-neg: " << (double(end-start)/CLOCKS_PER_SEC) << " seconds" << std::endl;
 
 
     double timing = -1;
     //start = clock();
     srand(start);
     
-    Q = crf.lp_inference_prox(Q, lp_params);
-
     //Q = crf.lp_inference_prox_restricted(Q, lp_params);
     typedef std::chrono::high_resolution_clock::time_point htime;
     // lp inference params
@@ -618,10 +616,11 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     lp_params_rest.prox_max_iter = 20;
     lp_params_rest.prox_reg_const = 0.001;
     htime st = std::chrono::high_resolution_clock::now();
-    Q = crf.lp_inference_prox_restricted(Q, lp_params_rest);
+    //Q = crf.lp_inference_prox_restricted(Q, lp_params_rest);
+    Q = crf.lp_inference_prox(Q, lp_params);
     htime et = std::chrono::high_resolution_clock::now();
     double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
-    std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
+    std::cout << "Time for prox-lp: " << dt << " seconds\n";
 
     end = clock();
     timing = (double(end-start)/CLOCKS_PER_SEC);
@@ -656,7 +655,7 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
 
 void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_to_unaries,
                       Potts_weight_set parameters, std::string path_to_output,
-                      std::string dataset_name) {
+                      std::string dataset_name,double sp_constant) {
 
     // lp inference params
     LP_inf_params lp_params;
@@ -677,9 +676,9 @@ void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_t
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
-    crf.addSuperPixel(img,4,2,5000);
-    crf.addSuperPixel(img,4,2,500);
-    crf.addSuperPixel(img,4,2,100);
+    crf.addSuperPixel(img,16,4,5000);
+    crf.addSuperPixel(img,16,4,500);
+    crf.addSuperPixel(img,16,4,50);
     clock_t start, end;
     MatrixXf init = crf.unary_init();
 
@@ -688,7 +687,7 @@ void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_t
     //Q = crf.lp_inference_prox_restricted(Q, lp_params);
     typedef std::chrono::high_resolution_clock::time_point htime;
     htime st = std::chrono::high_resolution_clock::now();
-    MatrixXf Q = crf.lp_inference_prox_super_pixels(init, lp_params);
+    MatrixXf Q = crf.lp_inference_prox_super_pixels(init, lp_params,sp_constant);
     htime et = std::chrono::high_resolution_clock::now();
     double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
     std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";

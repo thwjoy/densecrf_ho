@@ -125,6 +125,9 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     unsigned char * segment_image = new unsigned char[W_ * H_ * 3];
     std::vector<int> regions_out;
     std::vector<std::vector<double>> super_pixel_container;
+    VectorXf count_regions; 
+    VectorXf mean_of_superpixels;
+    VectorXf sd_of_superpixels; 
     int region;
 
     //get the mean shift info
@@ -134,19 +137,44 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     m_process.GetResults(segment_image);
     int reg = m_process.GetRegions(regions_out);
     super_pixel_container.resize(reg);
+    count_regions.resize(reg);
+    mean_of_superpixels.resize(reg);
+    sd_of_superpixels.resize(reg);
+    count_regions.fill(0);
+    mean_of_superpixels.fill(0);
+    sd_of_superpixels.fill(0);
     for (int i = 0; i < H_ * W_; i++) {
         region = regions_out[i];
-        regions_out[i] += R_; //increment the current region so we don't get a mix up!
         super_pixel_container[region].push_back(i); //for the super pixel region, add the pixel index to the vector
+        mean_of_superpixels(region) += 0.2989 * (double) img[i];
+        mean_of_superpixels(region) += 0.5870 * (double) img[i + 1];
+        mean_of_superpixels(region) += 0.1140 * (double) img[i + 2];
+        count_regions(region) += 1;
     }
 
-    R_ += reg;
+    mean_of_superpixels = mean_of_superpixels.cwiseQuotient(count_regions);
 
+    
+    for (int i = 0; i < H_ * W_; i++) {
+        region = regions_out[i];
+        double grey_val = 0.2989 * (double) img[i] + 0.5870 * (double) img[i + 1] + 0.1140 * (double) img[i + 2];
+        sd_of_superpixels(region) += (mean_of_superpixels(region) - grey_val) * (mean_of_superpixels(region) - grey_val);
+        regions_out[i] += R_; //increment the current region so we don't get a mix up!
+    }
+
+    sd_of_superpixels = (sd_of_superpixels.cwiseQuotient(NORMALISER * count_regions));
+
+    //update the private member functions
+    R_ += reg;
+    mean_of_superpixels_.conservativeResize(R_);
+    mean_of_superpixels_.tail(reg) = mean_of_superpixels;
+    exp_of_superpixels_.conservativeResize(R_);
+    exp_of_superpixels_.tail(reg) = exp(-1 * sd_of_superpixels.array());
     super_pixel_container_.insert(super_pixel_container_.end(),super_pixel_container.begin(), super_pixel_container.end());
     pixel_to_regions_.insert(pixel_to_regions_.end(),regions_out.begin(),regions_out.end());
 
 
-    writePPMImage("./output.ppm",segment_image, H_, W_, 3, "");
+    //writePPMImage("./output.ppm",segment_image, H_, W_, 3, "");
     delete[] segment_image;
     return;
 }
@@ -3750,8 +3778,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
         
         int pit = 0;
         alpha_tQ.fill(0);   // all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
-        u_tQ.fill(0);
-
+        initUu(u_tQ,sp_constant);
         
         // proximal iteration this is the t iterating parameter in the paper
         do {    
@@ -3760,7 +3787,6 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             sa_tQ.fill(0);
             su_tQ.fill(0);
 /*#############################Optimise aver gamma##############################*/
-
 
             // QP-gamma -- \cite{NNQP solver Xiao and Chen 2014}
             // case-1: solve for gamma using qp solver! 
@@ -3778,8 +3804,8 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             //we have calculate Y as a +ve when it's actually -ve
             for (int i = 0; i < N_; ++i) {
                 for (int j = 0; j < M_; ++j) {  
-                    pos_H(j, i) = std::max(Y(j, i), (float)0);     // pos_H 
-                    neg_H(j, i) = std::min(Y(j, i), (float)0);      // neg_H
+                    pos_H(j, i) = std::max(-Y(j, i), (float)0);     // pos_H 
+                    neg_H(j, i) = std::max(Y(j, i), (float)0);      // neg_H
                 }
             }
             // qp iterations, 
@@ -3796,8 +3822,11 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                     v_pos_h = pos_H.col(i);
                     v_neg_h = neg_H.col(i);
 
+                    //htime st = std::chrono::high_resolution_clock::now();
                     // do it linear time
                     qp_gamma_step(v_gamma, v_pos_h, v_neg_h, qp_delta, M_, lambda, v_step, v_tmp, v_tmp2);
+                    //htime et = std::chrono::high_resolution_clock::now();
+                    //dt += std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
                     gamma.col(i) = v_gamma;
                                    
                     // do it in linear time
@@ -3813,6 +3842,8 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                 qp_value = qp_value1;
             } while (qpit < qp_maxiter);
 
+            
+            //std::cout << "Number of iterations: " << qpit << std::endl;
             
 
 
@@ -3852,7 +3883,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             tmp = alpha_tQ - sa_tQ;  
             dual_gap = dotProduct(tmp, Q, dot_tmp);
 
-            //if (dual_gap <= dual_gap_tol) break;    // stopping condition
+            if (dual_gap <= dual_gap_tol) break;    // stopping condition
 
             // compute the optimal step size
             delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
@@ -3873,12 +3904,11 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
             //compute optimal step size
             delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
+            if (delta != delta) delta = 0;
             delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
-            std::cout << "Step: " << delta << std::endl;
+            //std::cout << "Step: " << delta << std::endl;
             //take a step
             u_tQ = (u_tQ + delta * (su_tQ - u_tQ));
-
-            
 
         } while(pit<fw_maxiter);
 
@@ -3962,8 +3992,8 @@ void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double consta
                     max = Q(lab,it);
                 }
             }
-            Us(lab,min_ind) = constant;
-            Us(lab,max_ind) = -constant;              
+            Us(lab,min_ind) = constant * exp_of_superpixels_(reg);
+            Us(lab,max_ind) = -constant * exp_of_superpixels_(reg);              
         }  
     }
 }
@@ -3973,7 +4003,7 @@ void DenseCRF::initUu(MatrixXf & u, double constant) const {
     assert(u.rows() == M_);
     for (int lab = 0; lab < M_; lab++) {
         for(int reg = 0; reg < R_; reg++) {
-            u(lab,super_pixel_container_[reg][0]) =  constant;         
+            u(lab,super_pixel_container_[reg][0]) =  constant * exp_of_superpixels_(reg);         
         }  
     }
 }
