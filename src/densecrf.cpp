@@ -43,7 +43,7 @@
 #include <set>
 
 #define DCNEG_FASTAPPROX false
-#define NORMALISER 10000 //should be around 10,000
+#define NORMALISER 1000 //should be around 10,000
 #define DIFF_ENG 100
 /////////////////////////////
 /////  Alloc / Dealloc  /////
