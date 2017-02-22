@@ -11,11 +11,11 @@ inline bool fileExists(const std::string& name) {
 }
 
 int main (int argc, char * argv[]) {
-	std::string dataset_name = "MSRC";
-	std::string unaries_directory = "./data/MSRC/texton_unaries/";
-	std::string images_directory = "./data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/";
-	//std::string unaries_directory = "./data/PascalVOC2010/logit_unaries/";
-	//std::string images_directory = "./data/PascalVOC2010/JPEGImages/";
+	std::string dataset_name = "PascalVOC2010";
+	//std::string unaries_directory = "./data/MSRC/texton_unaries/";
+	//std::string images_directory = "./data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/";
+	std::string unaries_directory = "./data/PascalVOC2010/logit_unaries/";
+	std::string images_directory = "./data/PascalVOC2010/JPEGImages/";
     std::string path_to_unaries;
     std::string path_to_image;
 	std::string path_to_output;
@@ -32,7 +32,7 @@ int main (int argc, char * argv[]) {
 	
 
 	path_to_unaries = unaries_directory + argv[1] + std::string(".c_unary");
-    path_to_image = images_directory + argv[1] + std::string(".bmp");
+    path_to_image = images_directory + argv[1] + std::string(".jpg");
     path_to_output = std::string("./data/output/") + argv[1] + std::string("_out.png");
 /*
     

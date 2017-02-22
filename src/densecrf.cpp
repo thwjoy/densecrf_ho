@@ -43,7 +43,7 @@
 #include <set>
 
 #define DCNEG_FASTAPPROX false
-#define NORMALISER 100000 //should be around 10,000
+#define NORMALISER 10000 //should be around 10,000
 #define DIFF_ENG 100
 /////////////////////////////
 /////  Alloc / Dealloc  /////
@@ -188,7 +188,7 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
         sd_of_superpixels(region) += (mean_of_superpixels(region) - grey_val) * (mean_of_superpixels(region) - grey_val);
     }
 
-    sd_of_superpixels = (sd_of_superpixels.cwiseQuotient(NORMALISER * count_regions).cwiseSqrt());
+    sd_of_superpixels = (sd_of_superpixels.cwiseQuotient(NORMALISER * count_regions));
 
     //update the private member functions
     R_ += reg;
@@ -983,6 +983,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
     MatrixXf constant =  K * exp_of_superpixels_.replicate( 1, grad_z.rows() ).transpose();
     //Implement the exponentials in diagonal way
 
+    std::cout << K << std::endl;
     //double K = CONSTANT;
     grad_z.fill(0);
     cond_grad_z.fill(0);
@@ -1050,9 +1051,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
         else if (optimal_step_size < 0) { optimal_step_size = 0;} //
         else if (optimal_step_size > 1) { optimal_step_size = 1;} //
 
-        //optimal_step_size = 2 / ((double) i + 2);
-
-        // Take a stepgit st
+        // Take a step
         Q += optimal_step_size * sx_y;
         z_labels += optimal_step_size * sx_z;
         if (not valid_probability(Q)) {
@@ -1060,15 +1059,13 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init, d
         }
 
         //compute the new gradient
-        grad_y += 2 * optimal_step_size * (psisx + multiplySuperPixels((z_labels - MatrixXf::Ones(M_,R_)).cwiseProduct(constant)));// - (sx_z.cwiseProduct(constant).sum() - dotProduct(sx_z.cwiseProduct(constant) * super_pixel_classifier_,Q - MatrixXf::Ones(M_,N_),temp_dot)) * sx_y.inverse().transpose(); 
+        grad_y += 2 * optimal_step_size * psisx + multiplySuperPixels((z_labels - MatrixXf::Ones(M_,R_)).cwiseProduct(constant));
         grad_z = MatrixXf::Ones(M_,R_).cwiseProduct(constant) + (multiplySuperPixels(Q - MatrixXf::Ones(M_,N_))).cwiseProduct(constant);
 
         energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
         energy += (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
     }
 
-    //std::cout << v.roow << std::endl;
-    //std::cout << multiplySuperPixels(sx_z.cwiseProduct(constant)).rows() << std::endl;
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
 
     return Q;
