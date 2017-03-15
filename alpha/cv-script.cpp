@@ -8,7 +8,7 @@
 
 void image_inference(Dataset dataset, std::string method, std::string path_to_results,
                      std::string image_name, float spc_std, float spc_potts, 
-                     float bil_spcstd, float bil_colstd, float bil_potts, LP_inf_params & lp_params)
+                     float bil_spcstd, float bil_colstd, float bil_potts, LP_inf_params & lp_params, double sp_const)
 
 {
 
@@ -25,6 +25,9 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
     crf.addPairwiseBilateral(bil_spcstd, bil_spcstd,bil_colstd, bil_colstd, bil_colstd,img, new PottsCompatibility(bil_potts));
+    crf.addSuperPixel(img,8,4,100);
+    crf.addSuperPixel(img,8,4,400);
+
 
     MatrixXf Q;
     {
@@ -75,7 +78,10 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
-                Q = crf.lp_inference_prox(Q, lp_params);    
+                Q = crf.lp_inference_prox(Q, lp_params);
+            } else if (method == "prox_lp_sp_0" || method == "prox_lp_sp_1" || method == "prox_lp_sp_10" || method == "prox_lp_sp_100" || method == "prox_lp_sp_1000" || method == "prox_lp_sp_10000" || method == "prox_lp_sp_01" || method == "prox_lp_sp_001" || method == "prox_lp_sp_0001" || method == "prox_lp_sp_00001")  {// prox_lp with super pixels
+                std::cout << "Running prox_lp with super pixels and constant: " << sp_const << std::endl;
+                Q = crf.lp_inference_prox_super_pixels(Q, lp_params, sp_const);   
             } else if (method == "prox_lp_acc_l"){  // standard prox_lp with limited labels
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
@@ -304,9 +310,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference_non_convex(Q);
             } else if (method == "qp_sp"){
                 std::cout << "---Running tests on QP with super pixel terms\r\n";
-                crf.addSuperPixel(img,4,2,5000);
-                crf.addSuperPixel(img,4,2,500);
-                crf.addSuperPixel(img,4,2,50);               
+              
                 Q = crf.qp_inference_super_pixels_non_convex(Q);
             } else if (method == "unary"){
                 (void)0;
@@ -380,6 +384,19 @@ int main(int argc, char *argv[])
     // lp inference params
 	LP_inf_params lp_params;
     lp_params.prox_energy_tol = lp_params.dual_gap_tol;
+
+
+    double sp_const;
+    if(method == "prox_lp_sp_0" || method == "prox_lp_sp" ) sp_const = 0;
+    else if (method == "prox_lp_sp_1") sp_const = 1;
+    else if (method == "prox_lp_sp_10") sp_const = 10;
+    else if (method == "prox_lp_sp_100") sp_const = 100;
+    else if (method == "prox_lp_sp_1000") sp_const = 1000;
+    else if (method == "prox_lp_sp_10000") sp_const = 10000;
+    else if (method == "prox_lp_sp_01") sp_const = 0.1;
+    else if (method == "prox_lp_sp_001") sp_const = 0.01;
+    else if (method == "prox_lp_sp_0001") sp_const = 0.001;
+    else if (method == "prox_lp_sp_00001") sp_const = 0.0001;
 	
 
     std::cout << "## COMMAND: " << argv[0] << " " << dataset_split << " " << dataset_name << " " << method << " "
@@ -394,20 +411,16 @@ int main(int argc, char *argv[])
 
     Dataset ds = get_dataset_by_name(dataset_name);
 
-    //std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-    std::vector<std::string> test_images;
-    //test_images.push_back("2007_000559");
-    //test_images.push_back("2007_000676");
-    test_images.push_back("2_14_s");
-    test_images.push_back("1_9_s");
-    test_images.push_back("1_23_s");
-//    omp_set_num_threads(10);
-//#pragma omp parallel for
-    for(int i=0; i< test_images.size(); ++i){
-    //for(int i=1; i< 2; ++i){
+    std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
+
+    for(int i=0; i< test_images.size(); i++){
+        //std::cout << test_images[i] << std::endl;
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
-                        bil_spcstd, bil_colstd, bil_potts, lp_params);
+                        bil_spcstd, bil_colstd, bil_potts, lp_params, sp_const);
     }
+
+
+    return 0;
 
 
 }

@@ -3768,17 +3768,10 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
         gamma.fill(1);  // all zero is a fixed point of QP iteration!
         cur_Q = Q;
         
-        if (accel_prox) {   // accelerated prox
-            w_it = float(it)/(it+3.0);  // simplest choice
-            tmp = Q - prev_Q;
-            tmp *= w_it;
-            cur_Q += tmp;   // cur_Q = Q + w_it(Q - prev_Q)
-            prev_Q = Q;
-        }
         
         int pit = 0;
         alpha_tQ.fill(0);   // all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
-        initUu(u_tQ,sp_constant);
+        u_tQ.fill(0);
         
         // proximal iteration this is the t iterating parameter in the paper
         do {    
@@ -3878,12 +3871,12 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
                 sa_tQ += tmp;    // A * s is lower minus upper, keep neg introduced by compatibility->apply
             }
 
+            //Compute the conditional gradient for mew
+            computeUCondGrad(su_tQ,Q,sp_constant);
 
             // find dual gap
-            tmp = alpha_tQ - sa_tQ;  
+            tmp = alpha_tQ + u_tQ - (sa_tQ + su_tQ);  
             dual_gap = dotProduct(tmp, Q, dot_tmp);
-
-            if (dual_gap <= dual_gap_tol) break;    // stopping condition
 
             // compute the optimal step size
             delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
@@ -3892,22 +3885,6 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
             // update alpha_tQ
             alpha_tQ = alpha_tQ + delta * (sa_tQ - alpha_tQ);
-
-            //WE NOW OPTIMISE OVER MEW
-
-            //Compute the conditional gradient
-            computeUCondGrad(su_tQ,Q,sp_constant);
-            
-            //Calculate dual gap
-            tmp = (u_tQ - su_tQ);
-            dual_gap = dotProduct(tmp, Q, dot_tmp);
-
-            //compute optimal step size
-            delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
-            if (delta != delta) delta = 0;
-            delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
-            //std::cout << "Step: " << delta << std::endl;
-            //take a step
             u_tQ = (u_tQ + delta * (su_tQ - u_tQ));
 
         } while(pit<fw_maxiter);

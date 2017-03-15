@@ -1,2 +1,2 @@
-build/alpha/cv-script Validation Pascal2010 qp_sp_0 data/PascalVOC2010/results_10000/val 3 2 50 15 3 && build/alpha/cv-script Validation Pascal2010 qp_sp_10 data/PascalVOC2010/results_10000/val 3 2 50 15 3 && build/alpha/cv-script Validation Pascal2010 qp_sp_100 data/PascalVOC2010/results_10000/val 3 2 50 15 3 && build/alpha/cv-script Validation Pascal2010 qp_sp_1000 data/PascalVOC2010/results_10000/val 3 2 50 15 3 && build/alpha/cv-script Validation Pascal2010 qp_sp_10000 data/PascalVOC2010/results_10000/val 3 2 50 15 3
+build/alpha/cv-script Validation Pascal2010 prox_lp_sp_10 data/PascalVOC2010/results_dc_neg/val 3.071772 0.5 49.785678 1 0.960811
 

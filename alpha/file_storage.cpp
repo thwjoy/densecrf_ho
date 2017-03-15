@@ -107,7 +107,7 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "_GT.bmp",
                        "MSRC");
     }
-    else if (dataset_name == "Pascal2010") {
+    else if (dataset_name == "Pascal2010" || dataset_name == "PascalVOC2010") {
         return Dataset("data/PascalVOC2010/JPEGImages/",
                        "data/PascalVOC2010/logit_unaries/",
                        "data/PascalVOC2010/SegmentationClass/",

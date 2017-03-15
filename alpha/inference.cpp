@@ -549,45 +549,17 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
                       std::string dataset_name, int argc, char* argv[]) {
 
     // lp inference params
-	LP_inf_params lp_params;
-	if(argc > 1) lp_params.prox_max_iter = atoi(argv[1]);
-	if(argc > 2) lp_params.fw_max_iter = atoi(argv[2]);
-	if(argc > 3) lp_params.qp_max_iter = atoi(argv[3]);
-	if(argc > 4) lp_params.prox_reg_const = atof(argv[4]);
-	if(argc > 5) lp_params.dual_gap_tol = atof(argv[5]);
-	if(argc > 6) lp_params.qp_tol = atof(argv[6]);
-	if(argc > 7) lp_params.best_int = atoi(argv[7]);
+    LP_inf_params lp_params;
     lp_params.prox_energy_tol = lp_params.dual_gap_tol;
-	if(argc > 8) lp_params.prox_energy_tol = atof(argv[8]);
-
-    std::cout << "## COMMAND: " << argv[0] << " " 
-        << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
-        << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
-        << lp_params.best_int << " " << lp_params.prox_energy_tol << std::endl;
 
     img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
     unsigned char * img = load_image(path_to_image, size);
 
-#if BINARY
-    int bg, fg;
-    if (dataset_name == "Pascal2010") {
-        bg = 0;
-        fg = 1;
-    } else if (dataset_name=="MSRC") {
-        bg = 1;
-        fg = 3;
-    }
-    MatrixXf tmp(2, unaries.cols());
-    tmp.row(0) = unaries.row(bg);
-    tmp.row(1) = unaries.row(fg);
-    unaries = tmp;
-#endif
-
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
-    std::cout << "CRF: W = " << size.width << ", H = " << size.height << ", L = " << unaries.rows() << std::endl;
+    std::cout << "Running Prox-lp"<< std::endl;
 
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
@@ -595,34 +567,21 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
-    //crf.compute_kl_divergence();
-    clock_t start, end;
-    //start = clock();
     MatrixXf Q = crf.unary_init();
-    //Q = crf.qp_inference(Q);
-    //Q = crf.concave_qp_cccp_inference(Q);
-    //end = clock();
-    //std::cout << "Upto DC-neg: " << (double(end-start)/CLOCKS_PER_SEC) << " seconds" << std::endl;
-
 
     double timing = -1;
-    //start = clock();
+    clock_t start, end;
     srand(start);
     
-    //Q = crf.lp_inference_prox_restricted(Q, lp_params);
     typedef std::chrono::high_resolution_clock::time_point htime;
     // lp inference params
-    LP_inf_params lp_params_rest = lp_params;
-    lp_params_rest.prox_max_iter = 20;
-    lp_params_rest.prox_reg_const = 0.001;
     htime st = std::chrono::high_resolution_clock::now();
-    //Q = crf.lp_inference_prox_restricted(Q, lp_params_rest);
     Q = crf.lp_inference_prox(Q, lp_params);
     htime et = std::chrono::high_resolution_clock::now();
     double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
     std::cout << "Time for prox-lp: " << dt << " seconds\n";
-
     end = clock();
+    /*
     timing = (double(end-start)/CLOCKS_PER_SEC);
     std::cout << "TOT-PROX-LP: " << timing << " seconds" << std::endl;
     double final_energy = crf.compute_energy(Q);
@@ -635,17 +594,10 @@ void minimize_prox_LP(std::string path_to_image, std::string path_to_unaries,
         << ", int: " << discretized_energy_true << std::endl;
 
     MatrixXf int_Q = crf.max_rounding(Q);
+*/
 
-#if BINARY    
-    double ph_energy = 0, bf_energy = 0;
-    crf.compare_energies(Q, ph_energy, bf_energy, false, false, true);
-    std::cout << "# lp-pairwise: " << ph_energy << "," << bf_energy << std::endl;
-    crf.compare_energies(int_Q, ph_energy, bf_energy, false, false, true);
-    std::cout << "# int-pairwise: " << ph_energy << "," << bf_energy << std::endl;
-#endif
-
-    std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
-        << crf.compute_energy_true(int_Q) << std::endl;
+    //std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
+      //  << crf.compute_energy_true(int_Q) << std::endl;
 
 
     save_map(Q, size, path_to_output, dataset_name);
@@ -668,7 +620,7 @@ void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_t
 
     // Load a crf
     DenseCRF2D crf(size.width, size.height, unaries.rows());
-    std::cout << "CRF: W = " << size.width << ", H = " << size.height << ", L = " << unaries.rows() << std::endl;
+    std::cout << "Running Prox-lp with super pixels and a constant of: " << sp_constant << std::endl;
 
     crf.setUnaryEnergy(unaries);
     crf.addPairwiseGaussian(parameters.spatial_std, parameters.spatial_std,
@@ -676,9 +628,8 @@ void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_t
     crf.addPairwiseBilateral(parameters.bilat_spatial_std, parameters.bilat_spatial_std,
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
-    crf.addSuperPixel(img,16,4,5000);
-    crf.addSuperPixel(img,16,4,500);
-    crf.addSuperPixel(img,16,4,50);
+    crf.addSuperPixel(img,8,4,100);
+    crf.addSuperPixel(img,8,4,400);
     clock_t start, end;
     MatrixXf init = crf.unary_init();
 
@@ -690,8 +641,8 @@ void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_t
     MatrixXf Q = crf.lp_inference_prox_super_pixels(init, lp_params,sp_constant);
     htime et = std::chrono::high_resolution_clock::now();
     double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
-    std::cout << "Time for prox-lp-restricted: " << dt << " seconds\n";
-
+    std::cout << "Time for prox-super_pixel: " << dt << " seconds\n";
+/*
     end = clock();
     timing = (double(end-start)/CLOCKS_PER_SEC);
     std::cout << "TOT-PROX-LP: " << timing << " seconds" << std::endl;
@@ -703,11 +654,11 @@ void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_t
     std::cout << "QP: " << final_energy << ", int: " << discretized_energy << std::endl;
     std::cout << "#TRUE QP: " << final_energy_true << ", LP: " << crf.compute_energy_LP(Q) 
         << ", int: " << discretized_energy_true << std::endl;
-
+*/
     MatrixXf int_Q = crf.max_rounding(Q);
 
-    std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
-        << crf.compute_energy_true(int_Q) << std::endl;
+    //std::cout << "# int-LP-total: " << crf.compute_energy_LP(int_Q) << ", int-QP-total: " 
+      //  << crf.compute_energy_true(int_Q) << std::endl;
 
     save_map(Q, size, path_to_output, dataset_name);
 
