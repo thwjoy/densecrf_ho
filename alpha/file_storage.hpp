@@ -96,6 +96,8 @@ public:
     std::string get_ground_truth_path(const std::string & image_name);
     std::string get_image_path(const std::string & image_name);
     std::vector<std::string> get_all_split_files(const std::string & split);
+    std::vector<std::string> get_MSRC_split_files(const std::string & split);
+    std::vector<std::string> get_PASCAL_split_files(const std::string & split);
 };
 
 

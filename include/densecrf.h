@@ -113,8 +113,8 @@ public:
 	//===============================================================
 	//The following definitions are for Tom Joys 4YP which computes the QP with a non convex function and with super pixel terms
 	MatrixXf qp_inference_non_convex(const MatrixXf & init) const;
-	MatrixXf qp_inference_super_pixels(const MatrixXf & init, double K = 10000) const;
-	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init, double K = 100000) const;
+	MatrixXf qp_inference_super_pixels(const MatrixXf & init) const;
+	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init) const;
 	std::vector<perf_measure> tracing_qp_inference_non_convex(MatrixXf & init, double time_limit = 0) const;
 	std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit = 0) const;
 	//===============================================================
@@ -194,8 +194,6 @@ protected:
 	// Width, height of the 2d grid
 	int W_, H_;
 
-
-
 public:
 	// Create a 2d dense CRF model of size W x H with M labels
 	DenseCRF2D( int W, int H, int M );
@@ -207,7 +205,8 @@ public:
 	void addPairwiseBilateral( float sx, float sy, float sr, float sg, float sb, const unsigned char * im, LabelCompatibility * function=NULL, KernelType kernel_type=DIAG_KERNEL, NormalizationType normalization_type=NORMALIZE_SYMMETRIC );
 	
 	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
-	void addSuperPixel(unsigned char * img, int spatial_radius = 8, int range_radius = 4, int min_region_count = 2500, SpeedUpLevel = NO_SPEEDUP);
+	void addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, SpeedUpLevel = NO_SPEEDUP);
+	void addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, double constant, SpeedUpLevel = NO_SPEEDUP);
 
 	
 	// Set the unary potential for a specific variable

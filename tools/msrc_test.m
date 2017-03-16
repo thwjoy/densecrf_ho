@@ -5,7 +5,7 @@ dpath = '/home/tomj/Documents/4YP/densecrf/data';
 datadir = [dpath '/MSRC'];
 testset = dataset_split;
 
-gtimgpath= [datadir '/MSRC_ObjCategImageDatabase_v2/GroundTruth/%s_GT.bmp'];
+gtimgpath= [datadir '/MSRC_ObjCategImageDatabase_v2/fine_annot/%s_GT.bmp'];
 respath_tmpl=[path '/%s.png'];
 
 path_to_test_set = [datadir '/split/' dataset_split '.txt'];
@@ -22,7 +22,9 @@ for i=1:length(gtids)
     imname = gtids{i};
     toks = strsplit(imname, '.');
     imname = toks{1};
-     try
+    imname = imname(1:end-3);
+  
+    try
     % ground truth label file
 
     gtfile = sprintf(gtimgpath,imname);
@@ -31,9 +33,10 @@ for i=1:length(gtids)
     [gtim,map] = imread(gtfile);
     gtim = rgb2ind(gtim, cmap);
     gtim = double(gtim);
-
+  
     % results file
     resfile = sprintf(respath_tmpl, imname);
+    
     [resim,map] = imread(resfile);
     %% Added Code    
     resim = rgb2ind(resim, cmap);

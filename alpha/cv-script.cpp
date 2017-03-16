@@ -57,11 +57,16 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.qp_inference(Q);
                 Q = crf.qp_inference_non_convex(Q);
             } else if (method == "qp_sp_0" || method == "qp_sp_0" || method == "qp_sp_00001" || method == "qp_sp_0001" || method == "qp_sp_001" || method == "qp_sp_01" || method == "qp_sp_1" || method == "qp_sp_10" || method == "qp_sp_100" || method == "qp_sp_1000" || method == "qp_sp_10000" ){
-                std::cout << "---Running tests on QP with super pixel terms. Constant = "<< sp_const << "\r\n";
-                crf.addSuperPixel(img,4,2,5000);
-                crf.addSuperPixel(img,4,2,500);
-                crf.addSuperPixel(img,4,2,50);               
-                Q = crf.qp_inference_super_pixels_non_convex(Q,sp_const);
+                std::cout << "---Running tests on QP with super pixel terms, with constant = "<< sp_const << "\r\n";
+                //crf.addSuperPixel(img,8,4,40,sp_const);
+                crf.addSuperPixel(img,8,4,400,sp_const);
+                crf.addSuperPixel(img,8,4,1000,sp_const);              
+                Q = crf.qp_inference_super_pixels_non_convex(Q);
+            } else if (method == "qp_sp"){ //qp with a non convex energy function, relaxations removed
+                std::cout << "---Running tests on QP with non convex energy and Super Pixels\r\n";
+                crf.addSuperPixel(img,8,4,400);
+                crf.addSuperPixel(img,8,4,100);              
+                Q = crf.qp_inference_super_pixels_non_convex(Q);
             } else if (method == "unary"){
                 (void)0;
             } else{
@@ -80,6 +85,8 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             std::ofstream txt_file(txt_output.c_str());
             txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
             txt_file.close();
+        } else {
+            std::cout << "File exists! Skipping: " << image_name << std::endl; 
         }
     }
 }
@@ -121,15 +128,14 @@ int main(int argc, char *argv[])
     else if (method == "qp_sp_001") sp_const = 0.01;
     else if (method == "qp_sp_0001") sp_const = 0.001;
     else if (method == "qp_sp_00001") sp_const = 0.0001;
-
-    
-
-
+  
     make_dir(path_to_results);
 
     Dataset ds = get_dataset_by_name(dataset_name);
-    std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
+    std::vector<std::string> test_images = ds.get_MSRC_split_files(dataset_split);
+    //std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
     for(int i=0; i< test_images.size(); ++i){
+        std::cout << "Image: " << test_images[i] << std::endl;
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts, bil_spcstd, bil_colstd, bil_potts, sp_const);
     }
 
