@@ -132,8 +132,8 @@ int main(int argc, char *argv[])
     make_dir(path_to_results);
 
     Dataset ds = get_dataset_by_name(dataset_name);
-    std::vector<std::string> test_images = ds.get_MSRC_split_files(dataset_split);
-    //std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
+    //std::vector<std::string> test_images = ds.get_MSRC_split_files(dataset_split);
+    std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
     for(int i=0; i< test_images.size(); ++i){
         std::cout << "Image: " << test_images[i] << std::endl;
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts, bil_spcstd, bil_colstd, bil_potts, sp_const);
