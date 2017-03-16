@@ -23,6 +23,7 @@ for i=1:length(gtids)
     imname = gtids{i};
     toks = strsplit(imname, '.');
     imname = toks{1};
+	imname = imname(1:end-3);
      try
     % ground truth label file
 
