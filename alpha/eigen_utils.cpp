@@ -128,11 +128,14 @@ void rescale(MatrixXf & out, const MatrixXf & Q) {
 //        assert(maxval >= 0);
 //        if (maxval > 0)	out.row(i) /= maxval;
 //    }
-    // old-rescale- works better in segmentation?
+    // old-rescale- works better in segmentation
+	//chack for nan and inf
+    	//if (!((out - out).array() == (out - out).array()).all()) std::cout << "NaN of Inf" << std::endl;
 	minval = out.minCoeff();
 	out = out.array() - minval;
 	maxval = out.maxCoeff();
-    assert(maxval >= 0);
-    if (maxval > 0) out /= maxval;
+//	std::cout << "Max: " << maxval << "\tMin: " << minval << std::endl;
+	if (maxval < 0) throw std::runtime_error("Maxval < 0, skipping");
+    	if (maxval > 0) out /= maxval;
 }
 

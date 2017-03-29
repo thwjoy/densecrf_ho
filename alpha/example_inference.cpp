@@ -18,8 +18,8 @@ int main(int argc, char* argv[]) {
     make_dir(path_to_output);
 	path_to_output = "/home/tomj/Documents/4YP/densecrf/data/output/"  + std::string(argv[1]) + "/prox_lp.bmp";
 	minimize_prox_LP(path_to_image, path_to_unaries, params, path_to_output, dataset_name,argc,argv);
-	double sp_constant = 0.001;
-	for (int i = 0; i < 5; i++) {
+	double sp_constant = 0.1;
+	for (int i = 0; i < 3; i++) {
 		sp_constant *= 10;
 		path_to_output = "/home/tomj/Documents/4YP/densecrf/data/output/"  + std::string(argv[1]) + "/" + std::to_string(sp_constant) + "_lp.bmp";
 		minimize_prox_LP_super_pixels(path_to_image, path_to_unaries, params, path_to_output, dataset_name,sp_constant);

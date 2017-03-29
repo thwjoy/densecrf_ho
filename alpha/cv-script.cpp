@@ -15,33 +15,34 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     std::string image_path = dataset.get_image_path(image_name);
     std::string unaries_path = dataset.get_unaries_path(image_name);
     std::string dataset_name = dataset.name;
+    std::string path_to_subexp_results = path_to_results + "/" + method + "/";
+    std::string output_path = get_output_path(path_to_subexp_results, image_name);
 
-    img_size size = {-1, -1};
-    //Load the unaries potentials for our image.
-    MatrixXf unaries = load_unary(unaries_path, size);
-    unsigned char * img = load_image(image_path, size);
-
-    DenseCRF2D crf(size.width, size.height, unaries.rows());
-    crf.setUnaryEnergy(unaries);
-    crf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
-    crf.addPairwiseBilateral(bil_spcstd, bil_spcstd,bil_colstd, bil_colstd, bil_colstd,img, new PottsCompatibility(bil_potts));
-    crf.addSuperPixel(img,8,4,100);
-    crf.addSuperPixel(img,8,4,400);
 
 
     MatrixXf Q;
-    {
-        std::string path_to_subexp_results = path_to_results + "/" + method + "/";
-        std::string output_path = get_output_path(path_to_subexp_results, image_name);
+    {   
+        
         make_dir(path_to_subexp_results);
         if (not file_exist(output_path)) {
-            //clock_t start, end;
+            
+    	    img_size size = {-1, -1};
+    	    //Load the unaries potentials for our image.
+    	    MatrixXf unaries = load_unary(unaries_path, size);
+    	    unsigned char * img = load_image(image_path, size);
+
+    	    DenseCRF2D crf(size.width, size.height, unaries.rows());
+    	    crf.setUnaryEnergy(unaries);
+    	    crf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
+    	    crf.addPairwiseBilateral(bil_spcstd, bil_spcstd,bil_colstd, bil_colstd, bil_colstd,img, new PottsCompatibility(bil_potts));
+    	    crf.addSuperPixel(img,8,4,100);
+    	    crf.addSuperPixel(img,8,4,400);
             typedef std::chrono::high_resolution_clock::time_point htime;
             htime start, end;
             //time_t start, end;
             //double start, end;
             double timing;
-            std::cout << image_path << std::endl;
+            //std::cout << image_path << std::endl;
             //start = clock();
             std::vector<perf_measure> traced_perfs;
             std::vector<perf_measure> new_perfs;
@@ -81,7 +82,12 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.lp_inference_prox(Q, lp_params);
             } else if (method == "prox_lp_sp_0" || method == "prox_lp_sp_1" || method == "prox_lp_sp_10" || method == "prox_lp_sp_100" || method == "prox_lp_sp_1000" || method == "prox_lp_sp_10000" || method == "prox_lp_sp_01" || method == "prox_lp_sp_001" || method == "prox_lp_sp_0001" || method == "prox_lp_sp_00001")  {// prox_lp with super pixels
                 std::cout << "Running prox_lp with super pixels and constant: " << sp_const << std::endl;
-                Q = crf.lp_inference_prox_super_pixels(Q, lp_params, sp_const);   
+		//Q.fill(0);
+		try {
+                    Q = crf.lp_inference_prox_super_pixels(Q, lp_params, sp_const);   
+		} catch (std::runtime_error &e) {
+		    std::cout << "Runtime Error!: " << e.what() << std::endl;
+		}	
             } else if (method == "prox_lp_acc_l"){  // standard prox_lp with limited labels
                 Q = crf.qp_inference(Q);
                 Q = crf.concave_qp_cccp_inference(Q);
@@ -414,7 +420,7 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
 
     for(int i=0; i< test_images.size(); i++){
-        //std::cout << test_images[i] << std::endl;
+        std::cout << test_images[i] <<"\t" << i << "/" << test_images.size() << std::endl;
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params, sp_const);
     }

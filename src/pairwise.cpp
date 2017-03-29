@@ -214,9 +214,10 @@ void PairwisePotential::applyTranspose(MatrixXf & out, const MatrixXf & Q) const
 void PairwisePotential::apply_upper_minus_lower_ord(MatrixXf & out, const MatrixXf & Q) {
     // pass rescaled_Q to reduce the discretization error! ("rescale" function is in eigen_utils.cpp)
     // when no of labels are high, each probabilty is small and all fall into one or two buckets!
-	assert(Q.maxCoeff() <= 1);
-	assert(Q.minCoeff() >= 0);  // values truncated to be [0,1], doesn't need to sum to 1
-    out.fill(0);
+	out.fill(0);
+        if (Q.maxCoeff() > 1)throw std::runtime_error("Value out of bounds");
+	if (Q.minCoeff() < 0)throw std::runtime_error("Value out of bounds");  // values truncated to be [0,1], doesn't need to sum to 1
+    
 	kernel_->apply_upper_minus_lower_ord(out, Q);
 
     //float alpha = 0.6;  // magic constant (bf-lp-energy/ph-lp-energy)

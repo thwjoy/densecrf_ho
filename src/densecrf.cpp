@@ -3859,18 +3859,27 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
             // case-3: dual conditional-gradient or primal-subgradient (do it as the final case)
             Q = lambda * (alpha_tQ + beta_mat + u_tQ + gamma - unary) + cur_Q; // Q may be infeasible --> but no problem
-            rescale(rescaled_Q, Q);//truncate Q to be [0,1]
-
+            try {
+		rescale(rescaled_Q, Q);//truncate Q to be [0,1]
+		}
+		catch (std::runtime_error &e) {
+			throw std::runtime_error(e.what());
+		}
             // Compute the conditional gradient
             // subgradient lower minus upper
             // Pairwise
+		
             for( unsigned int k=0; k<pairwise_.size(); k++ ) {
                 // new PH implementation
                 // rescaled_Q values in the range [0,1] --> but the same order as Q! --> subgradient of Q
-                pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q); 
-                sa_tQ += tmp;    // A * s is lower minus upper, keep neg introduced by compatibility->apply
+                try {
+		    pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q); 
+                 sa_tQ += tmp;    // A * s is lower minus upper, keep neg introduced by compatibility->apply
+               } catch (std::runtime_error & e) {
+	      	    throw std::runtime_error(e.what());
+		}	
             }
-
+	    
             //Compute the conditional gradient for mew
             computeUCondGrad(su_tQ,Q,sp_constant);
 
@@ -3881,7 +3890,10 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             // compute the optimal step size
             delta = (float)(dual_gap / (lambda * dotProduct(tmp, tmp, dot_tmp)));
             delta = std::min(std::max(delta, (float)0.0), (float)1.0);  // I may not need to truncate the step-size!!
-            assert(delta >= 0);
+//            if (delta == 0) {
+//		std::cout << "step = 0" << std::endl;
+//		//break;
+//		}
 
             // update alpha_tQ
             alpha_tQ = alpha_tQ + delta * (sa_tQ - alpha_tQ);
@@ -3891,6 +3903,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
 /*##############################################################################*/
 
+  
         // project Q back to feasible region
         feasible_Q(tmp, ind, sum, K, Q);
         Q = tmp;
@@ -3947,7 +3960,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
     return best_Q;
 }
-
+/*
 void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double constant) const {
     assert(Us.cols() == N_);
     assert(Us.rows() == M_);
@@ -3973,6 +3986,36 @@ void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double consta
             Us(lab,max_ind) = -constant * exp_of_superpixels_(reg);              
         }  
     }
+}
+*/
+
+void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double constant) const {
+    assert(Us.cols() == N_);
+    assert(Us.rows() == M_);
+    Us.fill(0);
+    int min,max,min_lab,max_lab,min_ind=0,max_ind=0, min_lab_ind=0,max_lab_ind=0;
+    int sum = 0;
+    for(int reg = 0; reg < R_; reg++) {
+        min = std::numeric_limits<int>::max();
+        max = std::numeric_limits<int>::min();
+        for (int lab = 0; lab < M_; lab++) {
+            for (auto it : super_pixel_container_[reg]) { //loop through all of the pixels in this super pixel
+                //we want to find the smallest and largest values, we then set the conditional gradient accordingly
+                if (min > Q(lab,it)) {
+                    min_ind = it;
+                    min_lab_ind = lab;
+                    min = Q(lab,it);
+                }
+                if (max < Q(lab,it)) {
+                    max_ind = it;
+                    max_lab_ind = lab;
+                    max = Q(lab,it);
+                }
+            }
+        }
+        Us(min_lab_ind,min_ind) = constant * exp_of_superpixels_(reg);
+        Us(max_lab_ind,max_ind) = -constant * exp_of_superpixels_(reg);              
+    }  
 }
 
 void DenseCRF::initUu(MatrixXf & u, double constant) const {
@@ -4957,7 +5000,8 @@ VectorXf DenseCRF::labelCompatibilityParameters() const {
             i += terms[k].rows();
         }
         return r;
-    }
+	}
+
     void DenseCRF::setKernelParameters( const VectorXf & v ) {
         std::vector< int > n;
         for( unsigned int k=0; k<pairwise_.size(); k++ )
@@ -4972,6 +5016,13 @@ VectorXf DenseCRF::labelCompatibilityParameters() const {
         }
     }
 
-    void DenseCRF::compute_kl_divergence(){
+     void DenseCRF::compute_kl_divergence(){
         compute_kl = true;
     }
+
+
+
+
+
+
+
