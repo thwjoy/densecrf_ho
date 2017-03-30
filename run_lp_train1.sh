@@ -1,0 +1,1 @@
+build/alpha/cv-script Validationp1 MSRC prox_lp_sp_1 data/MSRC/results_dc_neg/val 3.071772 0.5 49.785678 1 0.960811 && build/alpha/cv-script Validationp1 MSRC prox_lp_sp_10 data/MSRC/results_dc_neg/val 3.071772 0.5 49.785678 1 0.960811 && build/alpha/cv-script Validationp1 MSRC prox_lp_sp_100 data/MSRC/results_dc_neg/val 3.071772 0.5 49.785678 1 0.960811
