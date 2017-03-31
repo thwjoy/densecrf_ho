@@ -205,8 +205,8 @@ public:
 	void addPairwiseBilateral( float sx, float sy, float sr, float sg, float sb, const unsigned char * im, LabelCompatibility * function=NULL, KernelType kernel_type=DIAG_KERNEL, NormalizationType normalization_type=NORMALIZE_SYMMETRIC );
 	
 	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
-	void addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, SpeedUpLevel = NO_SPEEDUP);
-	void addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, double constant, SpeedUpLevel = NO_SPEEDUP);
+	void addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count);
+	void addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, double constant);
 
 	
 	// Set the unary potential for a specific variable
