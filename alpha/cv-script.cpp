@@ -76,8 +76,8 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.concave_qp_cccp_inference(Q);
                 Q = crf.lp_inference(Q, false, true);
             } else if (method == "prox_lp"){    // standard prox_lp
-                Q = crf.qp_inference(Q);
-                Q = crf.concave_qp_cccp_inference(Q);
+                //Q = crf.qp_inference(Q);
+                //Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
                 Q = crf.lp_inference_prox(Q, lp_params);
             } else if (method == "prox_lp_sp_0" || method == "prox_lp_sp_1" || method == "prox_lp_sp_10" || method == "prox_lp_sp_100" || method == "prox_lp_sp_1000" || method == "prox_lp_sp_10000" || method == "prox_lp_sp_01" || method == "prox_lp_sp_001" || method == "prox_lp_sp_0001" || method == "prox_lp_sp_00001")  {// prox_lp with super pixels
