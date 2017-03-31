@@ -192,8 +192,8 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     std::cout << "---Running mean-shift and adding super pixel term" <<std::endl;
-    crf.addSuperPixel(img,8,4,400);
-    crf.addSuperPixel(img,8,4,100);
+    //crf.addSuperPixel(img,8,4,400);
+    //crf.addSuperPixel(img,8,4,100);
     MatrixXf init = crf.unary_init();
     std::vector<perf_measure> traced_perfs_qp;
     std::vector<perf_measure> traced_perfs_qp_nc;
@@ -305,8 +305,8 @@ void minimize_LR_QP_non_convex_tracing(std::string path_to_image, std::string pa
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     std::cout << "---Running mean-shift and adding super pixel term" <<std::endl;
-    crf.addSuperPixel(img,8,4,400);
-    crf.addSuperPixel(img,8,4,100);
+    //crf.addSuperPixel(img,8,4,400);
+    //crf.addSuperPixel(img,8,4,100);
     MatrixXf init = crf.unary_init();
     std::vector<perf_measure> traced_perfs_qp;
     std::vector<perf_measure> traced_perfs_qp_nc;
