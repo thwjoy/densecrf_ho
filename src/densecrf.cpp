@@ -120,6 +120,72 @@ void DenseCRF2D::addPairwiseBilateral ( float sx, float sy, float sr, float sg, 
     addPairwiseEnergy(feature, function, kernel_type, normalization_type);
 }
 
+void DenseCRF2D::addSuperPixel(std::string path_to_classifier,unsigned char * img, float constant, float normaliser) {
+    int regions_out_arr[W_ * H_];
+    std::vector<int> regions_out;
+    std::vector<std::vector<double>> super_pixel_container;
+    VectorXf count_regions; 
+    VectorXf mean_of_superpixels;
+    VectorXf sd_of_superpixels; 
+    Matrix<float, Dynamic, Dynamic> super_pixel_classifier;
+
+    //get the classifier
+    std::ifstream is(path_to_classifier, std::ios::binary);
+    //while (is.get(c)) regions_out.push_back((int) c);
+    is.read((char *) &regions_out_arr, sizeof(regions_out_arr));
+    is.close();
+    for (int j = 0; j < W_ * H_; j++) regions_out.push_back(regions_out_arr[j]);
+    std::vector<int>::iterator it_reg = std::max_element(regions_out.begin(),regions_out.end());
+    int reg = *it_reg + 1;
+    int region;
+
+
+    super_pixel_container.resize(reg);
+    count_regions.resize(reg);
+    mean_of_superpixels.resize(reg);
+    sd_of_superpixels.resize(reg);
+    count_regions.fill(0);
+    mean_of_superpixels.fill(0);
+    sd_of_superpixels.fill(0);
+    super_pixel_classifier.resize(reg,W_ * H_);
+    super_pixel_classifier.fill(0);
+    for (int i = 0; i < super_pixel_classifier.cols(); i++) {
+        region = regions_out[i];
+        super_pixel_classifier(region,i) = 1;
+        super_pixel_container[region].push_back(i);
+        mean_of_superpixels(region) += 0.2989 * (double) img[i];
+        mean_of_superpixels(region) += 0.5870 * (double) img[i + 1];
+        mean_of_superpixels(region) += 0.1140 * (double) img[i + 2];
+        count_regions(region) += 1;
+    }
+    mean_of_superpixels = mean_of_superpixels.cwiseQuotient(count_regions);
+
+    
+    for (int i = 0; i < regions_out.size(); i++) {
+        region = regions_out[i];
+        double grey_val = 0.2989 * (double) img[i] + 0.5870 * (double) img[i + 1] + 0.1140 * (double) img[i + 2];
+        sd_of_superpixels(region) += (mean_of_superpixels(region) - grey_val) * (mean_of_superpixels(region) - grey_val);
+    }
+
+    sd_of_superpixels = (sd_of_superpixels.cwiseQuotient(normaliser * count_regions));
+
+    
+    std::vector<float> constants(reg, constant);
+    constants_.insert(constants_.end(),constants.begin(),constants.end());
+ 
+    //update the private member functions
+    R_ += reg;
+    super_pixel_container_.insert(super_pixel_container_.end(),super_pixel_container.begin(), super_pixel_container.end());
+    mean_of_superpixels_.conservativeResize(R_);
+    mean_of_superpixels_.tail(reg) = mean_of_superpixels;
+    exp_of_superpixels_.conservativeResize(R_);
+    exp_of_superpixels_.tail(reg) = constant * exp(-1 * sd_of_superpixels.array());
+    super_pixel_classifier_.conservativeResize(R_,W_ * H_);
+    super_pixel_classifier_.block(R_ - reg, 0, reg,W_ * H_) << super_pixel_classifier;
+
+    return ;
+}
+
 void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, SpeedUpLevel) {
     //addSuperPixel is a member function that applies the mean-shift algorithm to the image and then initialises the protected member varaiable super_pixel_classifer.
     unsigned char * segment_image = new unsigned char[W_ * H_ * 3];
@@ -3683,7 +3749,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 }
 
 // LP inference with proximal algorithm
-MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params, double sp_constant) const {
+MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const {
     MatrixXf best_Q(M_, N_), tmp(M_, N_), tmp2(M_, N_);
     MatrixP dot_tmp(M_, N_);
     MatrixXi ind(M_, N_);
@@ -3881,7 +3947,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             }
 	    
             //Compute the conditional gradient for mew
-            computeUCondGrad(su_tQ,Q,sp_constant);
+            computeUCondGrad(su_tQ,Q);
 
             // find dual gap
             tmp = alpha_tQ + u_tQ - (sa_tQ + su_tQ);  
@@ -3989,7 +4055,7 @@ void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double consta
 }
 */
 
-void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double constant) const {
+void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const {
     assert(Us.cols() == N_);
     assert(Us.rows() == M_);
     Us.fill(0);
@@ -4013,8 +4079,8 @@ void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double consta
                 }
             }
         }
-        Us(min_lab_ind,min_ind) = constant * exp_of_superpixels_(reg);
-        Us(max_lab_ind,max_ind) = -constant * exp_of_superpixels_(reg);              
+        Us(min_lab_ind,min_ind) = constants_[reg] * exp_of_superpixels_(reg);
+        Us(max_lab_ind,max_ind) = -constants_[reg] * exp_of_superpixels_(reg);              
     }  
 }
 

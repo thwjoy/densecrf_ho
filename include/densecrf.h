@@ -95,6 +95,9 @@ protected:
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
 
+	//store the constants for the clique
+	std::vector<float> constants_;
+
 	// Store all pairwise potentials -- no-normalization: used to caluclate energy 
 	std::vector<PairwisePotential*> no_norm_pairwise_;
 
@@ -104,7 +107,7 @@ protected:
 	// Don't copy this object, bad stuff will happen
 	DenseCRF( DenseCRF & o ){}
 
-	void computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double constant) const;
+	void computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const;
 	void initUu(MatrixXf & u, double constant) const;
 public:
 	// Create a dense CRF model of size N with M labels
@@ -167,7 +170,7 @@ public:
     MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad, bool full_mat = false) const;
     MatrixXf lp_inference_new(MatrixXf & init) const;
     MatrixXf lp_inference_prox(MatrixXf & init, LP_inf_params & params) const;
-    MatrixXf lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params, double sp_const = 1) const;
+    MatrixXf lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
     MatrixXf lp_inference_prox_restricted(MatrixXf & init, LP_inf_params & params) const;
 	std::vector<perf_measure> tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit = 0, bool full_mat = false) const;
 	std::vector<perf_measure> tracing_lp_inference_prox(MatrixXf & init, LP_inf_params & params, 
@@ -268,6 +271,7 @@ public:
 	void addPairwiseBilateral( float sx, float sy, float sr, float sg, float sb, const unsigned char * im, LabelCompatibility * function=NULL, KernelType kernel_type=DIAG_KERNEL, NormalizationType normalization_type=NORMALIZE_SYMMETRIC );
 	
 	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
+	void addSuperPixel(std::string path_to_classifier,unsigned char * img, float constant, float normaliser);
 	void addSuperPixel(unsigned char * img, int spatial_radius = 8, int range_radius = 4, int min_region_count = 2500, SpeedUpLevel = NO_SPEEDUP);
 
 	// Set the unary potential for a specific variable

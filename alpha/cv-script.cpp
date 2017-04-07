@@ -6,9 +6,19 @@
 #include "file_storage.hpp"
 #include "densecrf.h"
 
+struct sp_params {
+    float const_1;
+    float const_2;
+    float const_3;
+    float norm_1;
+    float norm_2;
+    float norm_3;
+};
+
+
 void image_inference(Dataset dataset, std::string method, std::string path_to_results,
                      std::string image_name, float spc_std, float spc_potts, 
-                     float bil_spcstd, float bil_colstd, float bil_potts, LP_inf_params & lp_params, double sp_const)
+                     float bil_spcstd, float bil_colstd, float bil_potts, LP_inf_params & lp_params, double sp_const, sp_params params)
 
 {
 
@@ -17,6 +27,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     std::string dataset_name = dataset.name;
     std::string path_to_subexp_results = path_to_results + "/" + method + "/";
     std::string output_path = get_output_path(path_to_subexp_results, image_name);
+    std::string super_pixel_path = "./data/MSRC/MSRC_ObjCategImageDatabase_v2/SuperPixels";
 
 
 
@@ -35,8 +46,6 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     	    crf.setUnaryEnergy(unaries);
     	    crf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
     	    crf.addPairwiseBilateral(bil_spcstd, bil_spcstd,bil_colstd, bil_colstd, bil_colstd,img, new PottsCompatibility(bil_potts));
-    	    crf.addSuperPixel(img,8,4,100);
-    	    crf.addSuperPixel(img,8,4,400);
             typedef std::chrono::high_resolution_clock::time_point htime;
             htime start, end;
             //time_t start, end;
@@ -80,11 +89,20 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 //Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
                 Q = crf.lp_inference_prox(Q, lp_params);
+            } else if (method == "prox_lp_sp"){    // standard prox_lp
+                crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
+                crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2); 
+                crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3); 
+                try {
+                    Q = crf.lp_inference_prox_super_pixels(Q, lp_params);   
+                } catch (std::runtime_error &e) {
+                    std::cout << "Runtime Error!: " << e.what() << std::endl;
+                }
             } else if (method == "prox_lp_sp_0" || method == "prox_lp_sp_1" || method == "prox_lp_sp_10" || method == "prox_lp_sp_100" || method == "prox_lp_sp_1000" || method == "prox_lp_sp_10000" || method == "prox_lp_sp_01" || method == "prox_lp_sp_001" || method == "prox_lp_sp_0001" || method == "prox_lp_sp_00001")  {// prox_lp with super pixels
                 std::cout << "Running prox_lp with super pixels and constant: " << sp_const << std::endl;
 		//Q.fill(0);
 		try {
-                    Q = crf.lp_inference_prox_super_pixels(Q, lp_params, sp_const);   
+                    Q = crf.lp_inference_prox_super_pixels(Q, lp_params);   
 		} catch (std::runtime_error &e) {
 		    std::cout << "Runtime Error!: " << e.what() << std::endl;
 		}	
@@ -374,7 +392,7 @@ int main(int argc, char *argv[])
     std::string dataset_name  = argv[2];
     std::string method = argv[3];
     std::string path_to_results = argv[4];
-    path_to_results = "/home/tomj/Documents/4YP/densecrf/" + path_to_results;
+    //path_to_results = "/home/tomj/Documents/4YP/densecrf/" + path_to_results;
 
     std::string param1 = argv[5];
     float spc_std = std::stof(param1);
@@ -386,6 +404,11 @@ int main(int argc, char *argv[])
     float bil_colstd = std::stof(param4);
     std::string param5 = argv[9];
     float bil_potts = std::stof(param5);
+
+    sp_params params;
+    if (argc==16) params = sp_params {std::stof(argv[10]), std::stof(argv[11]), std::stof(argv[12]), std::stof(argv[13]), std::stof(argv[14]), std::stof(argv[15])};
+    else params = {0,0,0,0,0,0};
+
 
     // lp inference params
 	LP_inf_params lp_params;
@@ -418,11 +441,12 @@ int main(int argc, char *argv[])
     Dataset ds = get_dataset_by_name(dataset_name);
 
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-
+    omp_set_num_threads(4);
+#pragma omp parallel for
     for(int i=0; i< test_images.size(); i++){
-        std::cout << test_images[i] <<"\t" << i << "/" << test_images.size() << std::endl;
+        //std::cout << test_images[i] <<"\t" << i << "/" << test_images.size() << std::endl;
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
-                        bil_spcstd, bil_colstd, bil_potts, lp_params, sp_const);
+                        bil_spcstd, bil_colstd, bil_potts, lp_params, sp_const, params);
     }
 
 

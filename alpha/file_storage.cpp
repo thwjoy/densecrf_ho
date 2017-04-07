@@ -82,7 +82,7 @@ std::string Dataset::get_ground_truth_path(const std::string & image_name){
 
 std::vector<std::string> Dataset::get_all_split_files(const std::string & split) {
 
-    std::string path_to_split = "data/PascalVOC2010/split/" + split+ ".txt";
+    std::string path_to_split = "data/MSRC/split/" + split+ ".txt";
 
     std::vector<std::string> split_images;
     std::string next_img_name;
@@ -91,7 +91,7 @@ std::vector<std::string> Dataset::get_all_split_files(const std::string & split)
 
     while(getline(file, next_img_name)){
         next_img_name = rtrim(next_img_name);
-        next_img_name = stringreplace(next_img_name, ".bmp", ""); // Cleanup the name in MSRC
+        next_img_name = stringreplace(next_img_name, "_GT.bmp", ""); // Cleanup the name in MSRC
         split_images.push_back(next_img_name);
     }
     return split_images;

@@ -638,7 +638,7 @@ void minimize_prox_LP_super_pixels(std::string path_to_image, std::string path_t
     //Q = crf.lp_inference_prox_restricted(Q, lp_params);
     typedef std::chrono::high_resolution_clock::time_point htime;
     htime st = std::chrono::high_resolution_clock::now();
-    MatrixXf Q = crf.lp_inference_prox_super_pixels(init, lp_params,sp_constant);
+    MatrixXf Q = crf.lp_inference_prox(init, lp_params);
     htime et = std::chrono::high_resolution_clock::now();
     double dt = std::chrono::duration_cast<std::chrono::duration<double>>(et-st).count();
     std::cout << "Time for prox-super_pixel: " << dt << " seconds\n";
