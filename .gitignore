@@ -4,3 +4,5 @@ debug
 *.pyc
 *.ppm
 run.*
+*.out
+tools/lib

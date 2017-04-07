@@ -2,18 +2,22 @@ import subprocess
 import matlab.engine
 import os
 
-experiment_suffix = "mf5"
+experiment_suffix = "qp_sp"
 split_no = "1"
 split = "val" + split_no
 dataset = "MSRC"
 
 def generate_segmentation(spc_std, spc_potts,
-                          bil_spcstd, bil_colstd, bil_potts):
+                          bil_spcstd, bil_colstd, bil_potts,
+				const_1,const_2,const_3,
+				norm_1, norm_2, norm_3):
     path_to_executable = 'build/alpha/cv-script'
 
 
     exp_path = '_'.join(map(str, [spc_std, spc_potts, bil_spcstd,
-                                  bil_colstd, bil_potts]))
+                                  bil_colstd, bil_potts,
+				const_1,const_2,const_3,
+				norm_1, norm_2, norm_3]))
 
     results_path = "/home/tomj/Documents/4YP/densecrf/data/CV" + split_no + "/" + dataset + "/" + experiment_suffix + "/" + exp_path
     try:
@@ -27,15 +31,21 @@ def generate_segmentation(spc_std, spc_potts,
                      experiment_suffix,
                      results_path,
                      str(spc_std), str(spc_potts),
-                     str(bil_spcstd), str(bil_colstd), str(bil_potts)])
+                     str(bil_spcstd), str(bil_colstd), str(bil_potts),
+			str(const_1),str(const_2),str(const_3),
+		 	str(norm_1), str(norm_2), str(norm_3)])
     
 
 def evaluate_segmentation(spc_std, spc_potts,
-                          bil_spcstd, bil_colstd, bil_potts):
+                          bil_spcstd, bil_colstd, bil_potts,
+				const_1,const_2,const_3,
+				norm_1, norm_2, norm_3):
     eng = matlab.engine.start_matlab()
     exp_path = '_'.join(map(str, [spc_std, spc_potts, bil_spcstd,
-                                  bil_colstd, bil_potts]))
-    path_to_results = "/home/tomj/Documents/4YP/densecrf/data/CV" + split_no "/MSRC/" + experiment_suffix + "/" + exp_path + "/" + experiment_suffix
+                                  bil_colstd, bil_potts,
+				const_1,const_2,const_3,
+				norm_1, norm_2, norm_3]))
+    path_to_results = "/home/tomj/Documents/4YP/densecrf/data/CV" + split_no + "/" + "MSRC/" + experiment_suffix + "/" + exp_path + "/" + experiment_suffix
     eng.addpath('/home/tomj/Documents/4YP/densecrf/tools/', nargout=0)
     ret = eng.CVmsrc_test(path_to_results, split)
     # This returns the value of the average accuracy.Spearmint
@@ -57,8 +67,18 @@ def main(job_id, params):
     bil_spcstd = params['bil_spcstd'][0]
     bil_colstd = params['bil_colstd'][0]
     bil_potts = params['bil_potts'][0]
+    const_1 = params['const_1'][0]
+    const_2 = params['const_2'][0]
+    const_3 = params['const_3'][0]
+    norm_1 = params['norm_1'][0]
+    norm_2 = params['norm_2'][0]
+    norm_3 = params['norm_3'][0]
 
     generate_segmentation(spc_std, spc_potts, bil_spcstd,
-                          bil_colstd, bil_potts)
+                          bil_colstd, bil_potts,
+				const_1,const_2,const_3,
+				norm_1, norm_2, norm_3)
     return evaluate_segmentation(spc_std, spc_potts,
-                                 bil_spcstd, bil_colstd, bil_potts)
+                                 bil_spcstd, bil_colstd, bil_potts,
+				const_1,const_2,const_3,
+				norm_1, norm_2, norm_3)

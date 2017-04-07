@@ -2,7 +2,7 @@ import subprocess
 import matlab.engine
 import os
 
-experiment_suffix = "mf5"
+experiment_suffix = "qp_nc"
 split_no = "1"
 split = "val" + split_no
 dataset = "MSRC"
@@ -35,7 +35,7 @@ def evaluate_segmentation(spc_std, spc_potts,
     eng = matlab.engine.start_matlab()
     exp_path = '_'.join(map(str, [spc_std, spc_potts, bil_spcstd,
                                   bil_colstd, bil_potts]))
-    path_to_results = "/home/tomj/Documents/4YP/densecrf/data/CV" + split_no "/MSRC/" + experiment_suffix + "/" + exp_path + "/" + experiment_suffix
+    path_to_results = "/home/tomj/Documents/4YP/densecrf/data/CV" + split_no + "/" + "MSRC/" + experiment_suffix + "/" + exp_path + "/" + experiment_suffix
     eng.addpath('/home/tomj/Documents/4YP/densecrf/tools/', nargout=0)
     ret = eng.CVmsrc_test(path_to_results, split)
     # This returns the value of the average accuracy.Spearmint

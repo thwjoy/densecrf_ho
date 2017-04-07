@@ -52,9 +52,9 @@ int main (int argc, char * argv[]) {
 	Potts_weight_set params(3.535267, 2.247081, 31.232626, 7.949970, 1.699011); //DC-NEG
 	//Potts_weight_set params(11.110367,0.5,1,50,92.53338);// LRQP
 	//Potts_weight_set params(4.105884, 77.047681, 47.793787, 4.963766, 100); //MF5
-
+	
 	//run the minimisation
-	minimize_LR_QP_non_convex_tracing(path_to_image, path_to_unaries, params, path_to_output, dataset_name);
+	minimize_LR_QP_non_convex(path_to_image, path_to_unaries, params, path_to_output, dataset_name);
 	
 	return 0;
 

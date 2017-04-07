@@ -4,13 +4,24 @@
 #include "file_storage.hpp"
 #include "densecrf.h"
 
+
+struct sp_params {
+    float const_1;
+    float const_2;
+    float const_3;
+    float norm_1;
+    float norm_2;
+    float norm_3;
+};
+
 void image_inference(Dataset dataset, std::string method, std::string path_to_results,
-                     std::string image_name, float spc_std, float spc_potts, float bil_spcstd, float bil_colstd, float bil_potts, float sp_const)
+                     std::string image_name, float spc_std, float spc_potts, float bil_spcstd, float bil_colstd, float bil_potts, float sp_const, sp_params params)
 {
 
     std::string image_path = dataset.get_image_path(image_name);
     std::string unaries_path = dataset.get_unaries_path(image_name);
     std::string dataset_name = dataset.name;
+    std::string super_pixel_path = "./data/MSRC/MSRC_ObjCategImageDatabase_v2/SuperPixels";
 
     img_size size = {-1, -1};
     //Load the unaries potentials for our image.
@@ -53,25 +64,25 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.concave_qp_cccp_inference(Q);
                 Q = crf.lp_inference(Q, true);
             } else if (method == "qp_nc"){ //qp with a non convex energy function, relaxations removed
-                std::cout << "---Running tests on QP with non convex energy\r\n";
+                //std::cout << "---Running tests on QP with non convex energy\r\n";
                 //Q = crf.qp_inference(Q);
                 Q = crf.qp_inference_non_convex(Q);
             } else if (method == "qp_sp_0" || method == "qp_sp_0" || method == "qp_sp_00001" || method == "qp_sp_0001" || method == "qp_sp_001" || method == "qp_sp_01" || method == "qp_sp_1" || method == "qp_sp_10" || method == "qp_sp_100" || method == "qp_sp_1000" || method == "qp_sp_10000" ){
-                std::cout << "---Running tests on QP with super pixel terms, with constant = "<< sp_const << "\r\n";
-                //crf.addSuperPixel(img,8,4,40,sp_const);
-                crf.addSuperPixel(img,8,4,400,sp_const);
-                crf.addSuperPixel(img,8,4,1000,sp_const);
-                //crf.addSuperPixel(img,8,4,5000,sp_const);               
+                //std::cout << "---Running tests on QP with super pixel terms, with constant = "<< sp_const << "\r\n";
+                crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "/_clsfr.bin",img,params.const_1,params.norm_1);
+                crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "/_clsfr.bin",img,params.const_2,params.norm_2); 
+                crf.addSuperPixel(super_pixel_path + "/40/" + image_name + "/_clsfr.bin",img,params.const_3,params.norm_3);             
                 Q = crf.qp_inference_super_pixels_non_convex(Q);
             } else if (method == "qp_sp"){ //qp with a non convex energy function, relaxations removed
-                std::cout << "---Running tests on QP with non convex energy and Super Pixels\r\n";
-                //crf.addSuperPixel(img,8,4,400);
-                //crf.addSuperPixel(img,8,4,100);              
+                //std::cout << "---Running tests on QP with non convex energy and Super Pixels\r\n";
+                crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
+                crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2); 
+                crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3);              
                 Q = crf.qp_inference_super_pixels_non_convex(Q);
             } else if (method == "unary"){
                 (void)0;
             } else{
-                std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
+                //std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
             }
 
 
@@ -87,7 +98,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
             txt_file.close();
         } else {
-            std::cout << "File exists! Skipping: " << image_name << std::endl; 
+            //std::cout << "File exists! Skipping: " << image_name << std::endl; 
         }
     }
 }
@@ -105,7 +116,8 @@ int main(int argc, char *argv[])
     std::string dataset_name  = argv[2];
     std::string method = argv[3];
     std::string path_to_results = argv[4];
-    path_to_results = "/home/tomj/Documents/4YP/densecrf/" + path_to_results;
+    //path_to_results = "/home/tomj/Documents/4YP/densecrf/" + path_to_results;
+    //std::cout << "build/alpha/cv-script " << dataset_split << " " << dataset_name << " " << method << " " << path_to_results << " " << argv[5] << " " << argv[6]  << " " << argv[7]  << " " << argv[8]  << " " << argv[9]  << std::endl;
 
     std::string param1 = argv[5];
     float spc_std = std::stof(param1);
@@ -117,6 +129,10 @@ int main(int argc, char *argv[])
     float bil_colstd = std::stof(param4);
     std::string param5 = argv[9];
     float bil_potts = std::stof(param5);
+    sp_params params;
+    if (argc==16) params = sp_params {std::stof(argv[10]), std::stof(argv[11]), std::stof(argv[12]), std::stof(argv[13]), std::stof(argv[14]), std::stof(argv[15])};
+    else params = {0,0,0,0,0,0};
+
 
     float sp_const;
     if(method == "qp_sp_0") sp_const = 0;
@@ -136,9 +152,11 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images;
     if (dataset_name == "MSRC") test_images = ds.get_MSRC_split_files(dataset_split);
     else test_images = ds.get_all_split_files(dataset_split);
+    omp_set_num_threads(4);
+#pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
-        std::cout << "Image: " << test_images[i] << "\t" << i << "/" << test_images.size() << std::endl;
-        image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts, bil_spcstd, bil_colstd, bil_potts, sp_const);
+        //std::cout << "Image: " << test_images[i] << "\t" << i << "/" << test_images.size() << std::endl;
+        image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts, bil_spcstd, bil_colstd, bil_potts, sp_const, params);
     }
 
 

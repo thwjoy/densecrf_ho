@@ -192,13 +192,14 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     std::cout << "---Running mean-shift and adding super pixel term" <<std::endl;
-    //crf.addSuperPixel(img,8,4,400);
-    //crf.addSuperPixel(img,8,4,100);
+    std::string path_to_classifier = "./data/MSRC/MSRC_ObjCategImageDatabase_v2/SuperPixels/1000/1_9_s_clsfr.bin";
+    crf.addSuperPixel(path_to_classifier,img,1,10000);
+    crf.addSuperPixel(img,8,4,1000,1);
     MatrixXf init = crf.unary_init();
     std::vector<perf_measure> traced_perfs_qp;
     std::vector<perf_measure> traced_perfs_qp_nc;
     std::vector<perf_measure> traced_perfs_qp_sp;
- /*   
+ /*   build/alpha
     //run the inference with the convex problem
     std::cout << "---Finding global optimum, of convex energy function" <<std::endl;
     clock_t start, end;

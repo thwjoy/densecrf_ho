@@ -40,6 +40,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <fstream>
 #include <set>
 
 #define DCNEG_FASTAPPROX false
@@ -142,7 +143,67 @@ void DenseCRF2D::addPairwiseBilateral ( float sx, float sy, float sr, float sg, 
     addPairwiseEnergy(feature, function, kernel_type, normalization_type);
 }
 
+void DenseCRF2D::addSuperPixel(std::string path_to_classifier,unsigned char * img, float constant, float normaliser) {
+    int regions_out_arr[W_ * H_];
+    std::vector<int> regions_out;
+    std::vector<std::vector<double>> super_pixel_container;
+    VectorXf count_regions; 
+    VectorXf mean_of_superpixels;
+    VectorXf sd_of_superpixels; 
+    Matrix<float, Dynamic, Dynamic> super_pixel_classifier;
 
+    //get the classifier
+    std::ifstream is(path_to_classifier, std::ios::binary);
+    //while (is.get(c)) regions_out.push_back((int) c);
+    is.read((char *) &regions_out_arr, sizeof(regions_out_arr));
+    is.close();
+    for (int j = 0; j < W_ * H_; j++) regions_out.push_back(regions_out_arr[j]);
+    std::vector<int>::iterator it_reg = std::max_element(regions_out.begin(),regions_out.end());
+    int reg = *it_reg + 1;
+    int region;
+
+
+    super_pixel_container.resize(reg);
+    count_regions.resize(reg);
+    mean_of_superpixels.resize(reg);
+    sd_of_superpixels.resize(reg);
+    count_regions.fill(0);
+    mean_of_superpixels.fill(0);
+    sd_of_superpixels.fill(0);
+    super_pixel_classifier.resize(reg,W_ * H_);
+    super_pixel_classifier.fill(0);
+    for (int i = 0; i < super_pixel_classifier.cols(); i++) {
+        region = regions_out[i];
+        super_pixel_classifier(region,i) = 1;
+        super_pixel_container[region].push_back(i);
+        mean_of_superpixels(region) += 0.2989 * (double) img[i];
+        mean_of_superpixels(region) += 0.5870 * (double) img[i + 1];
+        mean_of_superpixels(region) += 0.1140 * (double) img[i + 2];
+        count_regions(region) += 1;
+    }
+    mean_of_superpixels = mean_of_superpixels.cwiseQuotient(count_regions);
+
+    
+    for (int i = 0; i < regions_out.size(); i++) {
+        region = regions_out[i];
+        double grey_val = 0.2989 * (double) img[i] + 0.5870 * (double) img[i + 1] + 0.1140 * (double) img[i + 2];
+        sd_of_superpixels(region) += (mean_of_superpixels(region) - grey_val) * (mean_of_superpixels(region) - grey_val);
+    }
+
+    sd_of_superpixels = (sd_of_superpixels.cwiseQuotient(normaliser * count_regions));
+
+    //update the private member functions
+    R_ += reg;
+    super_pixel_container_.insert(super_pixel_container_.end(),super_pixel_container.begin(), super_pixel_container.end());
+    mean_of_superpixels_.conservativeResize(R_);
+    mean_of_superpixels_.tail(reg) = mean_of_superpixels;
+    exp_of_superpixels_.conservativeResize(R_);
+    exp_of_superpixels_.tail(reg) = constant * exp(-1 * sd_of_superpixels.array());
+    super_pixel_classifier_.conservativeResize(R_,W_ * H_);
+    super_pixel_classifier_.block(R_ - reg, 0, reg,W_ * H_) << super_pixel_classifier;
+
+    return ;
+}
 void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, double constant) {
     //addSuperPixel is a member function that applies the mean-shift algorithm to the image and then initialises the protected member varaiable super_pixel_classifer.
     unsigned char * segment_image = new unsigned char[W_ * H_ * 3];
@@ -161,6 +222,7 @@ void DenseCRF2D::addSuperPixel(unsigned char * img, int spatial_radius, int rang
     m_process.Segment(spatial_radius,range_radius,min_region_count,NO_SPEEDUP);
     m_process.GetResults(segment_image);
     int reg = m_process.GetRegions(regions_out);
+
 
     super_pixel_container.resize(reg);
     count_regions.resize(reg);
@@ -864,7 +926,7 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference_non_convex(MatrixXf & i
         }
         
     }
-    std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
+    //std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
     init = Q;
     return perfs;
 }
@@ -963,7 +1025,7 @@ MatrixXf DenseCRF::qp_inference_non_convex(const MatrixXf & init) const {
         
     };
 
-    std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
+    //std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
 
     return Q;
 }
@@ -1072,7 +1134,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) c
         energy += (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
     }
 
-    std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
+    //std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
 
     return Q;
 }
