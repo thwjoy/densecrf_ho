@@ -66,6 +66,9 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             } else if (method == "qp_nc"){ //qp with a non convex energy function, relaxations removed
                 //std::cout << "---Running tests on QP with non convex energy\r\n";
                 //Q = crf.qp_inference(Q);
+                crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
+                crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2); 
+                crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3); 
                 Q = crf.qp_inference_non_convex(Q);
             } else if (method == "qp_sp_0" || method == "qp_sp_0" || method == "qp_sp_00001" || method == "qp_sp_0001" || method == "qp_sp_001" || method == "qp_sp_01" || method == "qp_sp_1" || method == "qp_sp_10" || method == "qp_sp_100" || method == "qp_sp_1000" || method == "qp_sp_10000" ){
                 //std::cout << "---Running tests on QP with super pixel terms, with constant = "<< sp_const << "\r\n";
@@ -95,8 +98,8 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             make_dir(path_to_subexp_results);
             end = clock();
             timing = (double(end-start)/CLOCKS_PER_SEC);
-            double final_energy = crf.compute_energy(Q);
-            double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+            double final_energy = crf.compute_energy_sp(Q);
+            double discretized_energy = crf.assignment_energy_sp(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
             std::string txt_output = output_path;
             txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");

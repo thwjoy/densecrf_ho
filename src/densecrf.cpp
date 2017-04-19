@@ -2786,14 +2786,16 @@ double DenseCRF::assignment_energy_sp( const VectorXs & l) const {
         ass_energy += total_energy[i];
     }
 
+    short prev = 0;
     for (int reg = 0; reg < R_; reg++) {
+        prev = super_pixel_container_[reg][0];
         for (int pix = 0; pix < super_pixel_container_[reg].size(); pix++) {
-            if (std::equal(super_pixel_container_[reg].begin(), super_pixel_container_[reg].end(), super_pixel_container_[reg].begin())) {
-                ass_energy += R_ * exp_of_superpixels_[reg];
-            } else {
-                ass_energy += (R_ - 1) * exp_of_superpixels_[reg];
-            }
+            if (prev != l[pix]) {
+                ass_energy += exp_of_superpixels_[reg];
+                break;
+            } 
         }
+        ass_energy += (R_ - 1) * exp_of_superpixels_[reg];
     }
     
     return ass_energy;
@@ -2950,9 +2952,8 @@ double DenseCRF::compute_energy_sp(const MatrixXf & Q) const {
     }
 
     //super pixels
-    MatrixXf constant = exp_of_superpixels_.replicate( 1, M_).transpose();
-    energy += (z_labels_.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels_).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
-
+    //MatrixXf constant = exp_of_superpixels_.replicate( 1, M_).transpose();
+    //energy += (z_labels_.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels_).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
 
 
     return energy;
