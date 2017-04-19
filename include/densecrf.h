@@ -58,6 +58,7 @@ protected:
 
 	//store the super pixel term
 	Matrix<float, Dynamic, Dynamic> super_pixel_classifier_;
+	Matrix<float, Dynamic, Dynamic> z_labels_;
 
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
@@ -113,8 +114,8 @@ public:
 	//===============================================================
 	//The following definitions are for Tom Joys 4YP which computes the QP with a non convex function and with super pixel terms
 	MatrixXf qp_inference_non_convex(const MatrixXf & init) const;
-	MatrixXf qp_inference_super_pixels(const MatrixXf & init) const;
-	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init) const;
+	MatrixXf qp_inference_super_pixels(const MatrixXf & init);
+	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init);
 	std::vector<perf_measure> tracing_qp_inference_non_convex(MatrixXf & init, double time_limit = 0) const;
 	std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit = 0) const;
 	//===============================================================
@@ -165,12 +166,15 @@ public: /* Debugging functions */
 
 	// Compute the energy of an assignment l.
 	double assignment_energy( const VectorXs & l) const;
+	double assignment_energy_sp( const VectorXs & l) const;
+
 
 	// Compute the KL-divergence of a set of marginals
 	double klDivergence( const MatrixXf & Q ) const;
 
     // Compute the energy associated with the QP relaxation
     double compute_energy( const MatrixXf & Q) const;
+    double compute_energy_sp( const MatrixXf & Q) const;
 
     // Compute the energy associated with the LP relaxation
     double compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const;
