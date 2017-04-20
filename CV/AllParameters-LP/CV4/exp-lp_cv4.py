@@ -2,7 +2,7 @@ import subprocess
 import matlab.engine
 import os
 
-experiment_suffix = "prox_lp"
+experiment_suffix = "prox_lp_sp"
 split_no = "4"
 split = "val" + split_no
 dataset = "MSRC"

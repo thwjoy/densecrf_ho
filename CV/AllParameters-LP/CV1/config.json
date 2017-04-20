@@ -1,7 +1,7 @@
 {
     "language"        : "PYTHON",
-    "main-file"       : "exp-lp_cv1.py",
-    "experiment-name" : "exp-lp_cv1",
+    "main-file"       : "exp-lp_cv1a.py",
+    "experiment-name" : "exp-lp_cv1a",
     "likelihood"      : "NOISELESS",
     "variables" : {
         "spc_std" : {
