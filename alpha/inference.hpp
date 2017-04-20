@@ -8,6 +8,15 @@ public:
                      float bilat_spatial_std, float bilat_color_std, float bilat_potts_weight);
 };
 
+struct sp_params {
+    float const_1;
+    float const_2;
+    float const_3;
+    float norm_1;
+    float norm_2;
+    float norm_3;
+};
+
 
 void minimize_mean_field_fixed_iter(std::string path_to_image, std::string path_to_unaries,
                                     Potts_weight_set parameters, std::string path_to_output,
@@ -34,8 +43,8 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
                     std::string dataset_name);
 
 void minimize_LR_QP_non_convex_tracing(std::string path_to_image, std::string path_to_unaries,
-                    Potts_weight_set parameters, std::string path_to_output,
-                    std::string dataset_name);
+                    Potts_weight_set parameters, sp_params p, std::string path_to_output,
+                    std::string dataset_name, std::string file_name);
 void minimize_QP_cccp(std::string path_to_image, std::string path_to_unaries,
                       Potts_weight_set parameters, std::string path_to_output,
                       std::string dataset_name);

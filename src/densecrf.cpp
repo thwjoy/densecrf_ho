@@ -1169,7 +1169,7 @@ std::vector<perf_measure>  DenseCRF::tracing_qp_inference_super_pixels_non_conve
 
     grad_z.fill(0);
     cond_grad_z.fill(0);
-    z_labels.fill(1); //indicates that in all super pixels there are pixels that do not take the same label
+    z_labels.fill(0); //indicates that in all super pixels there are pixels that do not take the same label
 
     double optimal_step_size = 0;
     // Get parameters

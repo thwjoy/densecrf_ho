@@ -98,8 +98,8 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             make_dir(path_to_subexp_results);
             end = clock();
             timing = (double(end-start)/CLOCKS_PER_SEC);
-            double final_energy = crf.compute_energy_sp(Q);
-            double discretized_energy = crf.assignment_energy_sp(crf.currentMap(Q));
+            double final_energy = crf.compute_energy(Q);
+            double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
             std::string txt_output = output_path;
             txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
@@ -161,8 +161,8 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images;
     if (dataset_name == "MSRC") test_images = ds.get_MSRC_split_files(dataset_split);
     else test_images = ds.get_all_split_files(dataset_split);
-    omp_set_num_threads(4);
-#pragma omp parallel for
+//    omp_set_num_threads(4);
+//#pragma omp parallel for
     for(int i=0; i< test_images.size(); ++i){
         //std::cout << "Image: " << test_images[i] << "\t" << i << "/" << test_images.size() << std::endl;
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts, bil_spcstd, bil_colstd, bil_potts, sp_const, params);

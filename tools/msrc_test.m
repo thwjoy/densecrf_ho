@@ -93,6 +93,7 @@ for j=1:num
    fprintf('  %14s: %6.3f%%\n',clname,accuracies(j));
 end
 accuracies = accuracies(1:end);
+accuracies(isnan(accuracies)) = [];
 avacc = mean(accuracies);
 
 score = avacc;
