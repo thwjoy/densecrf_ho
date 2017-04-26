@@ -1,7 +1,7 @@
 {
     "language"        : "PYTHON",
     "main-file"       : "exp-lpsp_cv5.py",
-    "experiment-name" : "exp-lpsp_cv5",
+    "experiment-name" : "exp-lpsp_cv5a",
     "likelihood"      : "NOISELESS",
     "variables" : {
         "spc_std" : {
