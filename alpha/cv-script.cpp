@@ -352,7 +352,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             //timing = difftime(end, start);
             //timing = end - start;
             double final_energy = crf.compute_energy_true(Q);
-            double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+            double discretized_energy = crf.assignment_energy_sp(crf.currentMap(Q));
             save_map(Q, size, output_path, dataset_name);
             if (!pixel_ids.empty()) save_less_confident_pixels(Q, pixel_ids, size, output_path, dataset_name);
             std::string txt_output = output_path;
@@ -441,8 +441,8 @@ int main(int argc, char *argv[])
     Dataset ds = get_dataset_by_name(dataset_name);
 
     std::vector<std::string> test_images = ds.get_all_split_files(dataset_split);
-    omp_set_num_threads(4);
-#pragma omp parallel for
+//    omp_set_num_threads(4);
+//#pragma omp parallel for
     for(int i=0; i< test_images.size(); i++){
         //std::cout << test_images[i] <<"\t" << i << "/" << test_images.size() << std::endl;
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,

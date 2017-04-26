@@ -224,6 +224,8 @@ public: /* Debugging functions */
     // Compute the true energy of an assignment l -- actual energy (differs by a const to assignment_energy - in pairwise case)
 	double assignment_energy_true( const VectorXs & l) const;
 
+	double assignment_energy_sp( const VectorXs & l) const;
+
 	// Compute the KL-divergence of a set of marginals
 	double klDivergence( const MatrixXf & Q ) const;
 

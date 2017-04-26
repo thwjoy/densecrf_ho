@@ -4674,6 +4674,36 @@ double DenseCRF::assignment_energy( const VectorXs & l) const {
     return ass_energy;
 }
 
+double DenseCRF::assignment_energy_sp( const VectorXs & l) const {
+    VectorXf unary = unaryEnergy(l);
+    VectorXf pairwise = pairwiseEnergy(l);
+
+    // Due to the weird way that the pairwise Energy is computed, this
+    // is how we get results that correspond to what would be given by
+    // binarizing the estimates, and using the compute_energy function.
+    VectorXf total_energy = unary -2* pairwise;
+
+    assert( total_energy.rows() == N_);
+    double ass_energy = 0;
+    for( int i=0; i< N_; ++i) {
+        ass_energy += total_energy[i];
+    }
+
+    short prev = 0;
+    for (int reg = 0; reg < R_; reg++) {
+        prev = super_pixel_container_[reg][0];
+        for (int pix = 0; pix < super_pixel_container_[reg].size(); pix++) {
+            if (prev != l[pix]) {
+                ass_energy += exp_of_superpixels_[reg];
+                break;
+            } 
+        }
+        ass_energy += (R_ - 1) * exp_of_superpixels_[reg];
+    }
+    
+    return ass_energy;
+}
+
 double DenseCRF::assignment_energy_true( const VectorXs & l) const {
     VectorXf unary = unaryEnergy(l);
     VectorXf pairwise = pairwise_energy_true(l);
