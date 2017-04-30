@@ -292,7 +292,7 @@ void minimize_LR_QP_non_convex(std::string path_to_image, std::string path_to_un
 
 void minimize_LR_QP_non_convex_tracing(std::string path_to_image, std::string path_to_unaries,
                     Potts_weight_set parameters, std::string path_to_output,
-                    std::string dataset_name) {
+                    std::string dataset_name, std::string image_name) {
     img_size size = {DEFAULT_SIZE, DEFAULT_SIZE};
     // Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
@@ -308,14 +308,15 @@ void minimize_LR_QP_non_convex_tracing(std::string path_to_image, std::string pa
                              parameters.bilat_color_std, parameters.bilat_color_std, parameters.bilat_color_std,
                              img, new PottsCompatibility(parameters.bilat_potts_weight));
     std::cout << "---Running mean-shift and adding super pixel term" <<std::endl;
-    crf.addSuperPixel(img,4,2,2000);
-    crf.addSuperPixel(img,4,2,200);
-    crf.addSuperPixel(img,4,2,20);
+    std::string super_pixel_path = "/media/tomj/DATA1/4YP_data/data/MSRC/MSRC_ObjCategImageDatabase_v2/SuperPixels";
+    crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,10,10000);
+    crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,10,10000); 
+    crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,10,10000); 
     MatrixXf init = crf.unary_init();
-    std::vector<perf_measure> traced_perfs_qp;
+    std::vector<perf_measure> traced_perfs_lp;
     std::vector<perf_measure> traced_perfs_qp_nc;
     std::vector<perf_measure> traced_perfs_qp_sp;
-    
+  /*  
     //run the inference with the convex problem
     std::cout << "---Finding global optimum, of convex energy function" <<std::endl;
     clock_t start, end;
@@ -334,7 +335,7 @@ void minimize_LR_QP_non_convex_tracing(std::string path_to_image, std::string pa
         prev += it.first;
         std::cout << "(" << prev << "," << it.second << ")";
     }
-
+*/
     //run with non_convex function
     std::cout << "---Finding local optimum, of non-convex energy function" <<std::endl;
     path_to_output.replace(path_to_output.end()-4, path_to_output.end(),"_nc.bmp");
@@ -342,22 +343,42 @@ void minimize_LR_QP_non_convex_tracing(std::string path_to_image, std::string pa
     start_nc = clock();
     //MatrixXf Q_non_convex = Q;
     //(void) crf.tracing_qp_inference_super_pixels_non_convex(Q_non_convex);
-    traced_perfs_qp_nc = crf.tracing_qp_inference_non_convex(init);
+    LP_inf_params lp_params;
+    MatrixXf Q = crf.tracing_lp_inference_prox_super_pixels(init,lp_params);
     end_nc = clock();
     double timing_non_convex = (double(end_nc-start_nc)/CLOCKS_PER_SEC);
-    double final_energy_non_convex = crf.compute_energy(init);
-    double discretized_energy_non_convex = crf.assignment_energy(crf.currentMap(init));
+    double final_energy_non_convex = crf.compute_energy(Q);
+    double discretized_energy_non_convex = crf.assignment_energy(crf.currentMap(Q));
     write_down_perf(timing_non_convex, final_energy_non_convex, discretized_energy_non_convex, path_to_output);
     // Perform the MAP estimation on the fully factorized distribution
     // and write the results to an image file with a dumb color code
     save_map(init, size, path_to_output, dataset_name);
-    prev = 0;
-    for (auto & it : traced_perfs_qp_nc)  {
-        prev += it.first;
+
+
+        //run with non_convex function
+    std::cout << "---Finding local optimum, of non-convex energy function" <<std::endl;
+    path_to_output.replace(path_to_output.end()-4, path_to_output.end(),"_nc.bmp");
+    start_nc = clock();
+    //MatrixXf Q_non_convex = Q;
+    //(void) crf.tracing_qp_inference_super_pixels_non_convex(Q_non_convex);
+
+    traced_perfs_lp = crf.tracing_lp_inference_prox(init,lp_params);
+    end_nc = clock();
+    double timing_lp = (double(end_nc-start_nc)/CLOCKS_PER_SEC);
+    double final_energy_lp = crf.compute_energy(init);
+    double discretized_energy_lp = crf.assignment_energy(crf.currentMap(init));
+    write_down_perf(timing_non_convex, final_energy_non_convex, discretized_energy_non_convex, path_to_output);
+    // Perform the MAP estimation on the fully factorized distribution
+    // and write the results to an image file with a dumb color code
+    save_map(init, size, path_to_output, dataset_name);
+     double prev = 0;
+    for (auto & it : traced_perfs_lp)  {
         std::cout << "(" << prev << "," << it.second << ")";
+        prev += it.first;
     }
 
- /*  
+   
+/*
     //we now need to run the code with a non_convex energy function including the super pixels starting at the initial value
     std::cout << "---Finding local optimum, of non-convex energy function with super pixel from initial values" <<std::endl;
     path_to_output.replace(path_to_output.end()-7, path_to_output.end(),"_g_nc_sp.png");

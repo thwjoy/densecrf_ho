@@ -3376,7 +3376,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox_restricted(MatrixX
 }
 
 // LP inference with proximal algorithm
-MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const {
+MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const {
     MatrixXf best_Q(M_, N_), tmp(M_, N_), tmp2(M_, N_);
     MatrixP dot_tmp(M_, N_);
     MatrixXi ind(M_, N_);
@@ -3450,13 +3450,12 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
     //clock_t start, end;
     typedef std::chrono::high_resolution_clock::time_point htime;
     htime start, end;
-    //clock_t start, end;
-    typedef std::chrono::high_resolution_clock::time_point htime;
-    htime start, end;
+
 
 
     int it=0;
     int count = 0;
+    double prev = 0;
 
 
     do { //step iteration
@@ -3472,7 +3471,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
         int pit = 0;
         alpha_tQ.fill(0);   // all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
         u_tQ.fill(0);
-        
+                start = std::chrono::high_resolution_clock::now();
         // proximal iteration this is the t iterating parameter in the paper
         do {    
             ++pit;
@@ -3611,7 +3610,7 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
         assert(valid_probability_debug(Q));
 
         double prev_int_energy = int_energy;
-        int_energy = assignment_energy_true(currentMap(Q));
+        int_energy = assignment_energy_sp(currentMap(Q));
 
         if (best_int) {
             if (abs(int_energy - prev_int_energy) < prox_tol) ++count;
@@ -3655,14 +3654,14 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             }
         }
 
-                end = std::chrono::high_resolution_clock::now();
+        end = std::chrono::high_resolution_clock::now();
         perf_timing = std::chrono::duration_cast<std::chrono::duration<double>>(end-start).count();
         perf_energy = best_int_energy;
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;
-
-
+        std::cout << "(" << total_time - perf_timing << "," << perf_energy << ")";
+        
 
     } while(it<maxiter);
 

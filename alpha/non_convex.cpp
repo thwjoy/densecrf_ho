@@ -11,9 +11,9 @@ inline bool fileExists(const std::string& name) {
 }
 
 int main (int argc, char * argv[]) {
-	std::string dataset_name = "PascalVOC2010";
-	std::string unaries_directory = "./data/PascalVOC2010/logit_unaries/";
-	std::string images_directory = "./data/PascalVOC2010/JPEGImages/";
+	std::string dataset_name = "MSRC";
+	std::string unaries_directory = "/media/tomj/DATA1/4YP_data/data/MSRC/texton_unaries/";
+	std::string images_directory = "/media/tomj/DATA1/4YP_data/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/";
     std::string path_to_unaries;
     std::string path_to_image;
 	std::string path_to_output;
@@ -30,7 +30,7 @@ int main (int argc, char * argv[]) {
 	
 
 	path_to_unaries = unaries_directory + argv[1] + std::string(".c_unary");
-    path_to_image = images_directory + argv[1] + std::string(".jpg");
+    path_to_image = images_directory + argv[1] + std::string(".bmp");
     path_to_output = std::string("./data/output/") + argv[1] + std::string("_out.png");
 /*
     
@@ -49,7 +49,7 @@ int main (int argc, char * argv[]) {
 	//Potts_weight_set params(3.071772, 0.5, 49.785678, 1, 0.960811);
 	//Potts_weight_set params(11.110367,0.5,1,50,92.53338);
 	//run the minimisation
-	minimize_LR_QP_non_convex(path_to_image, path_to_unaries, params, path_to_output, dataset_name);
+	minimize_LR_QP_non_convex_tracing(path_to_image, path_to_unaries, params, path_to_output, dataset_name, file_name);
 	
 	return 0;
 
