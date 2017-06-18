@@ -5,4 +5,5 @@ debug
 *.ppm
 run.*
 *.out
+*.sh
 tools/lib
