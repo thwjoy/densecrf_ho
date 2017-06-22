@@ -110,6 +110,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             //std::cout << "File exists! Skipping: " << image_name << std::endl; 
         }
     }
+    delete[] img; 
 }
 
 int main(int argc, char *argv[])

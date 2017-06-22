@@ -70,7 +70,9 @@ protected:
 	DenseCRF( DenseCRF & o ){}
 
 	float multiplySuperPixels(const MatrixXf & p1, const MatrixXf & p2) const;
+	float multiplyDecompSuperPixels(const MatrixXf & p1, const MatrixXf & p2, int reg) const;
 	MatrixXf multiplySuperPixels(const MatrixXf & p) const;
+	MatrixXf multiplyDecompSuperPixels(const MatrixXf & p, int reg) const; //used for the DCneg case
 
 public:
 	// Create a dense CRF model of size N with M labels
@@ -126,6 +128,10 @@ public:
 	// Third one the QP-cccp defined in the Krahenbuhl paper, restricted to concave label compatibility function.
 	MatrixXf concave_qp_cccp_inference(const MatrixXf & init) const;
 	std::vector<perf_measure> tracing_concave_qp_cccp_inference(MatrixXf & init, double time_limit = 0) const;
+    //for the super pixel implementation
+	MatrixXf concave_qp_sp_cccp_inference(const MatrixXf & init) const;
+    std::vector<perf_measure> tracing_concave_qp_sp_cccp_inference(MatrixXf & init, double time_limit = 0) const;
+
 	// Run the energy minimisation on the LP
     MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad) const;
     MatrixXf lp_inference_new(MatrixXf & init) const;

@@ -98,6 +98,40 @@ MatrixXf DenseCRF::multiplySuperPixels(const MatrixXf & p) const {
     
 } 
 
+float DenseCRF::multiplyDecompSuperPixels(const MatrixXf & p1, const MatrixXf & p2, int sp_reg) const {
+    float res = 0;
+    for(int pixel = 0; pixel < super_pixel_container_[sp_reg].size(); pixel++) { //sum up the values where the pixel is in the sp
+        for(int lab = 0; lab < M_; lab++) {
+            res += p1(lab, sp_reg) * p2(lab, pixel);
+        }
+    }
+    return res;
+}
+
+MatrixXf DenseCRF::multiplyDecompSuperPixels(const MatrixXf & p, int sp_reg) const {
+    //if we just get a single columed vector then we are just summin up over labels and hence the output will just be a scalar
+    int dim = 1;
+    if (p.cols() == 1) dim = super_pixel_container_[sp_reg].size();
+    assert(p.rows() == M_);
+    MatrixXf res(M_, dim);
+    res.fill(0);
+    if (dim == 1) { //we want to sum up over the pixel values resulting in a single vector of size M_ * 1
+        for(int lab =0; lab < M_; lab++) {
+            for(int pixel = 0; pixel < super_pixel_container_[sp_reg].size(); pixel++) {
+                res(lab,sp_reg) += p(lab,pixel);
+            }
+        }
+        
+    } else { //we want to sum up over the label values 
+        for(int lab =0; lab < M_; lab++) {
+            for(int pixel = 0; pixel < super_pixel_container_[sp_reg].size(); pixel++) {
+                res(lab,pixel) += p(lab,sp_reg);
+            }
+        }      
+    }
+    return res;
+}
+
 
 DenseCRF::DenseCRF(int N, int M) : N_(N), M_(M), unary_(0), R_(0) {
 }
@@ -1130,7 +1164,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) {
         grad_y += 2 * optimal_step_size * psisx + optimal_step_size * multiplySuperPixels((sx_z).cwiseProduct(constant));
         grad_z = MatrixXf::Ones(M_,R_).cwiseProduct(constant) + (multiplySuperPixels(Q - MatrixXf::Ones(M_,N_))).cwiseProduct(constant);
 
-        energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
+        energy = dotProduct(Q, grad_y + unary, temp_dot);
         energy += (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
     }
 
@@ -1530,6 +1564,242 @@ MatrixXf DenseCRF::concave_qp_cccp_inference(const MatrixXf & init) const {
 }
 
 std::vector<perf_measure> DenseCRF::tracing_concave_qp_cccp_inference(MatrixXf & init, double time_limit) const {
+    MatrixXf Q(M_, N_), unary(M_, N_), tmp(M_, N_),
+        outer_grad(M_,N_), psis(M_, N_);
+
+    clock_t start, end;
+    double perf_energy, perf_timing;
+    double total_time = 0;
+    perf_measure latest_perf;
+    std::vector<perf_measure> perfs;
+
+    // Get parameters
+    unary.fill(0);
+    if(unary_){
+        unary = unary_->get();
+    }
+
+    Q = init;
+    // Compute the value of the energy
+    double old_energy;
+    double energy = compute_energy(Q);
+    int outer_rounds = 0;
+    double identity_coefficient = 0;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        identity_coefficient -= pairwise_[k]->parameters()(0);
+    }
+
+    MatrixXf inv_KKT(M_+1, M_+1);
+    for (int i=0; i < M_; i++) {
+        for (int j=0; j < M_; j++) {
+            inv_KKT(i,j) = 1 / (M_ * 2*identity_coefficient);
+            if (i==j) {
+                inv_KKT(i,j) -= 1/ (2*identity_coefficient);
+            }
+        }
+        inv_KKT(M_, i) = 1.0/M_;
+        inv_KKT(i, M_) = 1.0/M_;
+    }
+    inv_KKT(M_,M_) = 2*identity_coefficient / M_;
+
+    VectorXf new_Q(M_);
+    float old_score, score;
+    VectorXf grad(M_), cond_grad(M_), desc(M_);
+    int best_coord;
+    float num, denom, optimal_step_size;
+    bool has_converged;
+    int nb_iter;
+    do {
+
+        start = clock();
+        // New value of the linearization point.
+        old_energy = energy;
+        psis.fill(0);
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, Q);
+            psis += tmp;
+        }
+        outer_grad = unary + 2 * psis;
+        cond_grad.fill(0);
+        for (int var = 0; var < N_; ++var) {
+#if DCNEG_FASTAPPROX
+            kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
+            clamp_and_normalize(new_Q);
+#else
+            kkt_solver(outer_grad.col(var), inv_KKT, new_Q);
+            score = outer_grad.col(var).dot(new_Q) + identity_coefficient * new_Q.squaredNorm();
+            if(not all_positive(new_Q)){
+                // Our KKT conditions didn't get us the correct results.
+                // Let's Frank-wolfe it
+                clamp_and_normalize(new_Q);
+                // Get an initial valid point.
+                score = outer_grad.col(var).dot(new_Q) + identity_coefficient * new_Q.squaredNorm();
+                // Get a valid score.
+                cond_grad.fill(0);
+                has_converged = false;
+                nb_iter = 0;
+                do{
+                    old_score = score;
+                    cond_grad.fill(0);
+                    grad = outer_grad.col(var) + 2 * identity_coefficient * new_Q;
+                    grad.minCoeff(&best_coord);
+                    cond_grad(best_coord) = 1;
+                    desc = cond_grad - new_Q;
+                    if (desc.squaredNorm()==0) {
+                        break;
+                    }
+                    num = grad.dot(desc);
+                    if (num > 0) {
+                        // Commented out code to identify bugs with this computation
+                        // if (num > 1e-6) {
+                        //     std::cout << "Shouldn't happen." << '\n';
+                        //     std::cout << "Cond score: " << grad.dot(cond_grad) << '\n';
+                        //     std::cout << "Point score: " << grad.dot(new_Q) << '\n';
+                        //     std::cout << num << '\n';
+                        //     std::cout  << '\n';
+                        // }
+                        num = 0;
+                    }
+                    denom = -identity_coefficient * desc.squaredNorm();
+                    optimal_step_size = - num / (2 * denom);
+                    if(optimal_step_size > 1){
+                        optimal_step_size = 1; // Would get outta bounds
+                    }
+                    new_Q += optimal_step_size*desc;
+                    score = outer_grad.col(var).dot(new_Q) + identity_coefficient * new_Q.squaredNorm();
+                    if (old_score - score < 1e-2) {
+                        has_converged = true;
+                    }
+                    nb_iter++;
+                } while(not has_converged);
+            }
+#endif
+            Q.col(var) = new_Q;
+        }
+        //valid_probability_debug(Q);
+        // Compute our current value of the energy;
+        end = clock();
+        perf_timing = (double(end-start)/CLOCKS_PER_SEC);
+        perf_energy = assignment_energy(currentMap(Q));
+        latest_perf = std::make_pair(perf_timing, perf_energy);
+        perfs.push_back(latest_perf);
+        total_time += perf_timing;
+        if (time_limit != 0 and total_time>time_limit) {
+            break;
+        }
+
+
+        energy = compute_energy(Q);
+        outer_rounds++;
+    } while (( (old_energy -energy) > 100 && outer_rounds < 100) or time_limit != 0);
+    init = Q;
+    return perfs;
+}
+
+MatrixXf DenseCRF::concave_qp_sp_cccp_inference(const MatrixXf & init) const {
+    MatrixXf Q(M_, N_), cur_Q(M_, N_), unary(M_, N_), tmp(M_, N_),
+        grad_y(M_,N_), cond_grad_y(M_,N_),outer_grad_z(M_,R_), psis(M_, N_), z_labels(M_, R_),
+         grad_z(M_, R_), cond_grad_z(M_,R_),sx_z(M_,R_), sx_y(M_,N_), psisx(M_, N_);
+    // Get parameters
+    MatrixP temp_dot(M_,N_);
+    
+    MatrixXf constant = exp_of_superpixels_.replicate( 1, grad_z.rows() ).transpose();
+
+    cond_grad_z.fill(0);
+    z_labels.fill(0);
+
+
+    unary.fill(0);
+    if(unary_){
+        unary = unary_->get();
+    }
+
+    Q = init;
+    // Compute the value of the energy
+    double old_energy;
+    double energy = compute_energy(Q);
+    int outer_rounds = 0;
+    double identity_coefficient = 0;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        identity_coefficient -= pairwise_[k]->parameters()(0);
+    }
+
+    
+    float old_score, score;
+    int best_coord;
+    float num, denom, optimal_step_size;
+    bool has_converged;
+    int nb_iter;
+    do {
+        // New value of the linearization point.
+        old_energy = energy;
+        psis.fill(0);
+        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+            pairwise_[k]->apply( tmp, Q);
+            psis += tmp;
+        }
+        //2 * psis is the same as -g in the paper
+        grad_y = unary + 2 * psis + multiplySuperPixels((z_labels - MatrixXf::Ones(M_,R_)).cwiseProduct(constant));;
+        //initialise the gradient of z
+        grad_z = (MatrixXf::Ones(M_,R_) + multiplySuperPixels((Q - MatrixXf::Ones(M_,N_))));
+        grad_z = grad_z.cwiseProduct(constant);
+        cond_grad_y.fill(0);
+
+        do{
+            //get the best score
+            old_score = score;
+            score = dotProduct(Q, psis + unary, temp_dot);   
+            score += (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
+            //get the conditional gradient
+
+            //solve the conditional gradient
+            descent_direction(cond_grad_y, grad_y);
+            descent_direction_z(cond_grad_z, grad_z);
+
+            sx_y = cond_grad_y - Q;
+            sx_z = cond_grad_z - z_labels;
+
+            double a = multiplySuperPixels(sx_z.cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_)));
+
+            double b = multiplySuperPixels((cond_grad_z - MatrixXf::Ones(M_,R_)).cwiseProduct(constant),sx_y);
+
+            double num = dotProduct(unary, sx_y, temp_dot) + 2 * identity_coefficient * dotProduct(sx_y,Q,temp_dot) + a + b + sx_z.sum();
+            // Num should be negative, otherwise our choice of s was necessarily wrong.
+            double denom = identity_coefficient * sx_y.squaredNorm() + multiplySuperPixels(sx_z.cwiseProduct(constant),sx_y);
+            // Denom should be negative, as our energy function is now concave.
+            optimal_step_size = - num / (2 * denom);
+
+            //check bounds for optimal step size
+            if (denom == 0 || num == 0) {break;}
+            //std::cout << "Numerator: " << num << ", Denomonator: " << denom << ", Step size: " << optimal_step_size << std::endl;
+            if (denom < 0) { optimal_step_size = 1;} //the function is concave and hence the optimal step size is 1
+            else if (optimal_step_size < 0) { optimal_step_size = 0;} //
+            else if (optimal_step_size > 1) { optimal_step_size = 1;} //
+
+            // Take a step
+            Q += optimal_step_size * sx_y;
+            z_labels += optimal_step_size * sx_z;
+            if (not valid_probability(Q)) {
+                std::cout << "Bad proba" << '\n';
+            }
+
+            //compute the new gradient
+            grad_y += 2 * optimal_step_size * psisx + optimal_step_size * multiplySuperPixels((sx_z).cwiseProduct(constant));
+            grad_z = MatrixXf::Ones(M_,R_).cwiseProduct(constant) + (multiplySuperPixels(Q - MatrixXf::Ones(M_,N_))).cwiseProduct(constant);
+
+            score = dotProduct(Q, psis + unary, temp_dot);
+            score += (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
+
+        } while(old_score - score > 100);
+        //valid_probability_debug(Q);
+        // Compute our current value of the energy;
+        energy = compute_energy(Q);
+        outer_rounds++;
+    } while ( (old_energy -energy) > 100 && outer_rounds < 100);
+    return Q;
+}
+
+std::vector<perf_measure> DenseCRF::tracing_concave_qp_sp_cccp_inference(MatrixXf & init, double time_limit) const {
     MatrixXf Q(M_, N_), unary(M_, N_), tmp(M_, N_),
         outer_grad(M_,N_), psis(M_, N_);
 
