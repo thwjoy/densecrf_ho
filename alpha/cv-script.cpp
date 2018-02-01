@@ -23,6 +23,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     std::string dataset_name = dataset.name;
     std::string super_pixel_path = "./data/MSRC/MSRC_ObjCategImageDatabase_v2/SuperPixels";
 
+
     img_size size = {-1, -1};
     //Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(unaries_path, size);
@@ -35,9 +36,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
 
     MatrixXf Q;
     {
-        std::string path_to_subexp_results = path_to_results + "/" + method + "/";
-        std::string output_path = get_output_path(path_to_subexp_results, image_name);
-
+       std::string output_path = get_output_path(path_to_results, image_name);
        if (not file_exist(output_path)) {
             clock_t start, end;
             double timing;
@@ -65,10 +64,6 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 Q = crf.lp_inference(Q, true);
             } else if (method == "qp_nc"){ //qp with a non convex energy function, relaxations removed
                 //std::cout << "---Running tests on QP with non convex energy\r\n";
-                //Q = crf.qp_inference(Q);
-                crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
-                crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2); 
-                crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3); 
                 Q = crf.qp_inference_non_convex(Q);
             } else if (method == "qp_sp_0" || method == "qp_sp_0" || method == "qp_sp_00001" || method == "qp_sp_0001" || method == "qp_sp_001" || method == "qp_sp_01" || method == "qp_sp_1" || method == "qp_sp_10" || method == "qp_sp_100" || method == "qp_sp_1000" || method == "qp_sp_10000" ){
                 //std::cout << "---Running tests on QP with super pixel terms, with constant = "<< sp_const << "\r\n";
@@ -95,7 +90,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             }
 
 
-            make_dir(path_to_subexp_results);
+            make_dir(path_to_results);
             end = clock();
             timing = (double(end-start)/CLOCKS_PER_SEC);
             double final_energy = crf.compute_energy(Q);
@@ -126,6 +121,11 @@ int main(int argc, char *argv[])
     std::string dataset_name  = argv[2];
     std::string method = argv[3];
     std::string path_to_results = argv[4];
+    make_dir(path_to_results);
+    path_to_results += std::string("/") + method;
+    make_dir(path_to_results);
+    path_to_results += std::string("/") + dataset_split + std::string("/");
+    make_dir(path_to_results);
     //path_to_results = "/home/tomj/Documents/4YP/densecrf/" + path_to_results;
     //std::cout << "build/alpha/cv-script " << dataset_split << " " << dataset_name << " " << method << " " << path_to_results << " " << argv[5] << " " << argv[6]  << " " << argv[7]  << " " << argv[8]  << " " << argv[9]  << std::endl;
 
@@ -162,10 +162,9 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images;
     if (dataset_name == "MSRC") test_images = ds.get_MSRC_split_files(dataset_split);
     else test_images = ds.get_all_split_files(dataset_split);
-//    omp_set_num_threads(4);
-//#pragma omp parallel for
+    #pragma omp parallel num_threads(10)
     for(int i=0; i< test_images.size(); ++i){
-        //std::cout << "Image: " << test_images[i] << "\t" << i << "/" << test_images.size() << std::endl;
+        std::cout << test_images[i] << std::endl;
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts, bil_spcstd, bil_colstd, bil_potts, sp_const, params);
     }
 

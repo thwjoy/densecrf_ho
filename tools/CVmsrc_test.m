@@ -1,11 +1,11 @@
 function score = msrc_test(path, dataset_split)
 
-dpath = '/home/tomj/Documents/4YP/densecrf/data';
+dpath = '/media/tom/DATA/datasets';
 
 datadir = [dpath '/MSRC'];
 testset = dataset_split;
 
-gtimgpath= [datadir '/MSRC_ObjCategImageDatabase_v2/fine_annot/%s_GT.bmp'];
+gtimgpath= [datadir '/acc_GT/%s_GT.bmp'];
 
 respath_tmpl=[path '/%s.png'];
 
@@ -13,7 +13,7 @@ path_to_test_set = [datadir '/split/' dataset_split '.txt'];
 [gtids,t]=textread(path_to_test_set,'%s %d');
 
 num = 22; % Number of classes
-
+gtimgpath
 confcounts = zeros(num);
 count=0;
 
@@ -21,16 +21,8 @@ cmap = MSRClabelcolormap(num);
 
 for i=1:length(gtids)
     imname = gtids{i};
-    toks = strsplit(imname, '.');
-    imname = toks{1};
-	imname = imname(1:end-3);
      try
-    % ground truth label file
-
-
     gtfile = sprintf(gtimgpath,imname);
-%     break;
-
     [gtim,map] = imread(gtfile);
     gtim = rgb2ind(gtim, cmap);
     gtim = double(gtim);

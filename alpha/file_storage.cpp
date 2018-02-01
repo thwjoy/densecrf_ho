@@ -98,7 +98,7 @@ std::vector<std::string> Dataset::get_all_split_files(const std::string & split)
 
 std::vector<std::string> Dataset::get_MSRC_split_files(const std::string & split) {
 
-    std::string path_to_split = "data/MSRC/split/" + split+ ".txt";
+    std::string path_to_split = "/media/tom/DATA/datasets/MSRC/split/" + split+ ".txt";
 
     std::vector<std::string> split_images;
     std::string next_img_name;
@@ -114,10 +114,10 @@ std::vector<std::string> Dataset::get_MSRC_split_files(const std::string & split
 
 Dataset get_dataset_by_name(const std::string & dataset_name){
     if (dataset_name == "MSRC") {
-        return Dataset("data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
-                       "data/MSRC/texton_unaries/",
-                       "data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
-                       "data/MSRC/",
+        return Dataset("/media/tom/DATA/datasets/MSRC/Images/",
+                       "/media/tom/DATA/datasets/MSRC/texton_unaries/",
+                       "/media/tom/DATA/datasets/MSRC/GroundTruth/",
+                       "/media/tom/DATA/datasets/MSRC/",
                        ".bmp",
                        "_GT.bmp",
                        "MSRC");
@@ -283,6 +283,8 @@ void save_map(const MatrixXf & estimates, const img_size & size, const std::stri
             img.at<cv::Vec3b>(row, col) = intensity;
         }
     }
+
+    std::cout << path_to_output << std::endl;
 
     cv::imwrite(path_to_output, img);
 }
