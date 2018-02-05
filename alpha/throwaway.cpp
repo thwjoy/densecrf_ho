@@ -189,10 +189,153 @@ void check_pairwise_energies(){
 
 }
 
+void eigen_test() {
+    std::srand(1337); // Set the seed
+	MatrixXf m(3,4);
+    m << 1, 2, 3, 4,
+        4, 3, 2, 1,
+        2, 2, 4, 4;
+	VectorXf v(4);
+	std::cout << "#m#\n" << m << std::endl;
+	v = m.row(0);
+	std::cout << "#v#\n" << v << std::endl;
+	m.row(2) = v;
+	std::cout << "#m#\n" << m << std::endl;
+	std::cout << "#v#\n" << v << std::endl;
+	VectorXf v1 = m.colwise().sum();
+	std::cout << "#v1#\n" << v1 << std::endl;
 
+	MatrixXf sm(3, 4);
+	MatrixXi ind(3, 4);
+	sortRows(m, ind);
+	for(int i = 0; i < 4; ++i) {
+		for (int j= 0; j < 3; ++j) {
+			sm(j, i) = m(j, ind(j, i));
+		}
+	}
+	std::cout << "#sm#\n" << sm << std::endl;
+
+    MatrixXf q(3,5), qq(3,5);
+    for(int i = 0; i < q.cols(); ++i) {
+		for (int j= 0; j < q.rows(); ++j) {
+			q(j, i) = std::rand() % 10;
+		}
+	}
+    rescale(qq, q);
+    std::cout << "#q#\n" << q << std::endl;
+    std::cout << "#qq#\n" << qq << std::endl;
+}
+
+void ph_test() {        
+    std::srand(1337); // Set the seed
+    int s = 5;
+    split_array* values = new split_array[ s ];
+    split_array* new_values = new split_array[ s ];
+    
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = values + i;
+        for (float& v : sp->data) v = std::rand()%100;
+    }
+	memset(new_values, 0, s*sizeof(split_array));
+    
+    std::cout << "\n#values#\n";
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = values + i;
+        for (float v : sp->data) std::cout << v << ", ";
+        std::cout << std::endl;
+    }
+    std::cout << "\n#new_values#\n";
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = new_values + i;
+        for (float v : sp->data) std::cout << v << ", ";
+        std::cout << std::endl;
+    }
+
+    split_array* tmp = new split_array[ s ];
+    delete[] tmp;
+    bool* t = new bool[10];
+    delete[] t;
+
+    memcpy(new_values, values, s*sizeof(split_array));
+    std::cout << "\nafter-memcpy\n";
+
+    std::cout << "\n#values#\n";
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = values + i;
+        for (float v : sp->data) std::cout << v << ", ";
+        std::cout << std::endl;
+    }
+    std::cout << "\n#new_values#\n";
+    for (int i = 0; i < s; ++i) {
+        split_array* sp = new_values + i;
+        for (float v : sp->data) std::cout << v << ", ";
+        std::cout << std::endl;
+    }
+}
+
+// make a step of qp_gamma: -- \cite{NNQP solver Xiao and Chen 2014} - O(n) implementation!!
+void qp_gamma_step_test(VectorXf & v_gamma, const VectorXf & v_pos_h, const VectorXf & v_neg_h, const float qp_delta, 
+        const int M, const float lambda, VectorXf & v_step, VectorXf & v_tmp, VectorXf & v_tmp2) {
+    // C: lambda*I - (lambda/m)*ones
+    // neg_C: max(-C, 0)- elementwise
+    // abs_C: abs(C)- elementwise
+    float sum = v_gamma.sum();
+    v_tmp2.fill(sum);
+    
+    v_tmp = v_tmp2 - v_gamma;
+    v_tmp *= (2*lambda/float(M));  // 2 * neg_C * v_gamma
+    v_step = v_tmp + v_pos_h;
+	v_step = v_step.array() + qp_delta;
+
+    v_tmp = (1.0/float(M)) * v_tmp2 + (1-2.0/float(M)) * v_gamma;
+    v_tmp *= lambda;    // abs_C * v_gamma
+	v_tmp = v_tmp + v_neg_h;
+	v_tmp = v_tmp.array() + qp_delta;
+	v_step = v_step.cwiseQuotient(v_tmp);
+	v_gamma = v_gamma.cwiseProduct(v_step);
+}
+
+// multiply by C in linear time!
+void qp_gamma_multiplyC_test(VectorXf & v_out, const VectorXf & v_in, const int M, const float lambda) {
+    // C: lambda*I - (lambda/m)*ones
+    float sum = v_in.sum();
+    v_out.fill(sum);
+    v_out = (-1.0/float(M)) * v_out + v_in;
+    v_out *= lambda;
+}
+
+void qp_gamma_test() {
+    int M_ = 3;
+    float lambda = 0.1;
+    MatrixXf C(M_, M_), neg_C(M_, M_), pos_C(M_, M_), abs_C(M_, M_);
+    VectorXf v_gamma(M_), v_y(M_), v_pos_h(M_), v_neg_h(M_), v_step(M_), v_tmp(M_), v_tmp2(M_);
+
+    pos_C = MatrixXf::Identity(M_, M_) * (1-1.0/float(M_));				      
+    pos_C *= lambda;	// pos_C
+    neg_C = MatrixXf::Ones(M_, M_) - MatrixXf::Identity(M_, M_);	
+    neg_C /= float(M_);													      
+    neg_C *= lambda; 	// neg_C
+    C = pos_C - neg_C;	// C
+    abs_C = pos_C + neg_C;	// abs_C
+    
+    std::srand(13);
+    for(int i = 0; i < M_; ++i) {
+        v_gamma(i) = std::rand()%10;
+    }
+
+    std::cout << "\n#v_gamma\n" << v_gamma << std::endl;
+    std::cout << "\n#C\n" << C << std::endl;
+    v_tmp = C * v_gamma;
+    std::cout << "\n#C*v_gamma (old)\n" << v_tmp << std::endl;
+    qp_gamma_multiplyC_test(v_tmp2, v_gamma, M_, lambda);
+    std::cout << "\n#C*v_gamma (new)\n" << v_tmp2 << std::endl;
+    
+}
 
 int main(int argc, char *argv[])
 {
-    check_pairwise_energies();
+    //eigen_test();
+    qp_gamma_test();
     return 0;
 }
+

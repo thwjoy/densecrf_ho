@@ -1,0 +1,24 @@
+import numpy as np
+
+
+p_c 	= np.array([0.5, 0.5]);
+p_s_c 	= np.array([[0.1, 0.9],[0.5, 0.5]]);
+p_r_c 	= np.array([[0.8, 0.2],[0.2, 0.8]]);
+p_w_sr 	= np.array([[0.99, 0.01],[0.9, 0.1],[0.9, 0.1],[0.0, 0.1]]);
+
+
+
+def __sampleRain__():
+	return value
+
+def __sampleSprinkler__():
+	return value
+
+def __sampleCloudy__():
+	return value
+
+def __sampleGrass__():
+	return value
+
+
+

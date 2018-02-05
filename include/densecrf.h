@@ -40,6 +40,40 @@ void expAndNormalize( MatrixXf & out, const MatrixXf & in);
 void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q);
 void normalize(MatrixXf & out, const MatrixXf & in);
 
+void get_limited_indices(MatrixXf const & Q, std::vector<int> & indices);
+MatrixXf get_restricted_matrix(MatrixXf const & in, std::vector<int> const & indices);
+MatrixXf get_extended_matrix(MatrixXf const & in, std::vector<int> const & indices, int max_rows);
+void less_confident_pixels(std::vector<int> & indices, const MatrixXf & Q, float tol = 0.99);
+
+class LP_inf_params {
+public: 
+	float prox_reg_const;	// proximal regularization constant
+	float dual_gap_tol;		// dual gap tolerance
+	float prox_energy_tol;	// proximal energy tolerance
+	int prox_max_iter;		// maximum proximal iterations
+	int fw_max_iter;		// maximum FW iterations
+	int qp_max_iter;		// maximum qp-gamma iterations
+	float qp_tol;			// qp-gamma tolerance
+	float qp_const;			// const used in qp-gamma
+    bool best_int;          // return the Q that yields the best integer energy
+    bool accel_prox;        // accelerated proximal method
+    // multi-plane FW params (work_set_size==0 && approx_fw_iter==0 ==> standard FW)
+    int work_set_size;      // working set size 
+    int approx_fw_iter;     // approximate FW iterations
+    // less-confident switch
+    float less_confident_percent;   // percentage of less confident pixels to break
+    float confidence_tol;           // tolerance to decide a pixel to be less-confident
+	LP_inf_params(float prox_reg_const, float dual_gap_tol, float prox_energy_tol, 
+        int prox_max_iter, int fw_max_iter, 
+        int qp_max_iter, float qp_tol, float qp_const, 
+        bool best_int, bool accel_prox, 
+        int work_set_size, int approx_fw_iter, 
+        float less_confident_percent, float confident_tol);
+	LP_inf_params();	// default values
+    LP_inf_params(const LP_inf_params& params); // copy constructor
+};
+
+
 /**** DenseCRF ****/
 class DenseCRF{
 protected:
@@ -48,10 +82,6 @@ protected:
 
 	VectorXf mean_of_superpixels_;
 	VectorXf exp_of_superpixels_;
-	std::vector<std::vector<double>> super_pixel_container_;
-
-
-
 
 	// Store the unary term
 	UnaryEnergy * unary_;
@@ -60,8 +90,18 @@ protected:
 	Matrix<float, Dynamic, Dynamic> super_pixel_classifier_;
 	Matrix<float, Dynamic, Dynamic> z_labels_;
 
+	std::vector<std::vector<double>> super_pixel_container_; //is a vector of super pixels which holds a vector of pixel locations for that super pixel
+	std::vector<int> pixel_to_regions_;
+
+
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
+
+	//store the constants for the clique
+	std::vector<float> constants_;
+
+	// Store all pairwise potentials -- no-normalization: used to caluclate energy 
+	std::vector<PairwisePotential*> no_norm_pairwise_;
 
 	// How to stop inference
 	bool compute_kl = false;
@@ -69,10 +109,15 @@ protected:
 	// Don't copy this object, bad stuff will happen
 	DenseCRF( DenseCRF & o ){}
 
+
 	float multiplySuperPixels(const MatrixXf & p1, const MatrixXf & p2) const;
 	float multiplyDecompSuperPixels(const MatrixXf & p1, const MatrixXf & p2, int reg) const;
 	MatrixXf multiplySuperPixels(const MatrixXf & p) const;
 	MatrixXf multiplyDecompSuperPixels(const MatrixXf & p, int reg) const; //used for the DCneg case
+
+
+	void computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const;
+	void initUu(MatrixXf & u, double constant) const;
 
 public:
 	// Create a dense CRF model of size N with M labels
@@ -88,6 +133,9 @@ public:
 
 	// Add your own favorite pairwise potential (ownership will be transfered to this class)
 	void addPairwiseEnergy( PairwisePotential* potential );
+
+    // set potts compatibility weight such that ratio *  unary enegy = pairwise energy (given Q)
+	void setPairwisePottsWeight(float ratio, const MatrixXf & Q);
 
 	// Set the unary potential (ownership will be transfered to this class)
 	void setUnaryEnergy( UnaryEnergy * unary );
@@ -133,17 +181,29 @@ public:
     std::vector<perf_measure> tracing_concave_qp_sp_cccp_inference(MatrixXf & init, double time_limit = 0) const;
 
 	// Run the energy minimisation on the LP
-    MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad) const;
+    MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad, bool full_mat = false) const;
     MatrixXf lp_inference_new(MatrixXf & init) const;
-	std::vector<perf_measure> tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit = 0) const;
+    MatrixXf lp_inference_prox(MatrixXf & init, LP_inf_params & params) const;
+    MatrixXf lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
+    MatrixXf tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
+    MatrixXf lp_inference_prox_restricted(MatrixXf & init, LP_inf_params & params) const;
+	std::vector<perf_measure> tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit = 0, bool full_mat = false) const;
+	std::vector<perf_measure> tracing_lp_inference_prox(MatrixXf & init, LP_inf_params & params, 
+            double time_limit = 0, std::string out_file_name = "") const;
+    std::vector<perf_measure> tracing_lp_inference_prox_restricted(MatrixXf & init, LP_inf_params & params, 
+            double time_limit = 0) const;
 
-	// compare permutohedral and bruteforce energies
-    void compare_energies(const MatrixXf & Q, double & ph_energy, double & bf_energy, bool qp=true, bool ph_old = false) const;
+	// compare permutohedral and bruteforce energies (testing code only)
+    void compare_energies(MatrixXf & Q, double & ph_energy, double & bf_energy, 
+        bool qp=true, bool ph_old = false, bool subgrad = false) const;
+
+	// compare old (_dc) and new (_ord) permutohedral implementation for timing
+    std::vector<perf_measure> compare_lpsubgrad_timings(MatrixXf & Q, bool cmp_subgrad = false) const;
 
 	// Perform the rounding based on argmaxes
 	MatrixXf max_rounding(const MatrixXf & estimates) const;
 	// Perform randomized roundings
-	MatrixXf interval_rounding(const MatrixXf & estimates) const;
+	MatrixXf interval_rounding(const MatrixXf & estimates, int nb_random_rounding = 10) const;
 
 	// Run the inference with gradually lower lambda values.
 	MatrixXf grad_inference(const MatrixXf & init) const;
@@ -170,20 +230,36 @@ public: /* Debugging functions */
 	// Compute the pairwise energy of an assignment l (half of each pairwise potential is added to each of it's endpoints)
 	VectorXf pairwiseEnergy( const VectorXs & l, int term=-1 ) const;
 
+    // compute true pairwise energy for LP objective given integer labelling
+	VectorXf pairwise_energy_true( const VectorXs & l, int term=-1 ) const;
+
 	// Compute the energy of an assignment l.
 	double assignment_energy( const VectorXs & l) const;
 	double assignment_energy_sp( const VectorXs & l) const;
 
 
+    // Compute the true energy of an assignment l -- actual energy (differs by a const to assignment_energy - in pairwise case)
+	double assignment_energy_true( const VectorXs & l) const;
+
+
 	// Compute the KL-divergence of a set of marginals
 	double klDivergence( const MatrixXf & Q ) const;
 
-    // Compute the energy associated with the QP relaxation
+    // KL-divergence between two probabilities KL(Q||P)
+    double klDivergence(const MatrixXf & Q, const MatrixXf & P) const;
+
+    // Compute the energy associated with the QP relaxation (const - true)
     double compute_energy( const MatrixXf & Q) const;
     double compute_energy_sp( const MatrixXf & Q) const;
 
+    // Compute the energy associated with the QP-CCCP relaxation (const - true)
+    double compute_energy_CCCP( const MatrixXf & Q) const;
+
+    // Compute the true-energy associated with the QP relaxation
+    double compute_energy_true( const MatrixXf & Q) const;
+
     // Compute the energy associated with the LP relaxation
-    double compute_energy_LP(const MatrixXf & Q, PairwisePotential** no_norm_pairwise, int nb_pairwise) const;
+    double compute_energy_LP(const MatrixXf & Q) const;
 
 	// Compute the value of a Lafferty-Ravikumar QP
 	double compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const;
@@ -216,10 +292,10 @@ public:
 	
 	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
 	void addSuperPixel(std::string path_to_classifier,unsigned char * img, float constant, float normaliser);
-	void addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count);
-	void addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, double constant);
 
 	
+    void addSuperPixel(unsigned char * img, int spatial_radius = 8, int range_radius = 4, int min_region_count = 2500, SpeedUpLevel = NO_SPEEDUP);
+
 	// Set the unary potential for a specific variable
 	using DenseCRF::setUnaryEnergy;
 };

@@ -82,7 +82,7 @@ std::string Dataset::get_ground_truth_path(const std::string & image_name){
 
 std::vector<std::string> Dataset::get_all_split_files(const std::string & split) {
 
-    std::string path_to_split = "data/PascalVOC2010/split/" + split+ ".txt";
+    std::string path_to_split = "data/MSRC/split/" + split+ ".txt";
 
     std::vector<std::string> split_images;
     std::string next_img_name;
@@ -90,7 +90,7 @@ std::vector<std::string> Dataset::get_all_split_files(const std::string & split)
 
     while(getline(file, next_img_name)){
         next_img_name = rtrim(next_img_name);
-        next_img_name = stringreplace(next_img_name, ".bmp", ""); // Cleanup the name in MSRC
+        next_img_name = stringreplace(next_img_name, "_GT.bmp", ""); // Cleanup the name in MSRC
         split_images.push_back(next_img_name);
     }
     return split_images;
@@ -122,7 +122,7 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "_GT.bmp",
                        "MSRC");
     }
-    else if (dataset_name == "Pascal2010") {
+    else if (dataset_name == "Pascal2010" || dataset_name == "PascalVOC2010") {
         return Dataset("data/PascalVOC2010/JPEGImages/",
                        "data/PascalVOC2010/logit_unaries/",
                        "data/PascalVOC2010/SegmentationClass/",
@@ -132,6 +132,61 @@ Dataset get_dataset_by_name(const std::string & dataset_name){
                        "Pascal2010");
     }
     // Add some possible other datasets
+    else if (dataset_name == "Pascal2010_2") {
+        return Dataset("/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/JPEGImages/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/logit_unaries/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/SegmentationClass/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/PascalVOC2010/",
+                       ".jpg",
+                       ".png",
+                       "Pascal2010");
+    }
+    else if (dataset_name == "MSRC_2") {
+        return Dataset("/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/texton_unaries/",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
+                       "/media/ajanthan/b7391340-f7ed-49ef-9dab-f3749bde5917/ajanthan/NICTA/Research/ubuntu_codes/data/MSRC/",
+                       ".bmp",
+                       "_GT.bmp",
+                       "MSRC");
+    }
+    // Add some possible other datasets
+    else if (dataset_name == "Pascal2010_3") {
+        return Dataset("/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/JPEGImages/",
+                       "/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/logit_unaries/",
+                       "/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/SegmentationClass/",
+                       "/media/ajanthan/sheep/Ajanthan/data/PascalVOC2010/",
+                       ".jpg",
+                       ".png",
+                       "Pascal2010");
+    }
+    else if (dataset_name == "MSRC_3") {
+        return Dataset("/media/ajanthan/sheep/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
+                       "/media/ajanthan/sheep/Ajanthan/data/MSRC/texton_unaries/",
+                       "/media/ajanthan/sheep/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
+                       "/media/ajanthan/sheep/Ajanthan/data/MSRC/",
+                       ".bmp",
+                       "_GT.bmp",
+                       "MSRC");
+    }
+    else if (dataset_name == "Pascal2010_4") {
+        return Dataset("/Ajanthan/data/PascalVOC2010/JPEGImages/",
+                       "/Ajanthan/data/PascalVOC2010/logit_unaries/",
+                       "/Ajanthan/data/PascalVOC2010/SegmentationClass/",
+                       "/Ajanthan/data/PascalVOC2010/",
+                       ".jpg",
+                       ".png",
+                       "Pascal2010");
+    }
+    else if (dataset_name == "MSRC_4") {
+        return Dataset("/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/Images/",
+                       "/Ajanthan/data/MSRC/texton_unaries/",
+                       "/Ajanthan/data/MSRC/MSRC_ObjCategImageDatabase_v2/GroundTruth",
+                       "/Ajanthan/data/MSRC/",
+                       ".bmp",
+                       "_GT.bmp",
+                       "MSRC");
+    }
 }
 
 std::string get_output_path(const std::string & path_to_results_folder, const std::string & image_name){
@@ -161,6 +216,43 @@ unsigned char * load_image( const std::string & path_to_image, img_size & size){
             char_img[(i+j*size.width)*3+0] = intensity.val[2];
             char_img[(i+j*size.width)*3+1] = intensity.val[1];
             char_img[(i+j*size.width)*3+2] = intensity.val[0];
+        }
+    }
+
+    return char_img;
+}
+
+unsigned char * load_rescaled_image( const std::string & path_to_image, img_size & size, int imskip){
+    assert(imskip > 1);
+    if (imskip < 1) imskip = 1;
+    cv::Mat img = cv::imread(path_to_image);
+
+    img_size size2 = {-1, -1};
+    if(size2.height != img.rows || size2.width != img.cols) {
+        std::cout << "Dimension doesn't correspond to unaries" << std::endl;
+        if (size2.height == -1) {
+            size2.height = img.rows;
+            std::cout << "Adjusting height because was undefined" << '\n';
+        }
+        if (size2.width == -1) {
+            size2.width = img.cols;
+            std::cout << "Adjusting width because was undefined" << '\n';
+        }
+    }
+    size.width = size2.width / imskip;
+    size.height = size2.height / imskip;
+
+    unsigned char * char_img = new unsigned char[size.width*size.height*3]();
+    for (int j=0; j < size.height; j++) {
+        if (j % imskip != 0) continue;
+        for (int i=0; i < size.width; i++) {
+            if (i % imskip != 0) continue;
+            cv::Vec3b intensity = img.at<cv::Vec3b>(j,i); // this comes in BGR
+            int ii = i/imskip; 
+            int jj = j/imskip;
+            char_img[(ii+jj*size.width)*3+0] = intensity.val[2];
+            char_img[(ii+jj*size.width)*3+1] = intensity.val[1];
+            char_img[(ii+jj*size.width)*3+2] = intensity.val[0];
         }
     }
 
@@ -285,6 +377,73 @@ void save_map(const MatrixXf & estimates, const img_size & size, const std::stri
     }
 
     cv::imwrite(path_to_output, img);
+}
+
+void save_less_confident_pixels(const MatrixXf & estimates, const std::vector<int> & pI, const img_size & size, 
+        const std::string & path_to_output, const std::string & dataset_name) {
+    std::vector<short> labeling(estimates.cols());
+
+    std::string out_file_name = path_to_output;
+    out_file_name.replace(out_file_name.end()-4, out_file_name.end(),"_lcf.png");
+    // MAP estimation
+    for(int i=0; i<estimates.cols(); ++i) {
+        int lbl;
+        estimates.col(i).maxCoeff( &lbl);
+        labeling[i] = lbl;
+    }
+    cv::Mat img(size.height, size.width, CV_8UC3);
+    cv::Vec3b intensity;
+    if(dataset_name == "Stereo_special") {
+        // Make the image
+        int max_label = *std::max_element(labeling.begin(), labeling.end());
+        int ii = 0;
+        for(int i=0; i<estimates.cols(); ++i) {
+             if (i == pI[ii]) {
+                intensity[2] = 255;
+                intensity[1] = 0;
+                intensity[0] = 0;
+                ++ii;
+            } else {
+                intensity[2] = 255.0*labeling[i]/max_label;
+                intensity[1] = 255.0*labeling[i]/max_label;
+                intensity[0] = 255.0*labeling[i]/max_label;
+            }
+
+            int col = i % size.width;
+            int row = (i - col)/size.width;
+            img.at<cv::Vec3b>(row, col) = intensity;
+        }
+    } else {
+        const unsigned char*  legend;
+        if (dataset_name == "MSRC") {
+            legend = MSRC_legend;
+        } else if (dataset_name == "Pascal2010") {
+            legend = Pascal_legend;
+        } else {
+            legend = Stereo_legend;
+        }
+
+        // Make the image
+        int ii = 0;
+        for(int i=0; i<estimates.cols(); ++i) {
+            if (i == pI[ii]) {
+                intensity[2] = 255;
+                intensity[1] = 255;
+                intensity[0] = 255;
+                ++ii;
+            } else {
+                intensity[2] = legend[3*labeling[i]];
+                intensity[1] = legend[3*labeling[i] + 1];
+                intensity[0] = legend[3*labeling[i] + 2];
+            }
+
+            int col = i % size.width;
+            int row = (i - col)/size.width;
+            img.at<cv::Vec3b>(row, col) = intensity;
+        }
+    }
+
+    cv::imwrite(out_file_name, img);
 }
 
 MatrixXf load_matrix(std::string path_to_matrix){

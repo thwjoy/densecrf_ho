@@ -2,8 +2,14 @@ data
 build
 debug
 *.pyc
+data
 *.ppm
+<<<<<<< HEAD
 run.*
 *.out
 *.sh
 tools/lib
+=======
+*.sh
+*.out
+>>>>>>> lp_prox_super_pix

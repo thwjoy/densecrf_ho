@@ -26,6 +26,7 @@
 */
 
 #include "permutohedral.h"
+#include <algorithm>
 
 #ifdef WIN32
 inline int round(double X) {
@@ -135,7 +136,17 @@ public:
 /***          Permutohedral Lattice           ***/
 /************************************************/
 
-Permutohedral::Permutohedral():N_( 0 ), M_( 0 ), d_( 0 ) {
+Permutohedral::Permutohedral():N_(0), M_(0), d_(0), L_(0), values_(0), new_values_(0), 
+    stored_values_l_(0), stored_values_u_(0) {
+}
+Permutohedral::~Permutohedral() {
+    if (L_ != 0) {
+        delete[] values_;
+        delete[] new_values_;
+        L_ = 0;
+    }
+    if(stored_values_l_) delete[] stored_values_l_;
+    if(stored_values_u_) delete[] stored_values_u_;
 }
 #ifdef SSE_PERMUTOHEDRAL
 void Permutohedral::init ( const MatrixXf & feature )
@@ -576,16 +587,22 @@ void sliceSplitArray(float *out, float alpha, float up_to, split_array *in, bool
 	assert(coeff >= 0 && coeff < RESOLUTION);
 	*out += in_f[coeff] * alpha;
 }
-void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* in, int value_size) const {
+void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* in, int value_size) {
 	// Shift all values by 1 such that -1 -> 0 (used for blurring)
-	split_array * values = new split_array[ (M_+2)*value_size ];
-	split_array * new_values = new split_array[ (M_+2)*value_size ];
+	//split_array * values = new split_array[ (M_+2)*value_size ];    
+	//split_array * new_values = new split_array[ (M_+2)*value_size ];
+    // ALLOCATE ONCE!!
+    if (L_ == 0) {  // L_ is not set, set it and allocate value arrays
+        L_ = value_size;
+        values_ = new split_array[ (M_+2)*value_size ];
+        new_values_ = new split_array[ (M_+2)*value_size ];
+    }
 
 	// Alpha is a magic scaling constant (write Andrew if you really wanna understand this)
 	float alpha = 1.0f / (1+powf(2, -d_)); // 0.8 in 2D / 0.97 in 5D
 	
-	memset(values, 0, (M_+2)*value_size*sizeof(split_array));
-	memset(new_values, 0, (M_+2)*value_size*sizeof(split_array));
+	memset(values_, 0, (M_+2)*value_size*sizeof(split_array));
+	memset(new_values_, 0, (M_+2)*value_size*sizeof(split_array));
 
 	// Lower
 	// Splatting
@@ -594,7 +611,7 @@ void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* i
 			int o = offset_[i*(d_+1)+j]+1;
 			float w = barycentric_[i*(d_+1)+j];
 			for( int k=0; k<value_size; k++ ) {
-				addSplitArray(&values[ o*value_size+k ], w, in[ i*value_size+k ], false);
+				addSplitArray(&values_[ o*value_size+k ], w, in[ i*value_size+k ], false);
 				// values[ o*value_size+k ] += w * in[ i*value_size+k ];
 			}
 		}
@@ -603,19 +620,19 @@ void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* i
 	// Blurring
 	for( int j=0; j<=d_; ++j ){
 		for( int i=0; i<M_; i++ ){
-			split_array * old_val = values + (i+1)*value_size;
-			split_array * new_val = new_values + (i+1)*value_size;
+			split_array * old_val = values_ + (i+1)*value_size;
+			split_array * new_val = new_values_ + (i+1)*value_size;
 			
 			int n1 = blur_neighbors_[j*M_+i].n1+1;
 			int n2 = blur_neighbors_[j*M_+i].n2+1;
-			split_array * n1_val = values + n1*value_size;
-			split_array * n2_val = values + n2*value_size;
+			split_array * n1_val = values_ + n1*value_size;
+			split_array * n2_val = values_ + n2*value_size;
 			for( int k=0; k<value_size; k++ ) {
 				weightedAddSplitArray(&new_val[k], &old_val[k], 0.5, &n1_val[k], &n2_val[k]);
 				// new_val[k] = old_val[k]+0.5*(n1_val[k] + n2_val[k]);
 			}
 		}
-		std::swap( values, new_values );
+		std::swap( values_, new_values_ );
 	}
 
 	// Slicing
@@ -626,14 +643,14 @@ void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* i
 			int o = offset_[i*(d_+1)+j]+1;
 			float w = barycentric_[i*(d_+1)+j];
 			for( int k=0; k<value_size; k++ ) {
-				sliceSplitArray(&out[ i*value_size+k ], -w*alpha, in[ i*value_size+k ], &values[ o*value_size+k ], false);
+				sliceSplitArray(&out[ i*value_size+k ], -w*alpha, in[ i*value_size+k ], &values_[ o*value_size+k ], false);
 				//out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
 			}
 		}
 	}
 	
-	memset(values, 0, (M_+2)*value_size*sizeof(split_array));
-	memset(new_values, 0, (M_+2)*value_size*sizeof(split_array));
+	memset(values_, 0, (M_+2)*value_size*sizeof(split_array));
+	memset(new_values_, 0, (M_+2)*value_size*sizeof(split_array));
 	
 	// Upper
 	// Splatting
@@ -642,7 +659,7 @@ void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* i
 			int o = offset_[i*(d_+1)+j]+1;
 			float w = barycentric_[i*(d_+1)+j];
 			for( int k=0; k<value_size; k++ ) {
-				addSplitArray(&values[ o*value_size+k ], w, in[ i*value_size+k ], true);
+				addSplitArray(&values_[ o*value_size+k ], w, in[ i*value_size+k ], true);
 				// values[ o*value_size+k ] += w * in[ i*value_size+k ];
 			}
 		}
@@ -651,19 +668,19 @@ void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* i
 	// Blurring
 	for( int j=0; j<=d_; ++j ){
 		for( int i=0; i<M_; i++ ){
-			split_array * old_val = values + (i+1)*value_size;
-			split_array * new_val = new_values + (i+1)*value_size;
+			split_array * old_val = values_ + (i+1)*value_size;
+			split_array * new_val = new_values_ + (i+1)*value_size;
 			
 			int n1 = blur_neighbors_[j*M_+i].n1+1;
 			int n2 = blur_neighbors_[j*M_+i].n2+1;
-			split_array * n1_val = values + n1*value_size;
-			split_array * n2_val = values + n2*value_size;
+			split_array * n1_val = values_ + n1*value_size;
+			split_array * n2_val = values_ + n2*value_size;
 			for( int k=0; k<value_size; k++ ) {
 				weightedAddSplitArray(&new_val[k], &old_val[k], 0.5, &n1_val[k], &n2_val[k]);
 				// new_val[k] = old_val[k]+0.5*(n1_val[k] + n2_val[k]);
 			}
 		}
-		std::swap( values, new_values );
+		std::swap( values_, new_values_ );
 	}
 	
 	// Slicing
@@ -672,14 +689,215 @@ void Permutohedral::seqCompute_upper_minus_lower_ord (float* out, const float* i
 			int o = offset_[i*(d_+1)+j]+1;
 			float w = barycentric_[i*(d_+1)+j];
 			for( int k=0; k<value_size; k++ ) {
-				sliceSplitArray(&out[ i*value_size+k ], w*alpha, in[ i*value_size+k ], &values[ o*value_size+k ], true);
+				sliceSplitArray(&out[ i*value_size+k ], w*alpha, in[ i*value_size+k ], &values_[ o*value_size+k ], true);
 				// out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
 			}
 		}
 	}
 	
-	delete[] values;
-	delete[] new_values;
+    // deleted in destructor!
+	//delete[] values;
+	//delete[] new_values;
+}
+void Permutohedral::seqCompute_upper_minus_lower_ord_restricted (float* out, const float* in, int value_size,
+        const std::vector<int> & pI, const float* extIn, const bool store) {
+	// Shift all values by 1 such that -1 -> 0 (used for blurring)
+    // ALLOCATE ONCE!!
+    int tot_value_size = (M_+2)*value_size;
+    if (L_ == 0) {  // L_ is not set, set it and allocate value arrays
+        L_ = value_size;
+        values_ = new split_array[ tot_value_size ];
+        new_values_ = new split_array[ tot_value_size ];
+    }
+    if (stored_values_l_ == 0 && stored_values_u_ == 0) {
+        stored_values_l_ = new split_array[ tot_value_size ];
+        stored_values_u_ = new split_array[ tot_value_size ];
+    }
+
+	// Alpha is a magic scaling constant (write Andrew if you really wanna understand this)
+	float alpha = 1.0f / (1+powf(2, -d_)); // 0.8 in 2D / 0.97 in 5D
+	
+	memset(values_, 0, tot_value_size*sizeof(split_array));
+	memset(new_values_, 0, tot_value_size*sizeof(split_array));
+
+	// Lower
+	// Splatting
+    if (store) {    // store values corresponding to the pixels not in pI, pI is in ascending order
+        int ii = 0;
+    	for( int i=0;  i<N_; i++ ){
+            if (i == pI[ii]) {
+                ++ii;
+                continue;
+            }
+            // not in pI
+    		for( int j=0; j<=d_; j++ ){
+    			int o = offset_[i*(d_+1)+j]+1;
+    			float w = barycentric_[i*(d_+1)+j];
+    			for( int k=0; k<value_size; k++ ) {
+    				addSplitArray(&values_[ o*value_size+k ], w, extIn[ i*value_size+k ], false);
+    				// values[ o*value_size+k ] += w * in[ i*value_size+k ];
+    			}
+    		}
+    	}
+        memcpy(stored_values_l_, values_, tot_value_size*sizeof(split_array));
+        //std::copy(values_, values_+tot_value_size, stored_values_l_);
+        
+        bool* activated = new bool[M_]();
+        stored_active_list_.clear();
+        // in pI
+        for( int ii = 0; ii < pI.size(); ++ii ) {
+            int i = pI[ii];
+        	for( int j=0; j<=d_; j++ ){
+        		int o = offset_[i*(d_+1)+j]+1;
+        		float w = barycentric_[i*(d_+1)+j];
+        		for( int k=0; k<value_size; k++ ) {
+        			addSplitArray(&values_[ o*value_size+k ], w, in[ ii*value_size+k ], false);
+        			// values[ o*value_size+k ] += w * in[ i*value_size+k ];
+        		}
+                int oo = o-1;
+                if (!activated[oo]) {
+                    activated[oo] = true;
+                    stored_active_list_.push_back(oo);
+                }
+        	}
+        }
+        delete[] activated;
+    } else {
+        // assumed stored_values_l_ has the correct value stored by calling previously with store==true
+        memcpy(values_, stored_values_l_, tot_value_size*sizeof(split_array));
+        //std::copy(stored_values_l_, stored_values_l_+tot_value_size, values_);
+        // in pI
+        for( int ii = 0; ii < pI.size(); ++ii ) {
+            int i = pI[ii];
+        	for( int j=0; j<=d_; j++ ){
+        		int o = offset_[i*(d_+1)+j]+1;
+        		float w = barycentric_[i*(d_+1)+j];
+        		for( int k=0; k<value_size; k++ ) {
+        			addSplitArray(&values_[ o*value_size+k ], w, in[ ii*value_size+k ], false);
+        			// values[ o*value_size+k ] += w * in[ i*value_size+k ];
+        		}
+        	}
+        }
+    }
+
+	// Blurring - only active lattice points
+	for( int j=0; j<=d_; ++j ){
+		for( int i : stored_active_list_ ){ // stored previously by calling store == true
+			split_array * old_val = values_ + (i+1)*value_size;
+			split_array * new_val = new_values_ + (i+1)*value_size;
+			
+			int n1 = blur_neighbors_[j*M_+i].n1+1;
+			int n2 = blur_neighbors_[j*M_+i].n2+1;
+			split_array * n1_val = values_ + n1*value_size;
+			split_array * n2_val = values_ + n2*value_size;
+			for( int k=0; k<value_size; k++ ) {
+				weightedAddSplitArray(&new_val[k], &old_val[k], 0.5, &n1_val[k], &n2_val[k]);
+				// new_val[k] = old_val[k]+0.5*(n1_val[k] + n2_val[k]);
+			}
+		}
+		std::swap( values_, new_values_ );
+	}
+
+	// Slicing - in pI only
+    for( int ii = 0; ii < pI.size(); ++ii ) {
+        int i = pI[ii];
+		//for( int k=0; k<value_size; k++ )
+		//	out[ii*value_size+k] = 0;   // out is assumed to be all zero
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j]+1;
+			float w = barycentric_[i*(d_+1)+j];
+			for( int k=0; k<value_size; k++ ) {
+				sliceSplitArray(&out[ ii*value_size+k ], -w*alpha, in[ ii*value_size+k ], &values_[ o*value_size+k ], false);
+				//out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
+			}
+		}
+	}
+	
+	memset(values_, 0, tot_value_size*sizeof(split_array));
+	memset(new_values_, 0, tot_value_size*sizeof(split_array));
+	
+	// Upper
+	// Splatting
+    if (store) {    // store values corresponding to the pixels not in pI, pI is in ascending order
+        int ii = 0;
+    	for( int i=0;  i<N_; i++ ){
+            if (i == pI[ii]) {
+                ++ii;
+                continue;
+            }
+            // not in pI
+    		for( int j=0; j<=d_; j++ ){
+    			int o = offset_[i*(d_+1)+j]+1;
+    			float w = barycentric_[i*(d_+1)+j];
+    			for( int k=0; k<value_size; k++ ) {
+    				addSplitArray(&values_[ o*value_size+k ], w, extIn[ i*value_size+k ], true);
+    				// values[ o*value_size+k ] += w * in[ i*value_size+k ];
+    			}
+    		}
+    	}
+        memcpy(stored_values_u_, values_, tot_value_size*sizeof(split_array));
+        //std::copy(values_, values_+tot_value_size, stored_values_u_);
+        
+        // in pI
+        for( int ii = 0; ii < pI.size(); ++ii ) {
+            int i = pI[ii];
+        	for( int j=0; j<=d_; j++ ){
+        		int o = offset_[i*(d_+1)+j]+1;
+        		float w = barycentric_[i*(d_+1)+j];
+        		for( int k=0; k<value_size; k++ ) {
+        			addSplitArray(&values_[ o*value_size+k ], w, in[ ii*value_size+k ], true);
+        			// values[ o*value_size+k ] += w * in[ i*value_size+k ];
+        		}
+        	}
+        }
+    } else {
+        // assumed stored_values_u_ has the correct value stored by calling previously with store==true
+        memcpy(values_, stored_values_u_, tot_value_size*sizeof(split_array));
+        //std::copy(stored_values_u_, stored_values_u_+tot_value_size, values_);
+        // in pI
+        for( int ii = 0; ii < pI.size(); ++ii ) {
+            int i = pI[ii];
+        	for( int j=0; j<=d_; j++ ){
+        		int o = offset_[i*(d_+1)+j]+1;
+        		float w = barycentric_[i*(d_+1)+j];
+        		for( int k=0; k<value_size; k++ ) {
+        			addSplitArray(&values_[ o*value_size+k ], w, in[ ii*value_size+k ], true);
+        			// values[ o*value_size+k ] += w * in[ i*value_size+k ];
+        		}
+        	}
+        }
+    }
+
+    // Blurring - only active lattice points
+	for( int j=0; j<=d_; ++j ){
+		for( int i : stored_active_list_ ){ // stored previously by calling store == true
+			split_array * old_val = values_ + (i+1)*value_size;
+			split_array * new_val = new_values_ + (i+1)*value_size;
+			
+			int n1 = blur_neighbors_[j*M_+i].n1+1;
+			int n2 = blur_neighbors_[j*M_+i].n2+1;
+			split_array * n1_val = values_ + n1*value_size;
+			split_array * n2_val = values_ + n2*value_size;
+			for( int k=0; k<value_size; k++ ) {
+				weightedAddSplitArray(&new_val[k], &old_val[k], 0.5, &n1_val[k], &n2_val[k]);
+				// new_val[k] = old_val[k]+0.5*(n1_val[k] + n2_val[k]);
+			}
+		}
+		std::swap( values_, new_values_ );
+	}
+
+	// Slicing - in pI only
+    for( int ii = 0; ii < pI.size(); ++ii ) {
+        int i = pI[ii];
+		for( int j=0; j<=d_; j++ ){
+			int o = offset_[i*(d_+1)+j]+1;
+			float w = barycentric_[i*(d_+1)+j];
+			for( int k=0; k<value_size; k++ ) {
+				sliceSplitArray(&out[ ii*value_size+k ], w*alpha, in[ ii*value_size+k ], &values_[ o*value_size+k ], true);
+				//out[ i*value_size+k ] += w * values[ o*value_size+k ] * alpha;
+			}
+		}
+	}
 }
 void Permutohedral::seqCompute_upper_minus_lower_dc ( float* out, int low, int middle_low, int middle_high, int high ) const
 {
@@ -850,8 +1068,13 @@ void Permutohedral::compute_upper_minus_lower_dc ( MatrixXf & out, int low, int 
 	assert(out.cols()==N_);
 	seqCompute_upper_minus_lower_dc(out.data(), low, middle_low, middle_high, high);
 }
-void Permutohedral::compute_upper_minus_lower_ord ( MatrixXf & out, const MatrixXf & Q) const {
+void Permutohedral::compute_upper_minus_lower_ord ( MatrixXf & out, const MatrixXf & Q) {
 	seqCompute_upper_minus_lower_ord(out.data(), Q.data(), Q.rows());
+}
+void Permutohedral::compute_upper_minus_lower_ord_restricted ( MatrixXf & rout, const MatrixXf & rQ,  
+    const std::vector<int> & pI, const MatrixXf & Q, const bool store ) {
+    assert(rQ.rows() == Q.rows());
+	seqCompute_upper_minus_lower_ord_restricted(rout.data(), rQ.data(), rQ.rows(), pI, Q.data(), store);
 }
 void Permutohedral::compute ( MatrixXf & out, const MatrixXf & in, bool reverse ) const
 {

@@ -5,7 +5,12 @@ dpath = '/home/tomj/Documents/4YP/densecrf/data';
 datadir = [dpath '/MSRC'];
 testset = dataset_split;
 
+<<<<<<< HEAD
 gtimgpath= [datadir '/MSRC_ObjCategImageDatabase_v2/fine_annot/%s_GT.bmp'];
+=======
+gtimgpath= [datadir '/MSRC_ObjCategImageDatabase_v2/GroundTruth/%s_GT.bmp'];
+
+>>>>>>> lp_prox_super_pix
 respath_tmpl=[path '/%s.png'];
 
 path_to_test_set = [datadir '/split/' dataset_split '.txt'];
@@ -22,10 +27,16 @@ for i=1:length(gtids)
     imname = gtids{i};
     toks = strsplit(imname, '.');
     imname = toks{1};
+<<<<<<< HEAD
     imname = imname(1:end-3);
   
     try
+=======
+	imname = imname(1:end-3);
+     try
+>>>>>>> lp_prox_super_pix
     % ground truth label file
+
 
     gtfile = sprintf(gtimgpath,imname);
 %     break;
@@ -93,7 +104,11 @@ for j=1:num
    fprintf('  %14s: %6.3f%%\n',clname,accuracies(j));
 end
 accuracies = accuracies(1:end);
+<<<<<<< HEAD
 accuracies(isnan(accuracies)) = [];
+=======
+accuracies(isnan(accuracies(:,1)),:)=[];
+>>>>>>> lp_prox_super_pix
 avacc = mean(accuracies);
 
 score = avacc;
@@ -127,4 +142,6 @@ function cmap = MSRClabelcolormap(N)
     cmap(22,:) = [0,0,0];
     
     cmap = cmap / 255;
+
 end
+

@@ -1,9 +1,9 @@
+
 function score = voc_test(path, dataset_split)
 addpath('/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/VOCdevkit/VOCcode');
 
+
 VOCinit;
-
-
 
 VOCopts.datadir = '/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010';
 testset = dataset_split;
@@ -14,6 +14,7 @@ imgsetpath= '/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/split/%s.txt';
 respath_tmpl=[path '/%s.png'];
 
 path_to_test_set = ['/home/tomj/Documents/4YP/densecrf/data/PascalVOC2010/split/' dataset_split '.txt'];
+
 [gtids,t]=textread(path_to_test_set,'%s %d');
 
 num = 21; % Number of classes
@@ -26,9 +27,11 @@ for i=1:length(gtids)
 
     % ground truth label file
     gtfile = sprintf(gtimgpath,imname);
+%     break;
     [gtim,map] = imread(gtfile);
     gtim = double(gtim);
 
+    %try
     % results file
     resfile = sprintf(respath_tmpl, imname);
     [resim,map] = imread(resfile);
@@ -57,6 +60,9 @@ for i=1:length(gtids)
     hs = histc(sumim(locs),1:num*num);
     count = count + numel(find(locs));
     confcounts(:) = confcounts(:) + hs(:);
+
+    %catch
+    %end
 end
 
 % confusion matrix - first index is true label, second is inferred label

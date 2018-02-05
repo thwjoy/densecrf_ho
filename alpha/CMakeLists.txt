@@ -1,4 +1,4 @@
-include_directories(../external/ProbImage ../external/ppm)
+include_directories(../external/ProbImage ../external/ppm ../external/ibfs ../external/ )
 
 find_package(OpenCV REQUIRED)
 
@@ -11,6 +11,9 @@ endif()
 
 # Libraries
 add_library(eigen_utils eigen_utils.cpp)
+
+add_library(runibfs runibfs.cpp)
+target_link_libraries(runibfs ibfs)
 
 add_library(newton_cccp newton_cccp.cpp)
 target_link_libraries(newton_cccp eigen_utils)
@@ -28,7 +31,7 @@ add_library(file_storage file_storage.cpp)
 target_link_libraries(file_storage probimage color_to_label ${OpenCV_LIBS})
 
 add_library(inference inference.cpp alpha_crf.cpp)
-target_link_libraries(inference densecrf brute_force file_storage eigen_utils newton_cccp)
+target_link_libraries(inference densecrf brute_force file_storage eigen_utils newton_cccp runibfs)
 
 # Executables
 add_executable(run throwaway.cpp)
@@ -41,7 +44,7 @@ add_executable(non_convex non_convex.cpp)
 target_link_libraries(non_convex inference mean-shift file_storage)
 
 add_executable(toy-problem toy-problem.cpp)
-target_link_libraries(toy-problem inference)
+target_link_libraries(toy-problem inference runibfs)
 
 add_executable(evaluate evaluate_on_dataset.cpp)
 target_link_libraries(evaluate inference file_storage color_to_label evaluation)

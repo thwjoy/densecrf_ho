@@ -1,5 +1,6 @@
 #include "eigen_utils.hpp"
 #include <iostream>
+#include <fstream>
 
 bool all_close_to_zero(const VectorXf & vec, float ref){
     for (int i = 0; i<vec.size() ; i++) {
@@ -110,3 +111,31 @@ void sortCols(const MatrixXf & M, MatrixXi & ind) {
     }
 
 }
+
+float infiniteNorm(const MatrixXf & M) {
+    return M.cwiseAbs().maxCoeff();
+}
+
+// rescale Q to be within [0,1] -- order of Q values preserved!
+void rescale(MatrixXf & out, const MatrixXf & Q) {
+	out = Q;
+    float minval, maxval;
+    // don't do label-wise rescaling -> introduces different error in each label!
+//    for (int i = 0; i < Q.rows(); ++i) {
+//	    minval = out.row(i).minCoeff();
+//	    out.row(i) = out.row(i).array() - minval;
+//	    maxval = out.row(i).maxCoeff();
+//        assert(maxval >= 0);
+//        if (maxval > 0)	out.row(i) /= maxval;
+//    }
+    // old-rescale- works better in segmentation
+	//chack for nan and inf
+    	//if (!((out - out).array() == (out - out).array()).all()) std::cout << "NaN of Inf" << std::endl;
+	minval = out.minCoeff();
+	out = out.array() - minval;
+	maxval = out.maxCoeff();
+//	std::cout << "Max: " << maxval << "\tMin: " << minval << std::endl;
+	if (maxval < 0) throw std::runtime_error("Maxval < 0, skipping");
+    	if (maxval > 0) out /= maxval;
+}
+

@@ -79,8 +79,12 @@ protected:
 		// Filter
 		lattice_.compute_upper_minus_lower_dc( out, low, middle_low, middle_high, high );
 	}
-	void filter_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) const {
+	void filter_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) {
 		lattice_.compute_upper_minus_lower_ord( out, Q );
+	}
+	void filter_upper_minus_lower_ord_restricted(MatrixXf & rout, const MatrixXf & rQ, 
+        const std::vector<int> & pI, const MatrixXf & Q, const bool store) {
+		lattice_.compute_upper_minus_lower_ord_restricted(rout, rQ, pI, Q, store);
 	}
 	// Compute d/df a^T*K*b
 	MatrixXf kernelGradient( const MatrixXf & a, const MatrixXf & b ) const {
@@ -127,9 +131,13 @@ public:
 	virtual void apply_upper_minus_lower_dc( MatrixXf & out, int low, int middle_low, int middle_high, int high) const {
 		filter_upper_minus_lower_dc(out, low, middle_low, middle_high, high);
 	}
-	virtual void apply_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) const {
+	virtual void apply_upper_minus_lower_ord( MatrixXf & out, const MatrixXf & Q) {
 		filter_upper_minus_lower_ord(out, Q);
 	}
+    virtual void apply_upper_minus_lower_ord_restricted(MatrixXf & rout, const MatrixXf & rQ, 
+        const std::vector<int> & pI, const MatrixXf & Q, const bool store) {
+		filter_upper_minus_lower_ord_restricted(rout, rQ, pI, Q, store);
+    }
 	virtual void apply( MatrixXf & out, const MatrixXf & Q ) const {
 		filter( out, Q, false );
 	}
@@ -203,15 +211,33 @@ void PairwisePotential::applyTranspose(MatrixXf & out, const MatrixXf & Q) const
 	// Apply the compatibility
 	compatibility_->applyTranspose( out, out );
 }
-void PairwisePotential::apply_upper_minus_lower_ord(MatrixXf & out, const MatrixXf & Q) const {
-	assert(Q.maxCoeff() <= 1);
-	assert(Q.minCoeff() >= 0);  // values truncated to be [0,1], doesn't need to sum to 1
-    out.fill(0);
+void PairwisePotential::apply_upper_minus_lower_ord(MatrixXf & out, const MatrixXf & Q) {
+    // pass rescaled_Q to reduce the discretization error! ("rescale" function is in eigen_utils.cpp)
+    // when no of labels are high, each probabilty is small and all fall into one or two buckets!
+	out.fill(0);
+        if (Q.maxCoeff() > 1)throw std::runtime_error("Value out of bounds");
+	if (Q.minCoeff() < 0)throw std::runtime_error("Value out of bounds");  // values truncated to be [0,1], doesn't need to sum to 1
+    
 	kernel_->apply_upper_minus_lower_ord(out, Q);
+
+    //float alpha = 0.6;  // magic constant (bf-lp-energy/ph-lp-energy)
+    //out *= alpha;
 	
 	// Apply the compatibility
 	compatibility_->apply( out, out );
 }	
+void PairwisePotential::apply_upper_minus_lower_ord_restricted(MatrixXf & rout, const MatrixXf & rQ, 
+    const std::vector<int> & pI, const MatrixXf & Q, const bool store) {
+    // pass rescaled_Q to reduce the discretization error! ("rescale" function is in eigen_utils.cpp)
+    // when no of labels are high, each probabilty is small and all fall into one or two buckets!
+    assert(rQ.maxCoeff() <= 1);
+	assert(rQ.minCoeff() >= 0);  // values truncated to be [0,1], doesn't need to sum to 1
+    rout.fill(0);
+	kernel_->apply_upper_minus_lower_ord_restricted(rout, rQ, pI, Q, store);
+	
+	// Apply the compatibility
+	compatibility_->apply( rout, rout );
+}    
 void PairwisePotential::apply_upper_minus_lower_dc(MatrixXf & out, const MatrixXi & ind) const {
 	MatrixXf const & features = kernel_->features();
 	MatrixXf sorted_features = features;
@@ -295,6 +321,41 @@ void PairwisePotential::apply_upper_minus_lower_bf(MatrixXf & out, const MatrixX
         // Lower
 		for(int c=0; c<ind.cols(); ++c) {
             for(int b=0; b<c; ++b) {
+                VectorXf featDiff = (sorted_features.col(c) - sorted_features.col(b));
+                single_label_out(c) -= exp(-featDiff.squaredNorm());
+            }
+        }
+
+		out.row(label) = single_label_out;
+	}
+	compatibility_->apply(out, out);
+}
+void PairwisePotential::apply_upper_minus_lower_bf_ord(MatrixXf & out, const MatrixXi & ind, 
+        const MatrixXf & Q) const {
+	MatrixXf const & features = kernel_->features();
+	MatrixXf sorted_features = features;
+	MatrixXf single_label_out(1, features.cols());
+
+	for(int label=0; label<ind.rows(); ++label) {
+		// Sort the features with the scores for this label
+		for(int j=0; j<features.cols(); ++j) {
+			sorted_features.col(j) = features.col(ind(label, j));
+		}
+
+		single_label_out.fill(0);
+		// brute-force computation
+		// Upper
+		for(int c=0; c<ind.cols(); ++c) {
+            for(int b=0; b<ind.cols(); ++b) {
+                if (Q(label, ind(label,b)) > Q(label, ind(label,c))) continue;    // equality considered
+                VectorXf featDiff = (sorted_features.col(c) - sorted_features.col(b));
+                single_label_out(c) += exp(-featDiff.squaredNorm());
+            }
+        }
+        // Lower
+		for(int c=0; c<ind.cols(); ++c) {
+            for(int b=0; b<ind.cols(); ++b) {
+                if (Q(label, ind(label,b)) < Q(label, ind(label,c))) continue;    // equality considered
                 VectorXf featDiff = (sorted_features.col(c) - sorted_features.col(b));
                 single_label_out(c) -= exp(-featDiff.squaredNorm());
             }

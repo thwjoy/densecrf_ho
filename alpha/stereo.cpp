@@ -6,7 +6,9 @@
 #include <iostream>
 #include <fstream>
 
-#define NUM_LABELS 16
+#define NUM_LABELS 4
+
+#define RESCALED false
 
 MatrixXf get_unaries(const unsigned char * left_img, const unsigned char * right_img, img_size & size){
     MatrixXf unaries(NUM_LABELS, size.height * size.width);
@@ -68,23 +70,57 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    float up_ratio = 1;
+	if(argc > 3) up_ratio = atof(argv[3]);
+
+	// lp inference params
+	LP_inf_params lp_params;
+	if(argc > 4) lp_params.prox_max_iter = atoi(argv[4]);
+	if(argc > 5) lp_params.fw_max_iter = atoi(argv[5]);
+	if(argc > 6) lp_params.qp_max_iter = atoi(argv[6]);
+	if(argc > 7) lp_params.prox_reg_const = atof(argv[7]);
+	if(argc > 8) lp_params.dual_gap_tol = atof(argv[8]);
+	if(argc > 9) lp_params.qp_tol = atof(argv[9]);
+	if(argc > 10) lp_params.best_int = atoi(argv[10]);
+
     std::string stereo_folder = argv[1];
     std::string method = argv[2];
+
+    std::cout << "## COMMAND: " << argv[0] << " " << argv[1] << " " << argv[2] << " " << up_ratio << " "
+        << lp_params.prox_max_iter << " " << lp_params.fw_max_iter << " " << lp_params.qp_max_iter << " "
+        << lp_params.prox_reg_const << " " << lp_params.dual_gap_tol << " " << lp_params.qp_tol << " " 
+        << lp_params.best_int << std::endl;
+
+#if RESCALED
+    std::string left_image_path = stereo_folder + "imL_025.png";
+    std::string right_image_path = stereo_folder + "imR_025.png";
+    std::string output_image_path = stereo_folder + "out_025_" + method + ".bmp";
+    std::string output_image_path_kt = stereo_folder + "out_025_" + method + "_kt.bmp";
+#else     
     std::string left_image_path = stereo_folder + "imL.png";
     std::string right_image_path = stereo_folder + "imR.png";
     std::string output_image_path = stereo_folder + "out_" + method + ".bmp";
+    std::string output_image_path_kt = stereo_folder + "out_" + method + "_kt.bmp";
+#endif
     std::string unary_path = stereo_folder + "unary.txt";
 
-    Potts_weight_set parameters(5, 50, 2, 15, 50);
+
+#if RESCALED
+    Potts_weight_set parameters(2, 50, 2, 15, 50);
+#else
+	Potts_weight_set parameters(5, 50, 2, 15, 50);
+#endif
 
     img_size size = {-1, -1};
 
     unsigned char * left_img = load_image(left_image_path, size);
     unsigned char * right_img = load_image(right_image_path, size);
 
-
-    // MatrixXf unaries = get_unaries(left_img, right_img, size);
+#if RESCALED
+    MatrixXf unaries = get_unaries(left_img, right_img, size);
+#else
     MatrixXf unaries = get_unaries_from_file(unary_path, size);
+#endif
 
     DenseCRF2D crf(size.width, size.height, unaries.rows());
     crf.setUnaryEnergy(unaries);
@@ -123,9 +159,37 @@ int main(int argc, char *argv[])
         Q = crf.concave_qp_cccp_inference(Q);
         discretized_energy = crf.assignment_energy(crf.currentMap(Q));
         printf("After QP concave: %lf\n", discretized_energy);
-        //Q = crf.lp_inference(Q,false);
-        Q = crf.lp_inference_new(Q);
+        Q = crf.lp_inference(Q,false);
+        //Q = crf.lp_inference_new(Q);
         discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        printf("After LP: %lf\n", discretized_energy);
+    } else if (method == "prox_lp"){
+#if RESCALED
+		crf.setPairwisePottsWeight(up_ratio, Q);
+#endif        
+        double discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+        printf("Before QP: %lf\n", discretized_energy);
+        Q = crf.qp_inference(Q);
+        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+        printf("After QP: %lf\n", discretized_energy);
+        Q = crf.concave_qp_cccp_inference(Q);
+        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
+        printf("After QP concave: %lf\n", discretized_energy);
+
+        MatrixXf int_Q = crf.max_rounding(Q);
+        std::cout << "# QP: " << crf.compute_energy_true(int_Q) << ", LP: " << crf.compute_energy_LP(int_Q) 
+            << ", int: " << crf.assignment_energy_true(crf.currentMap(int_Q)) << std::endl;
+
+        
+        //double ph_energy = 0, bf_energy = 0;
+        //crf.compare_energies(int_Q, ph_energy, bf_energy, false, false, true);
+        //std::cout << "# lp: " << ph_energy << "," << bf_energy << std::endl;
+        //exit(1);
+        //Q = crf.lp_inference(Q,false);
+        //Q = crf.lp_inference_new(Q);
+
+        Q = crf.lp_inference_prox(Q, lp_params);
+        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
         printf("After LP: %lf\n", discretized_energy);
     } else if (method == "cg_lp"){
         Q = crf.qp_inference(Q);
@@ -164,6 +228,29 @@ int main(int argc, char *argv[])
         }
         new_perfs = crf.tracing_lp_inference(Q, false, time_budget);
         traced_perfs.insert( traced_perfs.end(), new_perfs.begin(), new_perfs.end());
+    } else if (method == "cmp-old-new-ph") {
+        std::srand(1337);
+        std::vector<perf_measure> perfs;
+        std::ofstream fout("stereo_lpsubgrad_timings.out");
+        int n = 10;
+        for (int k = 0; k < n; ++k) {
+            for (int i = 0; i < Q.cols(); ++i) {
+                for (int j = 0; j < Q.rows(); ++j) {
+                    int r = std::rand() % 100;
+                    Q(j, i) = float(r)/100.0;
+                }
+            }
+            perfs = crf.compare_lpsubgrad_timings(Q, 1);
+            fout << k << '\t';
+            std::cout << "# " <<  k << '\t';
+            for (int p = 0; p < perfs.size(); ++p) {
+                fout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << '\t';
+                std::cout << p << '\t' << perfs[p].first << '\t' << perfs[p].second << '\t';
+            }
+            fout << std::endl;
+            std::cout << std::endl;
+        }
+        fout.close();
     } else{
         std::cout << method << '\n';
         std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
@@ -183,11 +270,31 @@ int main(int argc, char *argv[])
         double timing = (double(end-start)/CLOCKS_PER_SEC);
         double final_energy = crf.compute_energy(Q);
         double discretized_energy = crf.assignment_energy(crf.currentMap(Q));
-        std::cout << "Fractional Energy: " << final_energy << '\n';
-        std::cout << "Integer Energy: " << discretized_energy << '\n';
+        double final_energy_true = crf.compute_energy_true(Q);
+        double discretized_energy_true = crf.assignment_energy_true(crf.currentMap(Q));
+        std::cout << "Fractional Energy: " << final_energy << ", True fractional enegy: " << final_energy_true << '\n';
+        std::cout << "Integer Energy: " << discretized_energy << ", True integer enegy: " << discretized_energy_true << '\n';
 
         write_down_perf2(timing, final_energy, discretized_energy, output_image_path);
         save_map(Q, size, output_image_path, "Stereo_special");
+
+        MatrixXf kt_Q = crf.interval_rounding(Q, 100);	// best of 100 KT rounding
+		VectorXs kt_l = crf.currentMap(kt_Q);
+		std::cout <<"#best_Q rounded: " << discretized_energy << " (KT-rounding: " << 
+			crf.assignment_energy(kt_l) << ")\n";	
+		std::cout <<"#best_Q rounded-true: " << discretized_energy_true << " (KT-rounding: " << 
+			crf.assignment_energy_true(kt_l) << ")\n";	
+        save_map(kt_Q, size, output_image_path_kt, "Stereo_special");
+
+//		// dump Q
+//		std::ofstream fout("out_q.txt");
+//		fout << Q << std::endl;
+//		fout.close();
+//		// dump kt_l
+//		fout.open("out_kt_l.txt");
+//		fout << kt_l << std::endl;
+//		fout.close();
+
     }
 
     return 0;
