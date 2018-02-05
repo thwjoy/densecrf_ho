@@ -143,14 +143,14 @@ unsigned char * load_image( const std::string & path_to_image, img_size & size){
     cv::Mat img = cv::imread(path_to_image);
 
     if(size.height != img.rows || size.width != img.cols) {
-        std::cout << "Dimension doesn't correspond to unaries" << std::endl;
+        //std::cout << "Dimension doesn't correspond to unaries" << std::endl;
         if (size.height == -1) {
             size.height = img.rows;
-            std::cout << "Adjusting height because was undefined" << '\n';
+            //std::cout << "Adjusting height because was undefined" << '\n';
         }
         if (size.width == -1) {
             size.width = img.cols;
-            std::cout << "Adjusting width because was undefined" << '\n';
+            //std::cout << "Adjusting width because was undefined" << '\n';
         }
     }
 
@@ -283,8 +283,6 @@ void save_map(const MatrixXf & estimates, const img_size & size, const std::stri
             img.at<cv::Vec3b>(row, col) = intensity;
         }
     }
-
-    std::cout << path_to_output << std::endl;
 
     cv::imwrite(path_to_output, img);
 }

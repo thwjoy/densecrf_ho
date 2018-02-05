@@ -21,7 +21,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
     std::string image_path = dataset.get_image_path(image_name);
     std::string unaries_path = dataset.get_unaries_path(image_name);
     std::string dataset_name = dataset.name;
-    std::string super_pixel_path = "./data/MSRC/MSRC_ObjCategImageDatabase_v2/SuperPixels";
+    std::string super_pixel_path = "/media/tom/DATA/datasets/MSRC/SuperPixels";
 
 
     img_size size = {-1, -1};
@@ -162,9 +162,9 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images;
     if (dataset_name == "MSRC") test_images = ds.get_MSRC_split_files(dataset_split);
     else test_images = ds.get_all_split_files(dataset_split);
-    #pragma omp parallel num_threads(10)
+    #pragma omp parallel num_threads(8)
     for(int i=0; i< test_images.size(); ++i){
-        std::cout << test_images[i] << std::endl;
+        //std::cout << test_images[i] << std::endl;
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts, bil_spcstd, bil_colstd, bil_potts, sp_const, params);
     }
 

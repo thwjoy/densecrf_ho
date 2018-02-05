@@ -186,16 +186,18 @@ void DenseCRF2D::addSuperPixel(std::string path_to_classifier,unsigned char * im
     VectorXf sd_of_superpixels; 
     Matrix<float, Dynamic, Dynamic> super_pixel_classifier;
 
-    //get the classifier
-    std::ifstream is(path_to_classifier, std::ios::binary);
-    //while (is.get(c)) regions_out.push_back((int) c);
-    is.read((char *) &regions_out_arr, sizeof(regions_out_arr));
+
+    regions_out.resize(W_ * H_);
+    std::fstream is(path_to_classifier, std::ios_base::binary|std::ios_base::in);
+    is.seekp(0);
+    is.seekg(0);
+    is.read((char *) regions_out.data(), regions_out.size() * sizeof(int));
     is.close();
-    for (int j = 0; j < W_ * H_; j++) regions_out.push_back(regions_out_arr[j]);
+
     std::vector<int>::iterator it_reg = std::max_element(regions_out.begin(),regions_out.end());
     int reg = *it_reg + 1;
-    int region;
 
+    int region;
 
     super_pixel_container.resize(reg);
     count_regions.resize(reg);

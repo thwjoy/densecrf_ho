@@ -57,3 +57,8 @@ target_link_libraries(cv-script densecrf file_storage)
 
 add_executable(stereo stereo.cpp)
 target_link_libraries(stereo densecrf file_storage inference)
+
+add_executable(mean_shift_gen mean_shift_gen.cpp)
+target_link_libraries(mean_shift_gen mean-shift file_storage)
+
+
