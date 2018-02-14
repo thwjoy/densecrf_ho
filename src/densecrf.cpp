@@ -224,6 +224,7 @@ void DenseCRF2D::addSuperPixel(std::string path_to_classifier,unsigned char * im
     is.close();
 
     std::vector<int>::iterator it_reg = std::max_element(regions_out.begin(),regions_out.end());
+    std::cout << *it_reg << "\n";
     int reg = *it_reg + 1;
 
     int region;

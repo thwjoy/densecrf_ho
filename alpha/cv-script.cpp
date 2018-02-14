@@ -89,7 +89,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
                 //Q = crf.concave_qp_cccp_inference(Q);
                 //Q = crf.lp_inference_new(Q);
                 Q = crf.lp_inference_prox(Q, lp_params);
-            } else if (method == "){    // standard prox_lp
+            } else if (method == "prox_lp_sp"){    // standard prox_lp
                 crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
                 crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2); 
                 crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3); 
