@@ -10,6 +10,5 @@ include_directories( include )
 include_directories( include/mean-shift )
 
 add_subdirectory (src)
-add_subdirectory (examples)
 add_subdirectory (external)
 add_subdirectory (alpha)

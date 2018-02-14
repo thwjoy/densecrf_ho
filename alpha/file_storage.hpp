@@ -101,7 +101,7 @@ public:
 };
 
 
-Dataset get_dataset_by_name(const std::string & dataset_name);
+Dataset get_dataset_by_name(const std::string & dataset_name, const std::string & dataset_root_dir);
 
 bool file_exist(std::string file_path);
 void make_dir(std::string dir_path);

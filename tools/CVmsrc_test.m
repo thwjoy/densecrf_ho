@@ -2,21 +2,18 @@ function score = msrc_test(path, dataset_split)
 
 dpath = '/media/tom/DATA/datasets';
 
-
 datadir = [dpath '/MSRC'];
 testset = dataset_split;
 
 gtimgpath= [datadir '/acc_GT/%s_GT.bmp'];
-
 
 respath_tmpl=[path '/%s.png'];
 
 path_to_test_set = [datadir '/split/' dataset_split '.txt'];
 [gtids,t]=textread(path_to_test_set,'%s %d');
 
-
 num = 22; % Number of classes
-
+gtimgpath
 confcounts = zeros(num);
 count=0;
 
@@ -24,11 +21,8 @@ cmap = MSRClabelcolormap(num);
 
 for i=1:length(gtids)
     imname = gtids{i};
+     try
     gtfile = sprintf(gtimgpath,imname);
-
-    % ground truth label file
-    gtfile = sprintf(gtimgpath,gtfile);
-
     [gtim,map] = imread(gtfile);
     gtim = rgb2ind(gtim, cmap);
     gtim = double(gtim);
@@ -61,6 +55,9 @@ for i=1:length(gtids)
     hs = histc(sumim(locs),1:num*num);
     count = count + numel(find(locs));
     confcounts(:) = confcounts(:) + hs(:);
+
+     catch
+     end
 end
 
 % confusion matrix - first index is true label, second is inferred label
@@ -88,9 +85,6 @@ for j=1:num
    fprintf('  %14s: %6.3f%%\n',clname,accuracies(j));
 end
 accuracies = accuracies(1:end);
-
-accuracies(isnan(accuracies(:,1)),:)=[]
-
 avacc = mean(accuracies);
 
 score = avacc;

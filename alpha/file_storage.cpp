@@ -112,12 +112,12 @@ std::vector<std::string> Dataset::get_MSRC_split_files(const std::string & split
     return split_images;
 }
 
-Dataset get_dataset_by_name(const std::string & dataset_name){
+Dataset get_dataset_by_name(const std::string & dataset_name, const std::string & dataset_root_dir){
     if (dataset_name == "MSRC") {
-        return Dataset("/media/tom/DATA/datasets/MSRC/Images/",
-                       "/media/tom/DATA/datasets/MSRC/texton_unaries/",
-                       "/media/tom/DATA/datasets/MSRC/GroundTruth/",
-                       "/media/tom/DATA/datasets/MSRC/",
+        return Dataset(dataset_root_dir + std::string("/Images/"),
+                       dataset_root_dir + std::string("/texton_unaries/"),
+                       dataset_root_dir + std::string("/GroundTruth/"),
+                       dataset_root_dir + std::string("/"),
                        ".bmp",
                        "_GT.bmp",
                        "MSRC");

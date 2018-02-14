@@ -11,7 +11,7 @@ int main (int argc, char ** argv) {
     std::vector<std::string> imgs;
 
     //get image names
-    std::string path_to_split = path_to_data + "/split/Test_acc.txt";
+    std::string path_to_split = path_to_data + "/split/Validation_acc.txt";
     std::ifstream file(path_to_split.c_str());
     std::string next_img_name;
     while(getline(file, next_img_name)){
@@ -58,12 +58,6 @@ int main (int argc, char ** argv) {
             bin_in.seekg(0);
             bin_in.read((char *) temp.data(), temp.size() * sizeof(int));
             bin_in.close();
-
-            for (int i = 0; i < temp.size(); i++)
-            {
-                if (i % 1000 == 0) std::cout << temp[i] << std::endl;
-            }
-
 
             delete[] img;
             delete[] segment_image;

@@ -1,15 +1,24 @@
-Job launching after 0.07 seconds in submission.
+Job launching after 0.10 seconds in submission.
 Running python job.
-Changed into dir /home/tomj/Documents/4YP/densecrf/CV/Allparameters-QP
+Changed into dir /home/tom/Documents/Codebase/densecrf/CV/Allparameters-QP
 Importing exp-lrqp.py
+Running exp-lrqp.main()
 Traceback (most recent call last):
-  File "/home/tomj/Documents/4YP/Spearmint/spearmint/launcher.py", line 243, in launch
+  File "/home/tom/Programs/Spearmint/spearmint/launcher.py", line 243, in launch
     result = python_launcher(job)
-  File "/home/tomj/Documents/4YP/Spearmint/spearmint/launcher.py", line 325, in python_launcher
-    module  = __import__(main_file)
-  File "/home/tomj/Documents/4YP/densecrf/CV/Allparameters-QP/exp-lrqp.py", line 2, in <module>
-    import matlab.engine
-ImportError: No module named matlab.engine
+  File "/home/tom/Programs/Spearmint/spearmint/launcher.py", line 327, in python_launcher
+    result = module.main(job['id'], params)
+  File "/home/tom/Documents/Codebase/densecrf/CV/Allparameters-QP/exp-lrqp.py", line 59, in main
+    bil_colstd, bil_potts)
+  File "/home/tom/Documents/Codebase/densecrf/CV/Allparameters-QP/exp-lrqp.py", line 28, in generate_segmentation
+    str(bil_spcstd), str(bil_colstd), str(bil_potts)])
+  File "/usr/lib/python2.7/subprocess.py", line 523, in call
+    return Popen(*popenargs, **kwargs).wait()
+  File "/usr/lib/python2.7/subprocess.py", line 711, in __init__
+    errread, errwrite)
+  File "/usr/lib/python2.7/subprocess.py", line 1343, in _execute_child
+    raise child_exception
+OSError: [Errno 2] No such file or directory
 Problem executing the function
-Job failed in 0.00 seconds.
-(<type 'exceptions.ImportError'>, ImportError('No module named matlab.engine',), <traceback object at 0x7f53c21a77e8>)
+Job failed in 0.07 seconds.
+(<type 'exceptions.OSError'>, OSError(2, 'No such file or directory'), <traceback object at 0x7f15550b4248>)

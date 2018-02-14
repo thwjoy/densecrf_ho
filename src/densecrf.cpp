@@ -218,13 +218,14 @@ void DenseCRF2D::addSuperPixel(std::string path_to_classifier,unsigned char * im
 
     regions_out.resize(W_ * H_);
     std::fstream is(path_to_classifier, std::ios_base::binary|std::ios_base::in);
+    if (!is.is_open()) std::cout << "Error! No super pixel classifier found:" << path_to_classifier << "\n";
     is.seekp(0);
     is.seekg(0);
     is.read((char *) regions_out.data(), regions_out.size() * sizeof(int));
     is.close();
 
     std::vector<int>::iterator it_reg = std::max_element(regions_out.begin(),regions_out.end());
-    std::cout << *it_reg << "\n";
+
     int reg = *it_reg + 1;
 
     int region;
@@ -1270,7 +1271,7 @@ MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) {
     return Q;
 }
 
-std::vector<perf_measure>  DenseCRF::tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit) const {
+std::vector<perf_measure>  DenseCRF::tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit) {
     /*Here we compute the Frank Wolfe, to find the optimum of the cost function contatining super pixels
      * The cost function is: phi'.y + y'.psi.y + K[z + (1 - z){1'.theta.(1 - y)}]
      * where theta reprosents a compatibility matrix for the super pixel regions
@@ -1394,6 +1395,7 @@ std::vector<perf_measure>  DenseCRF::tracing_qp_inference_super_pixels_non_conve
             break;
         }
     }
+    z_labels_ = z_labels;
 
     std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
     init = Q;
@@ -2039,258 +2041,6 @@ std::vector<perf_measure> DenseCRF::tracing_concave_qp_sp_cccp_inference(MatrixX
     return perfs;
 }
 
-
-MatrixXf DenseCRF::qp_cccp_inference(const MatrixXf & init) const {
-    MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
-        desc(M_, N_), sx(M_, N_), psis(M_, N_), diag_dom(M_,N_);
-    MatrixP temp_dot(M_,N_);
-    // Compute the smallest eigenvalues, that we need to make bigger
-    // than 0, to ensure that the problem is convex.
-    diag_dom.fill(0);
-    MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
-    diag_dom.fill(0);
-    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-        pairwise_[k]->apply( tmp, full_ones);
-        diag_dom += tmp;
-    }
-    diag_dom += 0.0001 * MatrixXf::Ones(M_, N_);
-
-    // Get parameters
-    unary.fill(0);
-    if(unary_){
-        unary = unary_->get();
-    }
-
-    Q = init;
-    // Compute the value of the energy
-    double old_energy;
-    double energy = compute_energy(Q);
-    int outer_rounds = 0;
-    do {
-        // New value of the linearization point.
-        old_energy = energy;
-        Q_old = Q;
-
-        double convex_energy = energy + dotProduct(Q, diag_dom.cwiseProduct(2*Q_old - Q), temp_dot);
-        double old_convex_energy;
-        int convex_rounds = 0;
-
-        double optimal_step_size = 0;
-
-        psis.fill(0);
-        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp, Q);
-            psis += tmp;
-        }
-        grad = unary + 2 * psis + 2 * diag_dom.cwiseProduct(Q_old - Q);
-        do {
-            old_convex_energy = convex_energy;
-
-            // Get a Descent direction by minimising < \nabla E, s >
-            descent_direction(desc, grad);
-
-            // Solve for the best step size of the convex problem. It
-            // is - frac{\phi^T(s-x) + 2 x^T \psi (s-x) + 2(x-x_old)^T
-            // d (s-x)}{2 (s-x) (\psi+d) (s-x)}
-            sx = desc - Q;
-
-            psis.fill(0);
-            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-                pairwise_[k]->apply(tmp, sx);
-                psis += tmp;
-            }
-
-            double num = dotProduct(sx, unary + 2*diag_dom.cwiseProduct(Q-Q_old), temp_dot) +
-                2 * dotProduct(Q, psis, temp_dot);
-            assert(num<=0); // This is negative if desc is really the good minimizer
-
-            double denom = dotProduct(desc, psis + diag_dom.cwiseProduct(desc), temp_dot);
-            assert(denom>0); // This is positive if we did our decomposition correctly
-
-            double cst = dotProduct(Q, 0.5 * (grad + unary) - diag_dom.cwiseProduct(Q_old),temp_dot);
-
-            optimal_step_size = - num/ (2 *denom);
-
-            if (optimal_step_size > 1) {
-                optimal_step_size = 1;
-            } else if( optimal_step_size < 0){
-                optimal_step_size = 0;
-            }
-
-            Q += optimal_step_size * sx;
-            // Compute gradient of the convex problem at the new position
-            grad += 2 * optimal_step_size * (psis-diag_dom.cwiseProduct(sx));
-
-            // std::cout << "Coefficients: "<< denom << '\t' << num << '\t' << cst << '\n';
-            convex_energy = pow(optimal_step_size, 2) * denom + optimal_step_size * num + cst;
-
-            // energy = compute_energy(Q);
-            convex_rounds++;
-        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<10 && optimal_step_size != 0);
-        // We are now (almost) at a minimum of the convexified problem, so we
-        // stop solving the convex problem and get a new convex approximation.
-
-
-        //Check that the reduction in dotProduct actually corresponds to a decrease in runtime.
-
-
-        // Compute our current value of the energy;
-        // energy = compute_energy(Q);
-        energy = dotProduct(Q, 0.5 * (grad + unary) - diag_dom.cwiseProduct(Q_old - Q), temp_dot);
-        outer_rounds++;
-    } while ( (old_energy -energy) > 100 && outer_rounds < 20);
-    return Q;
-}
-
-std::vector<perf_measure> DenseCRF::tracing_qp_cccp_inference(MatrixXf & init, double time_limit) const {
-    MatrixXf Q(M_, N_), Q_old(M_,N_), grad(M_,N_), unary(M_, N_), tmp(M_, N_),
-        desc(M_, N_), sx(M_, N_), psis(M_, N_), diag_dom(M_,N_);
-    MatrixP temp_dot(M_,N_);
-
-    clock_t start, end;
-    double perf_energy, perf_timing;
-    double total_time = 0;
-    perf_measure latest_perf;
-    std::vector<perf_measure> perfs;
-
-    Q = init;
-    MatrixXf best_Q = Q;
-    double best_int_energy = std::numeric_limits<double>::max();
-    double int_energy = 0;
-    start = clock();
-    {
-        // Compute the smallest eigenvalues, that we need to make bigger
-        // than 0, to ensure that the problem is convex.
-        diag_dom.fill(0);
-        MatrixXf full_ones = -MatrixXf::Ones(M_, N_);
-        diag_dom.fill(0);
-        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp, full_ones);
-            diag_dom += tmp;
-        }
-        diag_dom += 0.0001 * MatrixXf::Ones(M_, N_);
-    }
-    end = clock();
-    perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-    int_energy = assignment_energy_true(currentMap(Q));
-    if (best_int_energy > int_energy) {
-        best_int_energy = int_energy;
-        best_Q = Q;
-    }
-    perf_energy = best_int_energy;
-    latest_perf = std::make_pair(perf_timing, perf_energy);
-    perfs.push_back(latest_perf);
-    // Get parameters
-    unary.fill(0);
-    if(unary_){
-        unary = unary_->get();
-    }
-
-    // Compute the value of the energy
-    double old_energy;
-    double energy = compute_energy(Q);
-    int outer_rounds = 0;
-    do {
-        start = clock();
-        // New value of the linearization point.
-        old_energy = energy;
-        Q_old = Q;
-
-        double convex_energy = energy + dotProduct(Q, diag_dom.cwiseProduct(2*Q_old - Q), temp_dot);
-        double old_convex_energy;
-        int convex_rounds = 0;
-
-        double optimal_step_size = 0;
-
-        psis.fill(0);
-        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp, Q);
-            psis += tmp;
-        }
-        grad = unary + 2 * psis + 2 * diag_dom.cwiseProduct(Q_old - Q);
-        do {
-            old_convex_energy = convex_energy;
-
-            // Get a Descent direction by minimising < \nabla E, s >
-            descent_direction(desc, grad);
-
-            // Solve for the best step size of the convex problem. It
-            // is - frac{\phi^T(s-x) + 2 x^T \psi (s-x) + 2(x-x_old)^T
-            // d (s-x)}{2 (s-x) (\psi+d) (s-x)}
-            sx = desc - Q;
-
-            psis.fill(0);
-            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-                pairwise_[k]->apply(tmp, sx);
-                psis += tmp;
-            }
-
-            double num = dotProduct(sx, unary + 2*diag_dom.cwiseProduct(Q-Q_old), temp_dot) +
-                2 * dotProduct(Q, psis, temp_dot);
-            assert(num<=0); // This is negative if desc is really the good minimizer
-
-            double denom = dotProduct(desc, psis + diag_dom.cwiseProduct(desc), temp_dot);
-            assert(denom>0); // This is positive if we did our decomposition correctly
-
-            double cst = dotProduct(Q, 0.5 * (grad + unary) - diag_dom.cwiseProduct(Q_old),temp_dot);
-
-            optimal_step_size = - num/ (2 *denom);
-
-            if (optimal_step_size > 1) {
-                optimal_step_size = 1;
-            } else if( optimal_step_size < 0){
-                optimal_step_size = 0;
-            }
-
-            Q += optimal_step_size * sx;
-            // Compute gradient of the convex problem at the new position
-            grad += 2 * optimal_step_size * (psis-diag_dom.cwiseProduct(sx));
-
-            // std::cout << "Coefficients: "<< denom << '\t' << num << '\t' << cst << '\n';
-            convex_energy = pow(optimal_step_size, 2) * denom + optimal_step_size * num + cst;
-
-            // energy = compute_energy(Q);
-            convex_rounds++;
-        } while ( (old_convex_energy - convex_energy) > 100 && convex_rounds<10 && optimal_step_size != 0);
-        // We are now (almost) at a minimum of the convexified problem, so we
-        // stop solving the convex problem and get a new convex approximation.
-
-
-        //Check that the reduction in dotProduct actually corresponds to a decrease in runtime.
-
-
-        // Compute our current value of the energy;
-        // energy = compute_energy(Q);
-        energy = dotProduct(Q, 0.5 * (grad + unary) - diag_dom.cwiseProduct(Q_old - Q), temp_dot);
-        outer_rounds++;
-
-        end = clock();
-        perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        int_energy = assignment_energy_true(currentMap(Q));
-        if (best_int_energy > int_energy) {
-            best_int_energy = int_energy;
-            best_Q = Q;
-        }
-        perf_energy = best_int_energy;
-        latest_perf = std::make_pair(perf_timing, perf_energy);
-        perfs.push_back(latest_perf);
-        total_time += perf_timing;
-        if (time_limit != 0 and total_time>time_limit) {
-            break;
-        }
-
-    } while (((old_energy -energy) > 100 && outer_rounds < 20) or time_limit != 0);
-    init = Q;
-    return perfs;
-}
-
-
-void add_noise(MatrixXf & Q, float var) {
-    Q += MatrixXf::Random(Q.rows(), Q.cols())*var;
-    for(int col=0; col<Q.cols(); ++col) {
-        Q.col(col) /= Q.col(col).sum();
-    }
-}
 
 void print_distri(MatrixXf const & Q) {
     int nb_buckets = 20;
@@ -3843,7 +3593,7 @@ MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_in
 
     MatrixXf Q = init;
     renormalize(Q);
-    assert(valid_probability_debug(Q));
+    //assert(valid_probability_debug(Q));
     best_Q = Q;
 
     // Compute the value of the energy
@@ -4064,10 +3814,10 @@ MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_in
         feasible_Q(tmp, ind, sum, K, Q);
         Q = tmp;
         renormalize(Q);
-        assert(valid_probability_debug(Q));
+        //assert(valid_probability_debug(Q));
 
         double prev_int_energy = int_energy;
-        int_energy = assignment_energy_sp(currentMap(Q));
+        int_energy = assignment_energy_higher_order(currentMap(Q));
 
         if (best_int) {
             if (abs(int_energy - prev_int_energy) < prox_tol) ++count;
@@ -4511,18 +4261,18 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 
     MatrixXf Q = init;
     renormalize(Q);
-    assert(valid_probability_debug(Q));
+    //assert(valid_probability_debug(Q));
     best_Q = Q;
 
     // Compute the value of the energy
     double energy = 0, best_energy = std::numeric_limits<double>::max(), 
            best_int_energy = std::numeric_limits<double>::max();
-    double int_energy = assignment_energy_true(currentMap(Q));
+    double int_energy = assignment_energy_higher_order(currentMap(Q));
 
-    energy = compute_energy_LP(Q);
+    energy = compute_energy_LP_higher_order(Q);
     if (energy > int_energy) {  // choose the best initialization 
         Q = max_rounding(Q);
-        energy = compute_energy_LP(Q);
+        energy = compute_energy_LP_higher_order(Q);
     }
     best_energy = energy;
     best_int_energy = int_energy;
@@ -4726,17 +4476,17 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
         feasible_Q(tmp, ind, sum, K, Q);
         Q = tmp;
         renormalize(Q);
-        assert(valid_probability_debug(Q));
+        //assert(valid_probability_debug(Q));
 
         double prev_int_energy = int_energy;
-        int_energy = assignment_energy_true(currentMap(Q));
+        int_energy = assignment_energy_higher_order(currentMap(Q));
 
         if (best_int) {
             if (abs(int_energy - prev_int_energy) < prox_tol) ++count;
             else count = 0;
             if (count >= 5) {
-                std::cout << "\n##CONV: int_energy - prev_int_energy < " << prox_tol << " for last " << count 
-                    << " iterations! terminating...\n";
+                //std::cout << "\n##CONV: int_energy - prev_int_energy < " << prox_tol << " for last " << count
+                //    << " iterations! terminating...\n";
                 break;
             }
             if(int_energy < best_int_energy) {
@@ -4747,13 +4497,13 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
         } else {
 
             double prev_energy = energy;
-            energy = compute_energy_LP(Q);
+            energy = compute_energy_LP_higher_order(Q);
 
             if (abs(energy - prev_energy) < prox_tol) ++count;
             else count = 0;
             if (count >= 5) {
-                std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count 
-                    << " iterations! terminating...\n";
+                //std::cout << "\n##CONV: energy - prev_energy < " << prox_tol << " for last " << count
+                //    << " iterations! terminating...\n";
                 break;
             }
             if( energy < best_energy) {
@@ -4767,8 +4517,8 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
             less_confident_pixels(pI, best_Q, confidence_tol);
             double percent = double(pI.size())/double(Q.cols())*100;
             if (percent > params.less_confident_percent) {
-                std::cout << "\n##CONV: Less confident pixels are greater than " << params.less_confident_percent 
-                    << "%, terminating...\n";
+                //std::cout << "\n##CONV: Less confident pixels are greater than " << params.less_confident_percent
+                //    << "%, terminating...\n";
                 break;
             }
         }
@@ -4780,38 +4530,10 @@ MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params
 }
 
 
-/*
-void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q, double constant) const {
-    assert(Us.cols() == N_);
-    assert(Us.rows() == M_);
-    Us.fill(0);
-    int min=std::numeric_limits<int>::max(),max=std::numeric_limits<int>::min(),min_ind=0,max_ind=0;
-    int sum = 0;
-    for (int lab = 0; lab < M_; lab++) {
-        for(int reg = 0; reg < R_; reg++) {
-            min = std::numeric_limits<int>::max();
-            max = std::numeric_limits<int>::min();
-            for (auto it : super_pixel_container_[reg]) { //loop through all of the pixels in this super pixel
-                //we want to find the smallest and largest values, we then set the conditional gradient accordingly
-                if (min > Q(lab,it)) {
-                    min_ind = it;
-                    min = Q(lab,it);
-                }
-                if (max < Q(lab,it)) {
-                    max_ind = it;
-                    max = Q(lab,it);
-                }
-            }
-            Us(lab,min_ind) = constant * exp_of_superpixels_(reg);
-            Us(lab,max_ind) = -constant * exp_of_superpixels_(reg);              
-        }  
-    }
-}
-*/
 
 void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const {
-    assert(Us.cols() == N_);
-    assert(Us.rows() == M_);
+    //assert(Us.cols() == N_);
+    //assert(Us.rows() == M_);
     Us.fill(0);
     int min,max,min_lab,max_lab,min_ind=0,max_ind=0, min_lab_ind=0,max_lab_ind=0;
     int sum = 0;
@@ -4839,8 +4561,8 @@ void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const {
 }
 
 void DenseCRF::initUu(MatrixXf & u, double constant) const {
-    assert(u.cols() == N_);
-    assert(u.rows() == M_);
+    //assert(u.cols() == N_);
+    //assert(u.rows() == M_);
     for (int lab = 0; lab < M_; lab++) {
         for(int reg = 0; reg < R_; reg++) {
             u(lab,super_pixel_container_[reg][0]) =  constant * exp_of_superpixels_(reg);         
@@ -5304,62 +5026,6 @@ MatrixXf DenseCRF::interval_rounding(const MatrixXf &estimates, int nb_random_ro
 }
 
 
-MatrixXf DenseCRF::cccp_inference(const MatrixXf & init) const {
-    MatrixXf Q( M_, N_), tmp1, unary(M_, N_), tmp2, old_Q(M_, N_);
-    float old_kl, kl;
-    unary.fill(0);
-    if(unary_){
-        unary = unary_->get();
-    }
-
-    // Compute the largest eigenvalues
-    float lambda_eig = 0;
-    for (int i=0; i<pairwise_.size(); i++) {
-        lambda_eig += pick_lambda_eig_to_concave(pairwise_[i]->compatibility_matrix(M_));
-    }
-    Q = init;
-
-    bool keep_inferring = true;
-    if (compute_kl) {
-        old_kl = 0;
-        kl = klDivergence(Q);
-    }
-
-    old_Q = Q;
-    int count = 0;
-    while(keep_inferring) {
-        MatrixXf Cste = unary;
-        Cste += MatrixXf::Ones(Q.rows(), Q.cols());
-        for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-            pairwise_[k]->apply( tmp2, old_Q);
-            Cste += tmp2;
-        }
-
-        Cste += -2* lambda_eig * old_Q;
-
-        for(int var = 0; var < N_; ++var){
-            VectorXf state(M_ + 1);
-            state.head(M_) = old_Q.col(var);
-            state(M_) = 1;
-
-            newton_cccp(state, Cste.col(var), lambda_eig);
-            Q.col(var) = state.head(M_);
-        }
-        if (compute_kl) {
-            kl = klDivergence(Q);
-            float kl_change = old_kl - kl;
-            keep_inferring = (kl_change > 0.001);
-            old_kl = kl;
-        } else {
-            float Q_change = (old_Q - Q).squaredNorm();
-            keep_inferring = (Q_change > 0.001);
-        }
-        old_Q = Q;
-        count++;
-    }
-    return Q;
-}
-
 
 MatrixXf DenseCRF::grad_inference(const MatrixXf & init) const {
     MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_), Q_prev_lambda(M_, N_);
@@ -5425,12 +5091,10 @@ double DenseCRF::assignment_energy( const VectorXs & l) const {
         ass_energy += total_energy[i];
     }
 
-
-
     return ass_energy;
 }
 
-double DenseCRF::assignment_energy_sp( const VectorXs & l) const {
+double DenseCRF::assignment_energy_higher_order(const VectorXs & l) const {
     VectorXf unary = unaryEnergy(l);
     VectorXf pairwise = pairwiseEnergy(l);
 
@@ -5447,7 +5111,7 @@ double DenseCRF::assignment_energy_sp( const VectorXs & l) const {
 
     short prev = 0;
     for (int reg = 0; reg < R_; reg++) {
-        prev = super_pixel_container_[reg][0];
+        prev = l[super_pixel_container_[reg][0]];
         for (int pix = 0; pix < super_pixel_container_[reg].size(); pix++) {
             if (prev != l[pix]) {
                 ass_energy += exp_of_superpixels_[reg];
@@ -5650,7 +5314,7 @@ double DenseCRF::compute_energy(const MatrixXf & Q) const {
     return energy;
 }
 
-double DenseCRF::compute_energy_true(const MatrixXf & Q) const {
+double DenseCRF::compute_energy_higher_order(const MatrixXf & Q) const {
     double energy = 0;
     MatrixP dot_tmp;
     // Add the unary term
@@ -5659,20 +5323,10 @@ double DenseCRF::compute_energy_true(const MatrixXf & Q) const {
         energy += dotProduct(unary, Q, dot_tmp);
     }
     // Add all pairwise terms
-    MatrixXf tmp, tmp2;
-    for( unsigned int k=0; k<no_norm_pairwise_.size(); k++ ) {
-#if BRUTE_FORCE
-        no_norm_pairwise_[k]->apply_bf( tmp, Q );
-#else
-        no_norm_pairwise_[k]->apply( tmp, Q );
-#endif
-		energy += dotProduct(Q, tmp, dot_tmp);	// do not cancel the neg intoduced in apply
-		// constant term
-		tmp = -tmp;	// cancel the neg introdcued in apply
-		tmp.transposeInPlace();
-		tmp2 = Q*tmp;	
-		double const_energy = tmp2.sum();
-		energy += const_energy;
+    MatrixXf tmp;
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        pairwise_[k]->apply( tmp, Q );
+        energy += dotProduct(Q, tmp, dot_tmp);
     }
 
     //super pixels
@@ -5742,6 +5396,63 @@ double DenseCRF::compute_energy_LP(const MatrixXf & Q) const {
 #endif        
         energy -= dotProduct(Q, tmp, dot_tmp);
 		//std::cout << "\nph-pairwise[" << k << "]-energy: " << -dotProduct(Q, tmp, dot_tmp);
+    }
+
+    return energy;
+}
+
+double DenseCRF::compute_energy_LP_higher_order(const MatrixXf & Q) const {
+    assert(pairwise_.size() == no_norm_pairwise_.size());
+    double energy = 0;
+    MatrixP dot_tmp;
+    MatrixXi ind(M_, N_);
+    // Add the unary term
+    if( unary_ ) {
+        MatrixXf unary = unary_->get();
+        energy += dotProduct(unary, Q, dot_tmp);
+    }
+    //std::cout << "\nph-unary-energy: " << energy;
+    // Add all pairwise terms
+    MatrixXf tmp(Q.rows(), Q.cols());
+#if BRUTE_FORCE
+    MatrixXf tmp2(Q.rows(), Q.cols());
+    sortRows(Q, ind);
+#else
+    MatrixXf rescaled_Q(Q.rows(), Q.cols());
+    rescale(rescaled_Q, Q);
+#endif
+    for( unsigned int k=0; k<pairwise_.size(); k++ ) {
+        // Add the upper minus the lower
+#if BRUTE_FORCE
+        no_norm_pairwise_[k]->apply_upper_minus_lower_bf(tmp2, ind);
+        // need to sort before dot-product
+        for(int i=0; i<tmp2.cols(); ++i) {
+            for(int j=0; j<tmp2.rows(); ++j) {
+                tmp(j, ind(j, i)) = tmp2(j, i);
+            }
+        }
+#else
+        // new-PH
+        pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);
+#endif
+        energy -= dotProduct(Q, tmp, dot_tmp);
+        //std::cout << "\nph-pairwise[" << k << "]-energy: " << -dotProduct(Q, tmp, dot_tmp);
+    }
+
+    for (int reg = 0; reg < R_; reg++)
+    {
+        MatrixXf Q_p;
+        for (const auto & it : super_pixel_container_[reg])
+        {
+            Q_p.conservativeResize(M_, Q_p.cols() + 1);
+            Q_p.col(Q_p.cols() - 1) = Q.col(it);
+        }
+
+        VectorXf maxVals = Q_p.rowwise().maxCoeff();
+        VectorXf minVals = Q_p.rowwise().minCoeff();
+        VectorXf maxDiff = maxVals - minVals;
+        float maxDiff_l = maxDiff.maxCoeff();
+        energy += exp_of_superpixels_[reg] * maxDiff_l;
     }
 
     return energy;

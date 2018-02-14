@@ -167,7 +167,7 @@ public:
 	MatrixXf qp_inference_super_pixels(const MatrixXf & init);
 	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init);
 	std::vector<perf_measure> tracing_qp_inference_non_convex(MatrixXf & init, double time_limit = 0) const;
-	std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit = 0) const;
+    std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit = 0);
 	//===============================================================
 
 	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
@@ -235,7 +235,7 @@ public: /* Debugging functions */
 
 	// Compute the energy of an assignment l.
 	double assignment_energy( const VectorXs & l) const;
-	double assignment_energy_sp( const VectorXs & l) const;
+    double assignment_energy_higher_order( const VectorXs & l) const;
 
 
     // Compute the true energy of an assignment l -- actual energy (differs by a const to assignment_energy - in pairwise case)
@@ -256,10 +256,13 @@ public: /* Debugging functions */
     double compute_energy_CCCP( const MatrixXf & Q) const;
 
     // Compute the true-energy associated with the QP relaxation
-    double compute_energy_true( const MatrixXf & Q) const;
+    double compute_energy_higher_order( const MatrixXf & Q) const;
 
     // Compute the energy associated with the LP relaxation
     double compute_energy_LP(const MatrixXf & Q) const;
+
+    // Compute the energy associated with the LP relaxation
+    double compute_energy_LP_higher_order(const MatrixXf & Q) const;
 
 	// Compute the value of a Lafferty-Ravikumar QP
 	double compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const;
