@@ -185,7 +185,7 @@ public:
     MatrixXf lp_inference_new(MatrixXf & init) const;
     MatrixXf lp_inference_prox(MatrixXf & init, LP_inf_params & params) const;
     MatrixXf lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
-    MatrixXf tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
+    std::vector<perf_measure> tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
     MatrixXf lp_inference_prox_restricted(MatrixXf & init, LP_inf_params & params) const;
 	std::vector<perf_measure> tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit = 0, bool full_mat = false) const;
 	std::vector<perf_measure> tracing_lp_inference_prox(MatrixXf & init, LP_inf_params & params, 

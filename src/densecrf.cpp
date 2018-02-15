@@ -967,6 +967,12 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference_non_convex(MatrixXf & i
     }
 
     Q = init;
+    perf_timing = 0.0;
+    perf_energy = assignment_energy(currentMap(Q));
+    latest_perf = std::make_pair(perf_timing, perf_energy);
+    perfs.push_back(latest_perf);
+    total_time += perf_timing;
+    std::cout << "(" << total_time << "," << perf_energy << ")";
 
     start = clock();
     
@@ -981,11 +987,7 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference_non_convex(MatrixXf & i
     double old_energy = std::numeric_limits<double>::max();
     double energy = 0.5 * dotProduct(Q, grad + unary, temp_dot);
     end = clock();
-    perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-    perf_energy = assignment_energy(currentMap(Q));
-    latest_perf = std::make_pair(perf_timing, perf_energy);
-    perfs.push_back(latest_perf);
-    total_time += perf_timing;
+
 
     int i = 0;
     while(total_time < time_limit) {
@@ -1053,9 +1055,13 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference_non_convex(MatrixXf & i
         // performance measurement
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = energy;
+        perf_energy = assignment_energy(currentMap(Q));
+        latest_perf = std::make_pair(perf_timing, perf_energy);
+        perfs.push_back(latest_perf);
+        total_time += perf_timing;
+        std::cout << "(" << total_time << "," << perf_energy << ")";
 
-        
+
     }
     //std::cout << "---Found optimal soloution in: " << i << " iterations.\r\n";
     init = Q;
@@ -1300,7 +1306,7 @@ std::vector<perf_measure>  DenseCRF::tracing_qp_inference_super_pixels_non_conve
 
     grad_z.fill(0);
     cond_grad_z.fill(0);
-    z_labels.fill(0); //indicates that in all super pixels there are pixels that do not take the same label
+    z_labels.fill(1); //indicates that in all super pixels there are pixels that do not take the same label
 
     double optimal_step_size = 0;
     // Get parameters
@@ -1310,6 +1316,12 @@ std::vector<perf_measure>  DenseCRF::tracing_qp_inference_super_pixels_non_conve
     }
 
     Q = init;
+    perf_timing = 0.0;
+    perf_energy = assignment_energy_higher_order(currentMap(Q));
+    latest_perf = std::make_pair(perf_timing, perf_energy);
+    perfs.push_back(latest_perf);
+    total_time += perf_timing;
+    std::cout << "(" << total_time << "," << perf_energy << ")";
   
     start = clock();
     //initialise the gradient of z
@@ -1329,11 +1341,6 @@ std::vector<perf_measure>  DenseCRF::tracing_qp_inference_super_pixels_non_conve
     double energy = 0.5 * dotProduct(Q, grad_y + unary, temp_dot);
     energy += (z_labels.cwiseProduct(constant).sum() + multiplySuperPixels((MatrixXf::Ones(M_,R_) - z_labels).cwiseProduct(constant),(Q - MatrixXf::Ones(M_,N_))));
     end = clock();
-    perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-    perf_energy = assignment_energy(currentMap(Q));
-    latest_perf = std::make_pair(perf_timing, perf_energy);
-    perfs.push_back(latest_perf);
-    total_time += perf_timing;
 
     int i = 0;
     while(total_time < time_limit){
@@ -1387,9 +1394,10 @@ std::vector<perf_measure>  DenseCRF::tracing_qp_inference_super_pixels_non_conve
         // performance measurement
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = energy;
+        perf_energy = assignment_energy_higher_order(currentMap(Q));
         latest_perf = std::make_pair(perf_timing, perf_energy);
-        perfs.push_back(latest_perf);
+        perfs.push_back(latest_perf);     
+        std::cout << "(" << total_time << "," << perf_energy << ")";
         total_time += perf_timing;
         if (time_limit != 0 and total_time>time_limit) {
             break;
@@ -3261,6 +3269,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox_restricted(MatrixX
     assert(valid_probability_debug(Q));
     best_Q = Q;
 
+
     // Compute the value of the energy
     double energy = 0, best_energy = std::numeric_limits<double>::max(), 
 		   best_int_energy = std::numeric_limits<double>::max();
@@ -3583,7 +3592,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox_restricted(MatrixX
 }
 
 // LP inference with proximal algorithm
-MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const {
+std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & Q, LP_inf_params & params) const {
     MatrixXf best_Q(M_, N_), tmp(M_, N_), tmp2(M_, N_);
     MatrixP dot_tmp(M_, N_);
     MatrixXi ind(M_, N_);
@@ -3591,7 +3600,6 @@ MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_in
     VectorXd sum(N_);
     MatrixXf unary = unary_->get();
 
-    MatrixXf Q = init;
     renormalize(Q);
     //assert(valid_probability_debug(Q));
     best_Q = Q;
@@ -3599,12 +3607,12 @@ MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_in
     // Compute the value of the energy
     double energy = 0, best_energy = std::numeric_limits<double>::max(), 
            best_int_energy = std::numeric_limits<double>::max();
-    double int_energy = assignment_energy_true(currentMap(Q));
+    double int_energy = assignment_energy_higher_order(currentMap(Q));
 
-    energy = compute_energy_LP(Q);
+    energy = compute_energy_LP_higher_order(Q);
     if (energy > int_energy) {  // choose the best initialization 
         Q = max_rounding(Q);
-        energy = compute_energy_LP(Q);
+        energy = compute_energy_LP_higher_order(Q);
     }
     best_energy = energy;
     best_int_energy = int_energy;
@@ -3658,6 +3666,12 @@ MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_in
     typedef std::chrono::high_resolution_clock::time_point htime;
     htime start, end;
 
+    perf_timing = 0.0;
+    perf_energy = assignment_energy_higher_order(currentMap(Q));
+    latest_perf = std::make_pair(perf_timing, perf_energy);
+    perfs.push_back(latest_perf);
+    total_time += perf_timing;
+    std::cout << "(" << total_time << "," << perf_energy << ")";
 
 
     int it=0;
@@ -3678,7 +3692,7 @@ MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_in
         int pit = 0;
         alpha_tQ.fill(0);   // all zero alpha_tQ is feasible --> alpha^1_{abi} = alpha^2_{abi} = K_{ab}/4
         u_tQ.fill(0);
-                start = std::chrono::high_resolution_clock::now();
+        start = std::chrono::high_resolution_clock::now();
         // proximal iteration this is the t iterating parameter in the paper
         do {    
             ++pit;
@@ -3835,7 +3849,7 @@ MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_in
         } else {
 
             double prev_energy = energy;
-            energy = compute_energy_LP(Q);
+            energy = compute_energy_LP_higher_order(Q);
 
             if (abs(energy - prev_energy) < prox_tol) ++count;
             else count = 0;
@@ -3867,13 +3881,11 @@ MatrixXf DenseCRF::tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_in
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;
-        std::cout << "(" << total_time - perf_timing << "," << perf_energy << ")";
+        std::cout << "(" << total_time << "," << perf_energy << ")" << std::flush;
         
+    } while(true);
 
-    } while(it<maxiter);
-
-
-    return best_Q;
+    return perfs;
 }
 
 
@@ -3887,6 +3899,23 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
     VectorXi K(N_);
     VectorXd sum(N_);
     MatrixXf unary = unary_->get();
+
+    double perf_energy, perf_timing;
+    double total_time = 0;
+    perf_measure latest_perf;
+    std::vector<perf_measure> perfs;
+    //clock_t start, end;
+    typedef std::chrono::high_resolution_clock::time_point htime;
+    htime start, end;
+    int it=0;
+    int count = 0;
+
+    perf_timing = 0.0;
+    perf_energy = assignment_energy(currentMap(init));
+    latest_perf = std::make_pair(perf_timing, perf_energy);
+    perfs.push_back(latest_perf);
+    total_time += perf_timing;
+    std::cout << "(" << total_time << "," << perf_energy << ")";
 
     MatrixXf Q = init;
     renormalize(Q);
@@ -3967,16 +3996,8 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 //	neg_C *= lambda; 	// neg_C
 //	C = pos_C - neg_C;	// C
 //	abs_C = pos_C + neg_C;	// abs_C
-    
-    double perf_energy, perf_timing;
-    double total_time = 0;
-    perf_measure latest_perf;
-    std::vector<perf_measure> perfs;
-    //clock_t start, end;
-    typedef std::chrono::high_resolution_clock::time_point htime;
-    htime start, end;
-    int it=0;
-    int count = 0;
+
+
     do {
         bool stop = false;
         ++it;
@@ -4162,7 +4183,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 
 
         double prev_int_energy = int_energy;
-        int_energy = assignment_energy_true(currentMap(Q));
+        int_energy = assignment_energy(currentMap(Q));
 #if VERBOSE
         double prev_energy = energy;
 		energy = compute_energy_LP(Q);
@@ -4239,10 +4260,11 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;
+        std::cout << "(" << total_time << "," << perf_energy << ")" <<std::flush;
 
         if (stop) break;
 
-    } while(it < maxiter && (time_limit == 0 || total_time < time_limit));
+    } while(true);
 
     if (dump) fout.close();
 

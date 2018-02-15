@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images;
     if (dataset_name == "MSRC") test_images = ds.get_MSRC_split_files(dataset_split);
     else test_images = ds.get_all_split_files(dataset_split);
-    #pragma omp parallel for num_threads(12)
+    //#pragma omp parallel for num_threads(12)
     for(int i=0; i< test_images.size(); ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params, sp_const, params);

@@ -16,7 +16,6 @@ struct sp_params {
     float norm_3;
 };
 
-
 void image_inference(Dataset dataset, std::string method, std::string path_to_results,
                      std::string image_name, float spc_std, float spc_potts,
                      float bil_spcstd, float bil_colstd, float bil_potts, LP_inf_params & lp_params, double sp_const, sp_params params)
@@ -31,83 +30,83 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
 
     MatrixXf Q;
     {
-        if (not file_exist(output_path)) {
 
-            img_size size = {-1, -1};
-            //Load the unaries potentials for our image.
-            MatrixXf unaries = load_unary(unaries_path, size);
-            unsigned char * img = load_image(image_path, size);
+        img_size size = {-1, -1};
+        //Load the unaries potentials for our image.
+        MatrixXf unaries = load_unary(unaries_path, size);
+        unsigned char * img = load_image(image_path, size);
 
-            DenseCRF2D crf(size.width, size.height, unaries.rows());
-            crf.setUnaryEnergy(unaries);
-            crf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
-            crf.addPairwiseBilateral(bil_spcstd, bil_spcstd,bil_colstd, bil_colstd, bil_colstd,img, new PottsCompatibility(bil_potts));
-            typedef std::chrono::high_resolution_clock::time_point htime;
-            clock_t start, end;
-            //time_t start, end;
-            //double start, end;
-            double timing;
-            //std::cout << image_path << std::endl;
-            //start = clock();
-            std::vector<perf_measure> traced_perfs;
-            std::vector<perf_measure> new_perfs;
-            std::vector<int> pixel_ids;
-            double time_budget = 30;    // seconds
+        DenseCRF2D crf(size.width, size.height, unaries.rows());
+        crf.setUnaryEnergy(unaries);
+        crf.addPairwiseGaussian(spc_std, spc_std, new PottsCompatibility(spc_potts));
+        crf.addPairwiseBilateral(bil_spcstd, bil_spcstd,bil_colstd, bil_colstd, bil_colstd,img, new PottsCompatibility(bil_potts));
+        typedef std::chrono::high_resolution_clock::time_point htime;
+        clock_t start, end;
+        //time_t start, end;
+        //double start, end;
+        double timing;
+        //std::cout << image_path << std::endl;
+        //start = clock();
+        std::vector<perf_measure> traced_perfs;
+        std::vector<perf_measure> new_perfs;
+        std::vector<int> pixel_ids;
+        double time_budget = 30;    // seconds
 
-            start = clock();
-            Q = crf.unary_init();
-            if (method == "prox_lp_sp"){    // standard prox_lp
-                crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
-                crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2);
-                crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3);
-                try {
-                    Q = crf.lp_inference_prox_super_pixels(Q, lp_params);
-                } catch (std::runtime_error &e) {
-                    std::cout << "Runtime Error!: " << e.what() << std::endl;
-                }
-            } else if (method == "prox_lp") {
-                Q = crf.lp_inference_prox(Q, lp_params);
-            } else if (method == "qp_nc"){ //qp with a non convex energy function, relaxations removed
-                //std::cout << "---Running tests on QP with non convex energy\r\n";
-                Q = crf.qp_inference_non_convex(Q);
-            } else if (method == "qp_sp"){ //qp with a non convex energy function, relaxations removed
-                //std::cout << "---Running tests on QP with non convex energy and Super Pixels\r\n";
-                crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
-                crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2);
-                crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3);
-                Q = crf.qp_inference_super_pixels_non_convex(Q);
-            } else if (method == "unary"){
-                (void)0;
-            } else{
-                std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
+        start = clock();
+        Q = crf.unary_init();
+        if (method == "prox_lp_sp"){    // standard prox_lp
+            crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
+            crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2);
+            crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3);
+            try {
+                traced_perfs = crf.tracing_lp_inference_prox_super_pixels(Q, lp_params);
+            } catch (std::runtime_error &e) {
+                std::cout << "Runtime Error!: " << e.what() << std::endl;
             }
-
-            make_dir(path_to_results);
-            end = clock();
-            timing = (double(end-start)/CLOCKS_PER_SEC);
-            double final_energy, discretized_energy;
-            if (method == "qp_sp" || method == "prox_lp_sp")
-            {
-                final_energy = crf.compute_energy_higher_order(Q);
-                discretized_energy = crf.assignment_energy_higher_order(crf.currentMap(Q));
-            }
-            else
-            {
-                final_energy = crf.compute_energy(Q);
-                discretized_energy = crf.assignment_energy(crf.currentMap(Q));
-            }
-            save_map(Q, size, output_path, dataset_name);
-            if (!pixel_ids.empty()) save_less_confident_pixels(Q, pixel_ids, size, output_path, dataset_name);
-            std::string txt_output = output_path;
-            txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
-            std::ofstream txt_file(txt_output);
-            txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
-            //std::cout << "#" << method << ": " << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
-            txt_file.close();
-            delete[] img;
-        } else {
-            std::cout << "File exists! Skipping: " << image_name << std::endl;
+        } else if (method == "prox_lp") {
+            traced_perfs = crf.tracing_lp_inference_prox(Q, lp_params);
+        } else if (method == "qp_nc"){ //qp with a non convex energy function, relaxations removed
+            //std::cout << "---Running tests on QP with non convex energy\r\n";
+            traced_perfs = crf.tracing_qp_inference_non_convex(Q, 60);
+        } else if (method == "qp_sp"){ //qp with a non convex energy function, relaxations removed
+            //std::cout << "---Running tests on QP with non convex energy and Super Pixels\r\n";
+            crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
+            crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2);
+            crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3);
+            traced_perfs = crf.tracing_qp_inference_super_pixels_non_convex(Q, 60);
+        } else if (method == "unary"){
+            (void)0;
+        } else{
+            std::cout << "Unrecognised method.\n Proper error handling would do something but I won't." << '\n';
         }
+
+        make_dir(path_to_results);
+        end = clock();
+        timing = (double(end-start)/CLOCKS_PER_SEC);
+        double final_energy, discretized_energy;
+        if (method == "qp_sp")
+        {
+            final_energy = crf.compute_energy_higher_order(Q);
+            discretized_energy = crf.assignment_energy_higher_order(crf.currentMap(Q));
+        }
+        else if (method == "prox_lp_sp")
+        {
+            final_energy = crf.compute_energy_LP_higher_order(Q);
+            discretized_energy = crf.assignment_energy_higher_order(crf.currentMap(Q));
+        }
+        {
+            final_energy = crf.compute_energy(Q);
+            discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        }
+        save_map(Q, size, output_path, dataset_name);
+        if (!pixel_ids.empty()) save_less_confident_pixels(Q, pixel_ids, size, output_path, dataset_name);
+        std::string txt_output = output_path;
+        txt_output.replace(txt_output.end()-3, txt_output.end(),"txt");
+        std::ofstream txt_file(txt_output);
+        txt_file << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+        //std::cout << "#" << method << ": " << timing << '\t' << final_energy << '\t' << discretized_energy << std::endl;
+        txt_file.close();
+        delete[] img;
     }
 }
 
