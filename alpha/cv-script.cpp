@@ -57,7 +57,10 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
 
             start = clock();
             Q = crf.unary_init();
-            if (method == "prox_lp_sp"){    // standard prox_lp
+            if (method == "mf5") {
+                Q = crf.inference(Q, 5);
+            }
+            else if (method == "prox_lp_sp"){    // standard prox_lp
                 crf.addSuperPixel(super_pixel_path + "/400/" + image_name + "_clsfr.bin",img,params.const_1,params.norm_1);
                 crf.addSuperPixel(super_pixel_path + "/100/" + image_name + "_clsfr.bin",img,params.const_2,params.norm_2); 
                 crf.addSuperPixel(super_pixel_path + "/250/" + image_name + "_clsfr.bin",img,params.const_3,params.norm_3); 
@@ -100,7 +103,7 @@ void image_inference(Dataset dataset, std::string method, std::string path_to_re
             }
             {
                 final_energy = crf.compute_energy(Q);
-                discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+                discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
             }
             save_map(Q, size, output_path, dataset_name);
             if (!pixel_ids.empty()) save_less_confident_pixels(Q, pixel_ids, size, output_path, dataset_name);
@@ -175,7 +178,7 @@ int main(int argc, char *argv[])
     std::vector<std::string> test_images;
     if (dataset_name == "MSRC") test_images = ds.get_MSRC_split_files(dataset_split);
     else test_images = ds.get_all_split_files(dataset_split);
-    //#pragma omp parallel for num_threads(12)
+    #pragma omp parallel for num_threads(12)
     for(int i=0; i< test_images.size(); ++i){
         image_inference(ds, method, path_to_results,  test_images[i], spc_std, spc_potts,
                         bil_spcstd, bil_colstd, bil_potts, lp_params, sp_const, params);

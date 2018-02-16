@@ -968,7 +968,7 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference_non_convex(MatrixXf & i
 
     Q = init;
     perf_timing = 0.0;
-    perf_energy = assignment_energy(currentMap(Q));
+    perf_energy = assignment_energy_true(currentMap(Q));
     latest_perf = std::make_pair(perf_timing, perf_energy);
     perfs.push_back(latest_perf);
     total_time += perf_timing;
@@ -1055,7 +1055,7 @@ std::vector<perf_measure> DenseCRF::tracing_qp_inference_non_convex(MatrixXf & i
         // performance measurement
         end = clock();
         perf_timing = (double(end-start)/CLOCKS_PER_SEC);
-        perf_energy = assignment_energy(currentMap(Q));
+        perf_energy = assignment_energy_true(currentMap(Q));
         latest_perf = std::make_pair(perf_timing, perf_energy);
         perfs.push_back(latest_perf);
         total_time += perf_timing;
@@ -3911,7 +3911,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
     int count = 0;
 
     perf_timing = 0.0;
-    perf_energy = assignment_energy(currentMap(init));
+    perf_energy = assignment_energy_true(currentMap(init));
     latest_perf = std::make_pair(perf_timing, perf_energy);
     perfs.push_back(latest_perf);
     total_time += perf_timing;
@@ -4183,7 +4183,7 @@ std::vector<perf_measure> DenseCRF::tracing_lp_inference_prox(MatrixXf & init, L
 
 
         double prev_int_energy = int_energy;
-        int_energy = assignment_energy(currentMap(Q));
+        int_energy = assignment_energy_true(currentMap(Q));
 #if VERBOSE
         double prev_energy = energy;
 		energy = compute_energy_LP(Q);
@@ -5118,12 +5118,9 @@ double DenseCRF::assignment_energy( const VectorXs & l) const {
 
 double DenseCRF::assignment_energy_higher_order(const VectorXs & l) const {
     VectorXf unary = unaryEnergy(l);
-    VectorXf pairwise = pairwiseEnergy(l);
+    VectorXf pairwise = pairwise_energy_true(l);
 
-    // Due to the weird way that the pairwise Energy is computed, this
-    // is how we get results that correspond to what would be given by
-    // binarizing the estimates, and using the compute_energy function.
-    VectorXf total_energy = unary -2* pairwise;
+    VectorXf total_energy = unary + pairwise;
 
     assert( total_energy.rows() == N_);
     double ass_energy = 0;
@@ -5158,7 +5155,6 @@ double DenseCRF::assignment_energy_true( const VectorXs & l) const {
     for( int i=0; i< N_; ++i) {
         ass_energy += total_energy[i];
     }
-
     return ass_energy;
 }
 
