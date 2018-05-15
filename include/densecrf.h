@@ -37,12 +37,6 @@
 typedef std::pair<double, double> perf_measure;
 
 void expAndNormalize( MatrixXf & out, const MatrixXf & in);
-void sumAndNormalize( MatrixXf & out, const MatrixXf & in, const MatrixXf & Q);
-void normalize(MatrixXf & out, const MatrixXf & in);
-
-void get_limited_indices(MatrixXf const & Q, std::vector<int> & indices);
-MatrixXf get_restricted_matrix(MatrixXf const & in, std::vector<int> const & indices);
-MatrixXf get_extended_matrix(MatrixXf const & in, std::vector<int> const & indices, int max_rows);
 void less_confident_pixels(std::vector<int> & indices, const MatrixXf & Q, float tol = 0.99);
 
 class LP_inf_params {
@@ -86,13 +80,11 @@ protected:
 	// Store the unary term
 	UnaryEnergy * unary_;
 
-	//store the super pixel term
-	Matrix<float, Dynamic, Dynamic> super_pixel_classifier_;
+    //store the z labels
 	Matrix<float, Dynamic, Dynamic> z_labels_;
 
 	std::vector<std::vector<double>> super_pixel_container_; //is a vector of super pixels which holds a vector of pixel locations for that super pixel
 	std::vector<int> pixel_to_regions_;
-
 
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
@@ -114,10 +106,7 @@ protected:
 	float multiplyDecompSuperPixels(const MatrixXf & p1, const MatrixXf & p2, int reg) const;
 	MatrixXf multiplySuperPixels(const MatrixXf & p) const;
 	MatrixXf multiplyDecompSuperPixels(const MatrixXf & p, int reg) const; //used for the DCneg case
-
-
 	void computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const;
-	void initUu(MatrixXf & u, double constant) const;
 
 public:
 	// Create a dense CRF model of size N with M labels
@@ -133,10 +122,6 @@ public:
 
 	// Add your own favorite pairwise potential (ownership will be transfered to this class)
 	void addPairwiseEnergy( PairwisePotential* potential );
-
-    // set potts compatibility weight such that ratio *  unary enegy = pairwise energy (given Q)
-	void setPairwisePottsWeight(float ratio, const MatrixXf & Q);
-
 	// Set the unary potential (ownership will be transfered to this class)
 	void setUnaryEnergy( UnaryEnergy * unary );
 	// Add a constant unary term
@@ -147,134 +132,39 @@ public:
 	int setSuperPixelEnergy( const unsigned char * img);
 	UnaryEnergy* getUnaryEnergy();
 
-
 	MatrixXf unary_init() const;
-	MatrixXf uniform_init() const;
-	// Run inference and return the probabilities
-	MatrixXf inference(const MatrixXf & init,  int n_iterations ) const;
-	MatrixXf inference(const MatrixXf & init) const;
-	std::vector<perf_measure> tracing_inference(MatrixXf & init, double time_limit = 0) const;
 
-	// Run the energy minimisation on the QP
-	// First one is the Lafferty-Ravikumar version of the QP
-	MatrixXf qp_inference(const MatrixXf & init) const;
-	MatrixXf qp_inference(const MatrixXf & init, int nb_iterations) const;
-	std::vector<perf_measure> tracing_qp_inference(MatrixXf & init, double time_limit = 0) const;
-
-	//===============================================================
-	//The following definitions are for Tom Joys 4YP which computes the QP with a non convex function and with super pixel terms
-	MatrixXf qp_inference_non_convex(const MatrixXf & init) const;
-	MatrixXf qp_inference_super_pixels(const MatrixXf & init);
-	MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init);
-	std::vector<perf_measure> tracing_qp_inference_non_convex(MatrixXf & init, double time_limit = 0) const;
-    std::vector<perf_measure> tracing_qp_inference_super_pixels_non_convex(MatrixXf & init, double time_limit = 0);
-	//===============================================================
-
-	// Second one is the straight up QP, using CCCP to be able to optimise shit up.
-    MatrixXf qp_cccp_inference(const MatrixXf & init) const;
-	std::vector<perf_measure> tracing_qp_cccp_inference(MatrixXf & init, double time_limit =0) const;
-	// Third one the QP-cccp defined in the Krahenbuhl paper, restricted to concave label compatibility function.
-	MatrixXf concave_qp_cccp_inference(const MatrixXf & init) const;
-	std::vector<perf_measure> tracing_concave_qp_cccp_inference(MatrixXf & init, double time_limit = 0) const;
-    //for the super pixel implementation
-	MatrixXf concave_qp_sp_cccp_inference(const MatrixXf & init) const;
-    std::vector<perf_measure> tracing_concave_qp_sp_cccp_inference(MatrixXf & init, double time_limit = 0) const;
-
+    const MatrixXf qp_inference_super_pixels_non_convex(const MatrixXf & init);
 	// Run the energy minimisation on the LP
-    MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad, bool full_mat = false) const;
-    MatrixXf lp_inference_new(MatrixXf & init) const;
-    MatrixXf lp_inference_prox(const MatrixXf &init, LP_inf_params & params) const;
-    MatrixXf lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
-    std::vector<perf_measure> tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
-    MatrixXf lp_inference_prox_restricted(MatrixXf & init, LP_inf_params & params) const;
-	std::vector<perf_measure> tracing_lp_inference(MatrixXf & init, bool use_cond_grad, double time_limit = 0, bool full_mat = false) const;
-	std::vector<perf_measure> tracing_lp_inference_prox(MatrixXf & init, LP_inf_params & params, 
-            double time_limit = 0, std::string out_file_name = "") const;
-    std::vector<perf_measure> tracing_lp_inference_prox_restricted(MatrixXf & init, LP_inf_params & params, 
-            double time_limit = 0) const;
-
-	// compare permutohedral and bruteforce energies (testing code only)
-    void compare_energies(MatrixXf & Q, double & ph_energy, double & bf_energy, 
-        bool qp=true, bool ph_old = false, bool subgrad = false) const;
-
-	// compare old (_dc) and new (_ord) permutohedral implementation for timing
-    std::vector<perf_measure> compare_lpsubgrad_timings(MatrixXf & Q, bool cmp_subgrad = false) const;
+    const MatrixXf lp_inference_prox_super_pixels(const MatrixXf & init, const LP_inf_params & params) const;
 
 	// Perform the rounding based on argmaxes
-	MatrixXf max_rounding(const MatrixXf & estimates) const;
-	// Perform randomized roundings
-	MatrixXf interval_rounding(const MatrixXf & estimates, int nb_random_rounding = 10) const;
+    MatrixXf max_rounding(const MatrixXf & estimates) const;
 
-	// Run the inference with gradually lower lambda values.
-	MatrixXf grad_inference(const MatrixXf & init) const;
+    VectorXs currentMap( const MatrixXf & Q ) const;
 
-	// Run the inference with cccp optimization
-	MatrixXf cccp_inference(const MatrixXf & init) const;
 
-	// Run MAP inference and return the map for each pixel
-	VectorXs map( int n_iterations ) const;
-
-	// Step by step inference
-	MatrixXf startInference() const;
-	void stepInference( MatrixXf & Q, MatrixXf & tmp1, MatrixXf & tmp2 ) const;
-	VectorXs currentMap( const MatrixXf & Q ) const;
-
-	// Learning functions
-	// Compute the gradient of the objective function over mean-field marginals with
-	// respect to the model parameters
-	double gradient( int n_iterations, const ObjectiveFunction & objective, VectorXf * unary_grad, VectorXf * lbl_cmp_grad, VectorXf * kernel_grad=NULL ) const;
 public: /* Debugging functions */
 	// Compute the unary energy of an assignment l
 	VectorXf unaryEnergy( const VectorXs & l ) const;
-
-	// Compute the pairwise energy of an assignment l (half of each pairwise potential is added to each of it's endpoints)
-	VectorXf pairwiseEnergy( const VectorXs & l, int term=-1 ) const;
 
     // compute true pairwise energy for LP objective given integer labelling
 	VectorXf pairwise_energy_true( const VectorXs & l, int term=-1 ) const;
 
 	// Compute the energy of an assignment l.
-	double assignment_energy( const VectorXs & l) const;
     double assignment_energy_higher_order( const VectorXs & l) const;
-
 
     // Compute the true energy of an assignment l -- actual energy (differs by a const to assignment_energy - in pairwise case)
 	double assignment_energy_true( const VectorXs & l) const;
-
-
-	// Compute the KL-divergence of a set of marginals
-	double klDivergence( const MatrixXf & Q ) const;
-
-    // KL-divergence between two probabilities KL(Q||P)
-    double klDivergence(const MatrixXf & Q, const MatrixXf & P) const;
-
-    // Compute the energy associated with the QP relaxation (const - true)
-    double compute_energy( const MatrixXf & Q) const;
-    double compute_energy_sp( const MatrixXf & Q) const;
-
-    // Compute the energy associated with the QP-CCCP relaxation (const - true)
-    double compute_energy_CCCP( const MatrixXf & Q) const;
 
     // Compute the true-energy associated with the QP relaxation
     double compute_energy_higher_order( const MatrixXf & Q) const;
 
     // Compute the energy associated with the LP relaxation
-    double compute_energy_LP(const MatrixXf & Q) const;
-
-    // Compute the energy associated with the LP relaxation
     double compute_energy_LP_higher_order(const MatrixXf & Q) const;
 
 	// Compute the value of a Lafferty-Ravikumar QP
-	double compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const;
-
-public: /* Parameters */
-	void compute_kl_divergence();
-	VectorXf unaryParameters() const;
-	void setUnaryParameters( const VectorXf & v );
-	VectorXf labelCompatibilityParameters() const;
-	void setLabelCompatibilityParameters( const VectorXf & v );
-	VectorXf kernelParameters() const;
-	void setKernelParameters( const VectorXf & v );
+    double compute_LR_QP_value(const MatrixXf & Q, const MatrixXf & diag_dom) const;
 
 };
 

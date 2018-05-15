@@ -337,7 +337,7 @@ void expAndNormalize ( MatrixXf & out, const MatrixXf & in ) {
 
 
 
-MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) {
+const MatrixXf DenseCRF::qp_inference_super_pixels_non_convex(const MatrixXf & init) {
     /*Here we compute the Frank Wolfe, to find the optimum of the cost function contatining super pixels
      * The cost function is: phi'.y + y'.psi.y + K[z + (1 - z){1'.theta.(1 - y)}]
      * where theta reprosents a compatibility matrix for the super pixel regions
@@ -523,7 +523,7 @@ void qp_gamma_multiplyC(VectorXf & v_out, const VectorXf & v_in, const int M, co
 }
 
 // LP inference with proximal algorithm
-MatrixXf DenseCRF::lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const {
+const MatrixXf DenseCRF::lp_inference_prox_super_pixels(const MatrixXf &init, const LP_inf_params &params) const {
     MatrixXf best_Q(M_, N_), tmp(M_, N_), tmp2(M_, N_);
     MatrixP dot_tmp(M_, N_);
     MatrixXi ind(M_, N_);
