@@ -183,7 +183,7 @@ public:
 	// Run the energy minimisation on the LP
     MatrixXf lp_inference(MatrixXf & init, bool use_cond_grad, bool full_mat = false) const;
     MatrixXf lp_inference_new(MatrixXf & init) const;
-    MatrixXf lp_inference_prox(MatrixXf & init, LP_inf_params & params) const;
+    MatrixXf lp_inference_prox(const MatrixXf &init, LP_inf_params & params) const;
     MatrixXf lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
     std::vector<perf_measure> tracing_lp_inference_prox_super_pixels(MatrixXf & init, LP_inf_params & params) const;
     MatrixXf lp_inference_prox_restricted(MatrixXf & init, LP_inf_params & params) const;
@@ -296,8 +296,7 @@ public:
 	//add a super pixel term, this function computes the super pixels using edison mean-shift algorithm
 	void addSuperPixel(std::string path_to_classifier,unsigned char * img, float constant, float normaliser);
 
-	
-    void addSuperPixel(unsigned char * img, int spatial_radius = 8, int range_radius = 4, int min_region_count = 2500, SpeedUpLevel = NO_SPEEDUP);
+    void addSuperPixel(unsigned char * img, int spatial_radius, int range_radius, int min_region_count, float constant, float normaliser);
 
 	// Set the unary potential for a specific variable
 	using DenseCRF::setUnaryEnergy;
