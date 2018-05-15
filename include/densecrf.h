@@ -29,10 +29,11 @@
 #include "unary.h"
 #include "labelcompatibility.h"
 #include "msImageProcessor.h"
-#include "objective.h"
 #include "pairwise.h"
 #include <vector>
 #include <utility>
+
+typedef Matrix<short,Dynamic,1> VectorXs;
 
 typedef std::pair<double, double> perf_measure;
 

@@ -8,12 +8,11 @@ if (OPENMP_FOUND)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-
 # Libraries
 add_library(eigen_utils eigen_utils.cpp)
 
-add_library(runibfs runibfs.cpp)
-target_link_libraries(runibfs ibfs)
+#add_library(runibfs runibfs.cpp)
+#target_link_libraries(runibfs ibfs)
 
 add_library(qp qp.cpp)
 
@@ -25,7 +24,5 @@ target_link_libraries(file_storage probimage color_to_label ${OpenCV_LIBS})
 add_executable(example_inference  example_inference.cpp)
 target_link_libraries(example_inference densecrf file_storage)
 
-add_executable(mean_shift_gen mean_shift_gen.cpp)
-target_link_libraries(mean_shift_gen mean-shift file_storage)
 
 

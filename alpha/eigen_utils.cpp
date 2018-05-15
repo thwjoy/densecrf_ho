@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 
+
 bool all_close_to_zero(const VectorXf & vec, float ref){
     for (int i = 0; i<vec.size() ; i++) {
         if(vec(i)> ref or vec(i)<-ref){
@@ -62,7 +63,6 @@ bool valid_probability_debug(const MatrixXf & proba){
     }
     return true;
 }
-
 
 
 typeP dotProduct(const MatrixXf & M1, const MatrixXf & M2, MatrixP & temp){
