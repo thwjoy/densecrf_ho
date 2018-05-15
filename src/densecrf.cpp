@@ -4893,21 +4893,21 @@ std::vector<perf_measure> DenseCRF::compare_lpsubgrad_timings(MatrixXf & Q, bool
     }
 
     renormalize(Q);
-	if (!valid_probability(Q)) {
-		std::cout << "Q is not a valid probability!" << std::endl;
-		exit(1);
-	}
-	
+    if (!valid_probability(Q)) {
+        std::cout << "Q is not a valid probability!" << std::endl;
+        exit(1);
+    }
+
     MatrixXf tmp(M_, N_), tmp2(M_, N_), rescaled_Q(M_, N_);
-	MatrixXi ind(M_, N_);
-	MatrixP dot_tmp;
+    MatrixXi ind(M_, N_);
+    MatrixP dot_tmp;
     MatrixXf old_grad(M_, N_), new_grad(M_, N_);
     old_grad.fill(0);
     new_grad.fill(0);
 
     std::vector<perf_measure> perfs;
 
-	// old-ph
+    // old-ph
     clock_t st, et;
     st = clock();
     sortRows(Q, ind);
@@ -4923,16 +4923,16 @@ std::vector<perf_measure> DenseCRF::compare_lpsubgrad_timings(MatrixXf & Q, bool
         st = clock();
         // old -ph
         no_norm_pairwise_[k]->apply_upper_minus_lower_dc(tmp2, ind);
-    	// need to sort before dot-product
-    	for(int i=0; i<tmp2.cols(); ++i) {
-        	for(int j=0; j<tmp2.rows(); ++j) {
-            	tmp(j, ind(j, i)) = tmp2(j, i);
-        	}
+        // need to sort before dot-product
+        for(int i=0; i<tmp2.cols(); ++i) {
+            for(int j=0; j<tmp2.rows(); ++j) {
+                tmp(j, ind(j, i)) = tmp2(j, i);
+            }
         }
         et = clock();
         double old_timing = (double)(et-st)/CLOCKS_PER_SEC + sort_time;
         old_grad -= tmp;
-        
+
         st = clock();
         // new ph
         pairwise_[k]->apply_upper_minus_lower_ord(tmp, rescaled_Q);
@@ -4942,9 +4942,9 @@ std::vector<perf_measure> DenseCRF::compare_lpsubgrad_timings(MatrixXf & Q, bool
 
         perfs.push_back(std::make_pair(old_timing, new_timing));
     }
-    	
+
     if (cmp_subgrad) {  // compare subgradients
-        // should be coliner 
+        // should be coliner
         MatrixXf diff = old_grad - new_grad;
         double costh = dotProduct(old_grad, new_grad, dot_tmp)/
             (sqrt(dotProduct(old_grad, old_grad, dot_tmp))*sqrt(dotProduct(new_grad, new_grad, dot_tmp)));
@@ -4973,84 +4973,7 @@ MatrixXf DenseCRF::max_rounding(const MatrixXf &estimates) const {
     return rounded;
 }
 
-MatrixXf DenseCRF::interval_rounding(const MatrixXf &estimates, int nb_random_rounding) const {
-    MatrixXf best_rounded;
-    double best_energy = 1e18;
 
-    MatrixXf rounded;
-    int assigned_labels;
-    int to_assign = estimates.cols();
-    double rounded_energy;
-
-    for (int it=0; it<nb_random_rounding; it++) {
-        rounded = MatrixXf::Zero(estimates.rows(), estimates.cols());
-        assigned_labels = 0;
-        std::vector<bool> assigned(to_assign, false);
-        while (assigned_labels < to_assign) {
-            int label_index = rand() % estimates.rows();
-            float interval = (float) rand()/ RAND_MAX;
-
-            for (int col=0; col < to_assign; col++) {
-                if (not assigned[col]) { // check that we need to assign something
-                    if (interval <= estimates(label_index, col)) { // check that this pixel should be assigned
-                        assigned[col] = true;
-                        assigned_labels++;
-                        rounded(label_index, col) = 1;
-                    }
-                }
-            }
-        }
-        rounded_energy = compute_energy(rounded);
-        if (rounded_energy < best_energy) {
-            best_energy = rounded_energy;
-            best_rounded = rounded;
-        }
-    }
-    return best_rounded;
-}
-
-
-
-MatrixXf DenseCRF::grad_inference(const MatrixXf & init) const {
-    MatrixXf Q( M_, N_ ), tmp1, unary( M_, N_ ), tmp2, old_Q(M_, N_), Q_prev_lambda(M_, N_);
-    unary.fill(0);
-    if( unary_ ) {
-        unary = unary_->get();
-    }
-    Q = init;
-
-    bool keep_decreasing_lambda = true;
-    float lambda = 1;
-    Q_prev_lambda = Q;
-    while(keep_decreasing_lambda){
-        lambda /= 1.1;
-
-        int count = 0;
-        bool keep_inferring = true;
-        old_Q = Q;
-        while(keep_inferring) {
-            tmp1 = -unary;
-            for( unsigned int k=0; k<pairwise_.size(); k++ ) {
-                pairwise_[k]->apply( tmp2, Q );
-                tmp1 -= tmp2;
-            }
-            tmp1 = (1/lambda) * tmp1;
-            expAndNormalize( Q, tmp1 );
-
-            float Q_change = (old_Q - Q).squaredNorm();
-            keep_inferring = (Q_change > 0.001);
-            old_Q = Q;
-            ++count;
-        }
-
-        float Q_lambda_change = (Q_prev_lambda - Q).squaredNorm();
-        keep_decreasing_lambda = (Q_lambda_change > 0.001);
-        Q_prev_lambda = Q;
-
-    }
-
-    return Q;
-}
 
 
 VectorXs DenseCRF::map ( int n_iterations ) const {
@@ -5548,7 +5471,7 @@ VectorXf DenseCRF::labelCompatibilityParameters() const {
             i += terms[k].rows();
         }
         return r;
-	}
+    }
 
     void DenseCRF::setKernelParameters( const VectorXf & v ) {
         std::vector< int > n;

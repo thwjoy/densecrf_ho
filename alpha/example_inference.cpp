@@ -75,7 +75,7 @@ void image_inference(std::string method,
     }
     else
     {
-        discretized_energy = crf.assignment_energy(crf.currentMap(Q));
+        discretized_energy = crf.assignment_energy_true(crf.currentMap(Q));
     }
     save_map(Q, size, path_to_results, "MSRC");
     std::cout << "# method: " << method << '\t' << discretized_energy << std::endl;
@@ -98,11 +98,12 @@ int main(int argc, char *argv[])
     std::string output = "./data/seg.png";
 
     //pairwise params
-    float spc_std = 3.0;
-    float spc_potts = 5.0;
+    float spc_std = 2.0;
+    float spc_potts = 3.0;
+    float bil_potts = 2.0;
     float bil_spcstd = 30.0;
-    float bil_colstd = 5.0;
-    float bil_potts = 10.0;
+    float bil_colstd = 8.0;
+
 
     if (argc == 7)
     {
