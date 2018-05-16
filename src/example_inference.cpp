@@ -29,9 +29,12 @@ void image_inference(std::string method,
     MatrixXf Q;
 
     img_size size = {-1, -1};
+
+
     //Load the unaries potentials for our image.
     MatrixXf unaries = load_unary(path_to_unaries, size);
     unsigned char * img = load_image(path_to_image, size);
+
 
     DenseCRF2D crf(size.width, size.height, unaries.rows());
     crf.setUnaryEnergy(unaries);
@@ -93,9 +96,9 @@ int main(int argc, char *argv[])
     }
 
     std::string method = argv[1];
-    std::string image = "./data/img.bmp";
-    std::string unaries = "./data/img.c_unary";
-    std::string output = "./data/seg.png";
+    std::string image = "../data/img.bmp";
+    std::string unaries = "../data/img.c_unary";
+    std::string output = "../data/seg.png";
 
     //pairwise params
     float spc_std = 2.0;
@@ -103,7 +106,6 @@ int main(int argc, char *argv[])
     float bil_potts = 2.0;
     float bil_spcstd = 30.0;
     float bil_colstd = 8.0;
-
 
     if (argc == 7)
     {

@@ -825,7 +825,7 @@ void DenseCRF::computeUCondGrad(MatrixXf & Us, const MatrixXf & Q) const {
             }
         }
         Us(min_lab_ind,min_ind) = constants_[reg] * exp_of_superpixels_(reg);
-        Us(max_lab_ind,max_ind) = -constants_[reg] * exp_of_superpixels_(reg);              
+        Us(max_lab_ind,max_ind) = -constants_[reg] * exp_of_superpixels_(reg);
     }  
 }
 
