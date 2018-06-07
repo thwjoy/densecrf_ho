@@ -1,4 +1,4 @@
-include_directories( ../external/liblbfgs/include ../external/ )
+include_directories(../external/ )
 include_directories(../alpha)
 add_subdirectory(mean-shift)
 
